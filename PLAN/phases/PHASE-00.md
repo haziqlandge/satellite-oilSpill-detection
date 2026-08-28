@@ -1,5 +1,11 @@
 # PHASE-00 — Scaffold, environment, research corpus
 
+> **Superseded in part, 2026-08-28.** This phase is **complete**, but the database
+> decision changed after it shipped: the project now uses **Supabase** (hosted Postgres +
+> PostGIS), not a local Docker container. The `docker-compose.yml` and PostGIS references
+> below record what was built at the time. For current setup follow
+> `scripts/SETUP_DATABASE.md`. Docker is still used for the SNAP container in PHASE-01.
+
 ## Objective
 A working development environment, repository skeleton, database, and the persistent
 research corpus, such that any later session can resume from `HANDOFF.md` alone.

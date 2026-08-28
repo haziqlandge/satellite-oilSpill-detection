@@ -4,10 +4,10 @@
 
 | Item | Version / note | Used by |
 |---|---|---|
-| Python | 3.11 (OpenDrift and geospatial stack are best-tested here) | everything |
+| Python | **3.12** (3.11 unavailable locally; 3.13+ unsupported by the stack) | everything |
 | uv or Poetry | dependency management | everything |
-| Docker + docker-compose | PostGIS, and containerising SNAP | Phase 0, 1 |
-| PostgreSQL + **PostGIS** | 16 + PostGIS 3.4 | Phase 0 onward |
+| Docker + docker-compose | Containerising SNAP only; **no longer used for the database** | Phase 1 |
+| **Supabase project** | Hosted Postgres + PostGIS, named `oilSpill-Detect` | Phase 0 onward |
 | Node.js | 20 LTS | Phase 7 |
 | Git | — | Phase 0 |
 | CUDA toolkit + NVIDIA driver | matching the local GPU | Phase 2 |
@@ -41,6 +41,7 @@ it is the most common early blocker in SAR projects.
 
 | Account | For | Cost | Notes |
 |---|---|---|---|
+| **Supabase** (`supabase.com`) | Hosted Postgres + PostGIS | Free tier (500 MB) | Project **`oilSpill-Detect`**. Create manually - the Supabase MCP connector is not installed. See `scripts/SETUP_DATABASE.md` |
 | **Copernicus Data Space Ecosystem** (`dataspace.copernicus.eu`) | Sentinel-1 GRD | Free | SciHub is dead — do not use `sentinelsat` against it |
 | **Copernicus Marine Service** (`marine.copernicus.eu`) | CMEMS currents | Free | OpenDrift reads credentials from env vars or `.netrc` |
 | CDS / ECMWF (`cds.climate.copernicus.eu`) | ERA5 wind | Free | Alternative: NOAA GFS, no account needed |
@@ -53,7 +54,8 @@ COPERNICUSMARINE_SERVICE_PASSWORD=
 CDSE_CLIENT_ID=
 CDSE_CLIENT_SECRET=
 CDSAPI_KEY=
-DATABASE_URL=postgresql+psycopg://oilspill:oilspill@localhost:5432/oilspill
+DATABASE_URL=postgresql+psycopg://postgres:<password>@db.<ref>.supabase.co:5432/postgres?sslmode=require
+DB_CONNECT_TIMEOUT=15
 ```
 
 ## Required — datasets
@@ -91,8 +93,14 @@ Full details and URLs in `RESEARCH/topics/datasets-and-data-access.md`.
    `scihub.copernicus.eu` is stale. Use CDSE or AWS.
 2. **Request MKLab on day one** — request-gated datasets have long lead times, and it is the
    one dependency we cannot accelerate.
-3. **Cache all met-ocean forcing early.** CMEMS auth/quota is the single most likely
-   live-demo failure. The demo must run with the network unplugged.
-4. **Do not install SNAP natively on Windows.** Containerise it.
-5. **The Zenodo masks are binary**; our class scheme needs two foreground classes. Budget a
+3. **Cache all met-ocean forcing early.** CMEMS auth/quota is a likely live-demo failure.
+   Note the demo is no longer offline by default (the database is hosted); C12 requires a
+   local snapshot fallback instead. See `PLAN/phases/PHASE-09.md`.
+4. **Do not install SNAP natively on Windows.** Containerise it. Docker is still needed for
+   this, just not for the database.
+5. **Use Supabase's direct connection for migrations**, not the transaction pooler on 6543:
+   the pooler has no prepared statements and alembic needs them.
+6. **Clip AIS to the AOI and time window before insert.** Free tier is 500 MB and
+   `ais_points` is what will exhaust it.
+7. **The Zenodo masks are binary**; our class scheme needs two foreground classes. Budget a
    relabelling pass — see PHASE-01 and PHASE-02. This is the largest hidden cost in the plan.

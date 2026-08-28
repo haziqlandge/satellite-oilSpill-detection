@@ -27,6 +27,17 @@ class Settings(BaseSettings):
         default="postgresql+psycopg://oilspill:oilspill@localhost:5432/oilspill",
         alias="DATABASE_URL",
     )
+    # The database is hosted (Supabase), so this is a network round trip rather
+    # than a local socket. 3 s was right for localhost and spuriously fails
+    # against a remote instance, especially one waking from free-tier pause.
+    db_connect_timeout: int = Field(default=15, alias="DB_CONNECT_TIMEOUT")
+
+    # Supabase REST endpoint + publishable key. Consumed by the PHASE-07
+    # frontend, not by the pipeline, which talks to Postgres directly. The
+    # service_role key is deliberately absent: it bypasses RLS and nothing
+    # here needs it.
+    supabase_url: str = Field(default="", alias="SUPABASE_URL")
+    supabase_publishable_key: str = Field(default="", alias="SUPABASE_PUBLISHABLE_KEY")
 
     # --- external services (see PLAN/PREREQUISITES.md) ---
     cdse_client_id: str = Field(default="", alias="CDSE_CLIENT_ID")
@@ -42,7 +53,9 @@ class Settings(BaseSettings):
 
     # --- runtime ---
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
-    force_cpu: bool = Field(default=True, alias="FORCE_CPU")
+    # Debug override only. An unusable GPU is *detected* in backend/device.py,
+    # so moving between machines needs no configuration change.
+    force_cpu: bool = Field(default=False, alias="FORCE_CPU")
 
     @property
     def raw_dir(self) -> Path:

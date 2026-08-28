@@ -50,6 +50,8 @@ not do.
 | Compute | Local NVIDIA GPU for training |
 | Regions | **Dual** — Gulf of Mexico (real AIS, published ground truth) + Indian waters (synthetic AIS demo) |
 | Stack | FastAPI + PostGIS backend; React + MapLibre + deck.gl frontend |
+| Database hosting | **Supabase** (`oilSpill-Detect`), decided 2026-08-28. Trade-offs in `scripts/SETUP_DATABASE.md` |
+| Training machine | RTX 4060 Ti, 16 GB. See PHASE-02 for batch sizing |
 
 ## Documents
 
@@ -58,7 +60,7 @@ not do.
 | **ARCHITECTURE.md** | System diagram, data flow, components, technology choices, deployment, explicit non-goals |
 | **PREREQUISITES.md** | Software, packages, accounts, datasets (required vs optional), hard-won install notes |
 | **INTERFACES.md** | Pipeline stage signatures, core data schemas, REST API, external contracts, AIS schema, weights manifest |
-| **CONSTRAINTS.md** | 11 scientific-integrity constraints (C1–C11), data/technical constraints, performance targets, scope boundaries, ethical constraints |
+| **CONSTRAINTS.md** | 12 scientific-integrity constraints (C1–C12), data/technical constraints, performance targets, scope boundaries, ethical constraints |
 | **EVALUATION.md** | Metrics and targets per stage, the three ground-truth fixtures, what we will not claim |
 
 ## Phases
@@ -95,6 +97,12 @@ coinciding with free real AIS** — the reason for the dual-region choice.
 Only a backward-drift field reaching the berth at the right time can rank it correctly.
 Solving it demonstrates something neither the literature nor the operational reference
 implementation does.
+
+## Parallel track
+
+`frontDemo/` is a five-direction landing-page layout study (Vite + React + anime.js). It is
+design exploration feeding **PHASE-07**, not PHASE-07 itself, and it is owned by a separate
+session. See `frontDemo/README.md`. Do not edit it from the backend track.
 
 ## Reading rule
 

@@ -70,7 +70,8 @@ differences** in particular.
 1. **Seed** N particles sampled inside the detected slick polygon (instance mask, not a
    bounding box — hence the need for instance segmentation). Optionally weight the sampling
    by damping ratio, so thicker/fresher parts of the slick contribute more.
-2. **Run backward** with negative `time_step` over a 0–48 h horizon.
+2. **Run backward** with negative `time_step` over a **0–72 h** horizon (raised from
+   48 h: P004 Case 3's source moored ~53 h before acquisition and a 48 h window misses it).
 3. **Ensemble** over the dominant uncertainties:
    - wind drift factor (~0.02–0.04, the standard range)
    - horizontal diffusivity
@@ -104,7 +105,7 @@ These must be surfaced in the UI, not hidden:
 | Limit | Why | Handling |
 |---|---|---|
 | **Reversal is not information recovery.** Diffusion is irreversible; running a diffusive process backward spreads the cloud rather than focusing it. | Physics | The origin field legitimately widens with backward time. Report it; do not tune it away. |
-| Beyond ~24–48 h the field may be too diffuse to discriminate candidates | Accumulated forcing error + diffusion | Degrade gracefully to **"origin window too diffuse to attribute"** rather than forcing a suspect. This is a required behaviour, not a failure. |
+| Beyond ~48–72 h the field may be too diffuse to discriminate candidates | Accumulated forcing error + diffusion | Degrade gracefully to **"origin window too diffuse to attribute"** rather than forcing a suspect. This is a required behaviour, not a failure. |
 | Forcing resolution (CMEMS ~1/12 deg) is coarser than slick scale | Data | Widens the field; acknowledged in the uncertainty interval |
 | Surface currents + Stokes drift + windage are all approximations | Model | Ensemble over wind drift factor covers the dominant term |
 | Weathering changes the particle's drift response over time | Physics | OpenOil models it; accept its defaults |

@@ -44,9 +44,43 @@ Base: `ultralytics` YOLOv8-seg or YOLO11-seg. Three modifications from P004 §2.
 - **SAHI** at inference for full-scene processing.
 
 ### Training (P004 §2.7)
-`epochs=100, batch=32, imgsz=1024, lr=0.01, workers=8`, official defaults otherwise —
-P004 deliberately avoided tuning so the architecture is what is being measured. We match
-that so our ablation is comparable to theirs.
+`epochs=100, imgsz=1024, lr=0.01, workers=8`, official defaults otherwise — P004
+deliberately avoided tuning so the architecture is what is being measured. We match that so
+our ablation is comparable to theirs.
+
+**Batch size is detected, not hard-coded.** `backend/device.py` resolves the device and
+derives a starting batch from actual VRAM, so the repository moves between machines with no
+edit. `python -m backend.cli doctor` prints what it would use.
+
+| GPU class | VRAM | Starting batch | Accumulate to nbs=32 |
+|---|---|---|---|
+| RTX 4090 (the paper's card) | 24 GB | 32 | x1 |
+| **RTX 4060 Ti** | 16 GB | 12 | x2 |
+| **RTX 5070 Ti laptop** | 12 GB | 8 | x4 |
+| anything under 8 GB | - | will not train | - |
+
+These are **starting points, not measured limits.** Confirm on the first run and raise if
+there is headroom. `nbs=32` keeps the *effective* batch at 32 on every machine, so the
+ablation stays comparable to Zhao et al. Table 1 regardless of which box ran it.
+
+**Record the physical batch actually used** in `ml/ablation/results.md`, and note if you
+switched machines mid-grid: an unreported batch change invalidates the comparison, and a
+grid split across two GPUs is only comparable because of the accumulation, not in spite of it.
+
+**Blackwell caveat (5070 Ti).** RTX 50-series is compute capability sm_120. Older CUDA
+wheels (cu124 and earlier) may not ship kernels for it and fail at runtime with "no kernel
+image is available for execution on the device". If you move to that laptop, install a
+CUDA 12.8+ build and verify before trusting a long run:
+
+```bash
+python -c "import torch; print(torch.cuda.get_device_capability(0)); print(torch.zeros(1).cuda())"
+```
+
+**Wall-clock.** Twelve runs at 100 epochs is likely days, not hours, on either card: the
+4060 Ti has roughly a quarter of the 4090's memory bandwidth and the 12 GB laptop is slower
+still under thermal limits. Agree a plan with the user
+before committing the compute. Suggested: screen all twelve at ~60 epochs to rank variants,
+then full-train the top two plus the baseline, and record that this is what was done.
 
 ### Augmentation
 **Mirroring only** (horizontal + vertical), as P004 used. **No rotation** — it invalidates

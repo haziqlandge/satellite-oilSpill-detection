@@ -1,70 +1,179 @@
-# Setting up PostGIS
+# Database setup - Supabase
 
-The plan assumed Docker. Docker is **not installed on this machine**, so the two
-supported routes are below. PostGIS is not needed until PHASE-01 — the PHASE-00 scaffold
-and its tests run without it.
+**Decision, 2026-08-28:** the project uses **Supabase** (hosted Postgres + PostGIS) instead
+of a local PostgreSQL or Docker container. User's call, made with the trade-offs below on
+the table.
 
-Verify either route with:
+Supabase is Postgres, so the schema in `backend/db/models.py` and the alembic baseline
+transfer essentially unchanged. PostGIS is available as an extension.
+
+---
+
+## 1. The project already exists
+
+Created 2026-08-28 via the Supabase MCP connector. **Do not create a second one.**
+
+| Field | Value |
+|---|---|
+| Name | **`oilSpill-Detect`** |
+| Project ref | `hbctpozvofhxlioywcjw` |
+| Organisation | ACM (`jpeeoezyysgtfndmxozv`) |
+| Region | `ap-south-1` (Mumbai) |
+| Postgres | 17.6 |
+| PostGIS | 3.3 (enabled, `USE_GEOS=1 USE_PROJ=1`) |
+| Cost | Free tier, $0/month |
+| Database host | `db.hbctpozvofhxlioywcjw.supabase.co` |
+
+**You still need to set the database password.** The project was created through the API,
+which does not surface one. In the dashboard go to
+**Project Settings > Database > Database password > Reset database password**, generate one,
+and save it in a password manager. That is the password for the `postgres` role in the
+connection string below.
+
+## 2. PostGIS is already enabled
+
+Done at creation. Verify any time with:
+
+```sql
+select postgis_version();
+```
+
+`extensions` is already on the `search_path` for this project
+(`"$user", public, extensions`), so geometry types resolve without extra configuration.
+
+## 3. Get the connection string
+
+Dashboard: **Project Settings > Database > Connection string > URI**.
+
+Supabase offers more than one, and **the difference matters**:
+
+| Connection | Port | Use for |
+|---|---|---|
+| **Direct** (`db.<ref>.supabase.co`) | 5432 | **Alembic migrations, bulk ingest** |
+| **Session pooler** (Supavisor) | 5432 | Long-lived app connections |
+| **Transaction pooler** (Supavisor) | 6543 | Short serverless queries |
+
+**Use the direct connection (or session pooler) for migrations.** The transaction pooler
+does not support prepared statements, and both alembic and psycopg3 rely on them; pointing
+alembic at port 6543 fails in confusing ways.
+
+Copy the URI exactly from the dashboard - do not hand-assemble the hostname.
+
+## 4. Configure the project
+
+In `.env` (git-ignored), convert the URI to the psycopg3 driver form by replacing the
+`postgresql://` scheme with `postgresql+psycopg://`, and append `sslmode=require`:
+
+```
+DATABASE_URL=postgresql+psycopg://postgres:<password>@db.hbctpozvofhxlioywcjw.supabase.co:5432/postgres?sslmode=require
+DB_CONNECT_TIMEOUT=15
+```
+
+`DB_CONNECT_TIMEOUT` defaults to 15 s for a remote database. The local-Postgres default of
+3 s was tuned for a socket on the same machine and will spuriously fail against Supabase,
+especially on a free-tier project waking from pause.
+
+URL-encode any special characters in the password (`@` becomes `%40`, and so on).
+
+## 5. Apply the schema
+
+```bash
+.venv/Scripts/python.exe -m alembic upgrade head
+```
+
+Then verify:
 
 ```bash
 .venv/Scripts/python.exe -m backend.cli doctor
 ```
 
----
-
-## Route A — native Windows install (recommended here, no Docker)
-
-1. Install **PostgreSQL 16** from the EDB installer:
-   <https://www.enterprisedb.com/downloads/postgres-postgresql-downloads>
-   Keep the default port `5432`. Remember the `postgres` superuser password.
-
-2. At the end of the installer, launch **Stack Builder** and install
-   **Spatial Extensions → PostGIS 3.4 Bundle**. If you skipped it, re-run
-   `"C:\Program Files\PostgreSQL\16\bin\stackbuilder.exe"`.
-
-3. Create the role and database:
-
-```bash
-"/c/Program Files/PostgreSQL/16/bin/psql" -U postgres -c "CREATE ROLE oilspill LOGIN PASSWORD 'oilspill';"
-```
-
-```bash
-"/c/Program Files/PostgreSQL/16/bin/psql" -U postgres -c "CREATE DATABASE oilspill OWNER oilspill;"
-```
-
-```bash
-"/c/Program Files/PostgreSQL/16/bin/psql" -U postgres -d oilspill -c "CREATE EXTENSION postgis;"
-```
-
-4. Confirm, then apply migrations:
-
-```bash
-.venv/Scripts/python.exe -m alembic upgrade head
-```
+`doctor` should report the database as ok with a PostGIS version.
 
 ---
 
-## Route B — Docker (if you install it later)
+## Trade-offs accepted with this choice
 
-`docker-compose.yml` in the repo root is ready to use:
+Recorded so nobody rediscovers these as surprises. These are real and were raised before
+the decision; the decision stands, and these are the mitigations.
 
-```bash
-docker compose up -d postgis
-```
+### The demo is no longer offline-capable by default
 
-```bash
-.venv/Scripts/python.exe -m alembic upgrade head
-```
+PHASE-09 originally required the whole demo to run with networking disabled, because
+network dependence is the most common way a live demo dies. With a hosted database that
+guarantee is gone: venue wifi failing now takes out the entire demo, not just live data.
+
+**Mitigation, to build in PHASE-09:** export the demo result set to a local SQLite or
+Postgres snapshot and add a `DEMO_OFFLINE=1` path that reads from it. The result set after
+PHASE-08 is small (scenes, detections, drift contours, ranked candidates), so this is
+cheap. See `PLAN/phases/PHASE-09.md`.
+
+### Storage ceiling versus AIS volume
+
+marinecadastre daily national files run to millions of rows. Free tier is **500 MB**; Pro
+is **8 GB**. `ais_points` is the table that will hit this first.
+
+**Mitigations:**
+- Clip AIS to the **AOI bounding box and the acquisition time window** at ingest, before
+  insert. We only ever query traffic near a detection, so nationwide rows are dead weight.
+- Keep raw AIS CSVs on local disk under `data/raw/`; only load the clipped subset.
+- Watch table size in the dashboard; `ais_points` is the one to check.
+
+### Bulk ingest is slower over the network
+
+Local `COPY` runs at disk speed. The same insert to a hosted instance is bound by
+bandwidth and round trips.
+
+**Mitigation:** use `COPY ... FROM STDIN` through psycopg's `cursor.copy()` rather than
+row-by-row `INSERT`, and batch. Clipping first (above) is what makes this tractable.
+
+### Free-tier projects pause
+
+A free Supabase project pauses after about a week of inactivity and must be resumed from
+the dashboard. If `doctor` reports a connection timeout after a quiet period, check the
+dashboard before debugging anything else.
+
+### Tables become reachable through the auto-generated REST API
+
+This did not exist with a local Postgres and is easy to miss. Supabase runs PostgREST over
+the `public` schema, so our tables sit in a schema that **can** be reached over HTTPS.
+
+Two separate gates decide whether they actually are:
+
+1. **Table exposure** - whether the `anon` / `authenticated` roles have been granted access.
+   Depending on the project's Data API settings, newly created tables are not always
+   exposed automatically, and may need an explicit `GRANT`.
+2. **Row-level security** - which rows are visible *once* a table is reachable.
+
+Do not rely on gate 1 staying shut. Enable RLS on every table in `public` regardless, as
+defence in depth, **before loading any real data**:
+
+- **Enable RLS with no policies** on every table. With RLS on and no policy, the default
+  is deny-all:
+  ```sql
+  alter table public.ais_points enable row level security;
+  ```
+  Repeat per table. The `postgres` role the pipeline connects as bypasses RLS, so ingest
+  and querying are unaffected.
+- **Or** move the pipeline tables into a schema that is not exposed (Settings > API >
+  Exposed schemas) and point alembic at it. Cleaner, since none of this data is meant to
+  be served to browsers directly.
+
+Check the project's current setting at **Dashboard > Integrations > Data API > Settings**
+before assuming either way.
+
+Run `get_advisors` (security) after `alembic upgrade head` - it flags exactly this.
+
+### Secrets
+
+`DATABASE_URL` now contains a real password to a hosted service. It lives in `.env`, which
+is git-ignored, and must not be committed, pasted into an issue, or included in a shared
+zip. Rotate it from the dashboard if it leaks.
 
 ---
 
-## Notes
+## Superseded
 
-- `DATABASE_URL` in `.env` is the single source of truth for the connection string —
-  `alembic.ini` reads it from there, so there is nothing to keep in sync.
-- `backend/db/session.py` sets `connect_timeout=3`. Without it, psycopg retries every
-  address `localhost` resolves to (`::1`, then `127.0.0.1`) on a very long default, and a
-  probe against an absent server blocks for **over four minutes** — which is what it did
-  before the timeout was added.
-- Tests marked `integration` skip automatically when no database is reachable, so
-  `pytest` stays green either way.
+`docker-compose.yml` in the repository root still defines a `postgis` service. It is no
+longer the supported path and is kept only as a fallback if the Supabase decision is ever
+reversed. The `ingest` service in that file is still relevant - it exists for ESA SNAP, not
+for the database.

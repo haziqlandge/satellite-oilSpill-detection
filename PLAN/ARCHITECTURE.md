@@ -32,7 +32,7 @@ restating it. Research justification lives in `RESEARCH/SYNTHESIS.md` §3.
   CMEMS currents ───▶┌────────────────── DRIFT ────────────────────────┐
   ERA5/GFS wind ────▶│  OpenDrift OpenOil, N-member ensemble           │
                      │    seed: particles sampled inside instance mask │
-                     │    BACKWARD (negative time_step) 0–48 h         │
+                     │    BACKWARD (negative time_step) 0-72 h         │
                      │    FORWARD 0–72 h                               │
                      │  ⇒ origin_field P(lat,lon,t) + convergence      │
                      │  ⇒ age {low,best,high} + temporal state         │
@@ -109,7 +109,7 @@ weights that `backend/detect/` loads.
 
 | Choice | Rationale |
 |---|---|
-| **PostGIS** | Every core query is spatiotemporal ("AIS points inside this polygon between t0 and t1"). Doing this in pandas will not scale past one scene. Cerulean uses Postgres for the same reason |
+| **PostGIS on Supabase** | Every core query is spatiotemporal ("AIS points inside this polygon between t0 and t1"). Doing this in pandas will not scale past one scene; Cerulean uses Postgres for the same reason. Hosting moved to Supabase on 2026-08-28 (user decision) - see `scripts/SETUP_DATABASE.md` for the trade-offs accepted, chiefly the loss of a free offline demo and a 500 MB / 8 GB storage ceiling that forces AIS clipping at ingest |
 | **OpenDrift OpenOil** | `RESEARCH/topics/drift-modelling-and-hindcasting.md`. Physics is sound (P002); named by P004; native backward support |
 | **YOLO-seg + LSK(L5) + MPDIoU + SAHI** | `RESEARCH/SYNTHESIS.md` §3. Only family giving class + contour + small-object sensitivity + full-scene inference |
 | **CFAR for ships** | No labels needed; bright targets on a dark sea is the easy detection case |
