@@ -1,0 +1,100 @@
+SAR -> Synthetic Aperture Radar (SAR)
+it is used to detect images of oil spills etc.
+>works in all weather, day / night
+>scan huge area in single pass
+>it can detect even thin oil layers
+>Distinguishing Oil from Water: Oil smoothens surface roughness, appearing as dark patches in SAR images,
+helping differentiate it from seawater
+>integrates with other sensors like optical, thermal etc for better accuracy
+> LIMITS: Limitations &Challenges: Low-wind areas or natural biogenic films are very likely mistaken for oil spills. Further validation is
+required through optical imagery, drones, or in-situ sampling.
+
+Automatic Identification System (AIS)
+> tracking system adopted for vessels and vessel operations
+> position of the ship, speed, and course, among other
+vital information
+>  deviations from the course by the vessel, unexpected stops, or sudden reductions in speed
+> vessels can deliberately switch off
+their AIS transponders to avoid detection.
+
+A. Methods for using AIS for Oil Spills Tracking
+The AIS (Automatic Identification System) directly helps track oil spills by providing useful vessel movement data, which can then
+be analyzed, in order to suggest suspect sources of pollution. When integrated with satellite imagery and environmental modeling,
+AIS plays a crucial role in spill detection, investigation, and response. The following methods outline how AIS is used for oil spill
+tracking:
+1) Monitoring Ships and Collecting Data in Real Time
+Based on shipboard transponder data, the Automatic Identification System (AIS) provides continuous and real-time broadcast data
+on vessel identity, position, speed, heading, and type of cargo. The vessel movement data is thus collected by coastal stations,
+satellites, and ship-based receivers. Such monitoring helps authorities observe movements of those vessels with oil sensitive
+interests such as shipping channels, offshore oil drilling zones, and marine protected areas.
+2) Anomaly Detection for Identifying Potential Polluters
+Using analysis of the AIS data, different kinds of unusual behaviors of vessels can be tracked to suggest illegal oil discharge.
+Automatic notifications may issue for anomalies such as an unplanned sudden speed reduction, irregular deviation of course, or
+vessels stopping in prohibited areas. Likewise, vessels that shut off or deliberately would not transmit their AIS signals (AIS
+spoofing-like behaviors) while on the high seas may be regarded as high risks, so monitoring is heightened
+
+3) Cross-Referencing AIS with Remote Sensing
+Before pollution takes place, once oil pollution is confirmed through satellite observation, aerial survey, or reports from the field,
+then the recorded time and location of the spill are cross-checked against the AIS records by authorities to know which vessels were
+in the vicinity. Synthetic aperture radar (SAR)-derived images, thermal infrared imagery, and optical satellite imagery will confirm
+whether an AIS-traced vessel could be contributing to the pollution or not.
+4) Historical Analysis of AIS Data for Source Attribution
+Archival AIS data affords historical records of vessel movements and thus can provide evidence in determining if indeed a certain
+ship was accountable for a prior spill. By tracing the routes of ships to and from ports and identifying transferred cargo information,
+authorities could trace oil pollution back to the source. A clear advantage of this technique is when the spill in question is noted after
+a certain ship has already left the area.
+5) Predicting the Movement of Spills by the Integration of AIS and Oceanographic Data
+The oceanographic modeling integrated to predict the oil spills' trajectory or drift uses AIS data. According to this scheme, stabbing
+for the way of spills and what part of the coast they may strike could be estimated based on the provided wind, current, and wave
+data, along with ship traffic monitoring information. Such predictions facilitate fast reaction and containment options in upper cases.
+Data tracked by the Automatic Identification System is used as a basis for environmental investigations and in legal proceedings.
+When such vessels are suspected to be involved in oil pollution, authorities may inspect such records, examine former behaviors,
+and impose fines or penalties when there is evidence of illegal discharge. Therefore, by using evidence from AIS to enforce existing
+regulations, authorities are able to deter violations in the future and promote cleaner shipping practices. When aided by AIS data, an
+oil spill response can better coordinate by identifying vessels nearby that can assist with cleanup tasks. This enables response teams
+to quickly assess which ships are available, including oil recovery vessels or coast guard units, for deploying containment booms,
+skimmers, and dispersants to mitigate any environmental damage. In conclusion, AIS plays a critical role in oil spill tracking
+through the provision of real-time vessel monitoring, suspicious activity detection, identification of sources of spills, prediction of
+oil movement, and backtracking for legality enforcement. Conjoined with remote sensing, environmental modeling, and AI-built
+anomaly detection algorithms, AIS improves maritime safety and introduces a strong defense in protecting marine ecosystems
+against oil pollution.
+B. Ship Tracking or Vessel Tracking/AIS
+The Automatic Identification System is an important system applied in oil spill investigations, since it does not directly detect the oil
+itself. Instead, AIS details the history of vessel movements, which provides insight into safeguarding the identification of the spill
+source. If an oil slick is detected, investigators are able to use the information from the AIS system in reconstructing which ships
+moved through a particular area when this oil slick was present. The information broadcasted from the AIS system includes such
+data as the ship's identification, position, course, and speed, thus allowing the authorities to track which vessels were present and
+when they were there. Once this data is assessed, ships may be identified that could have been responsible, such as tankers or any
+other vessels carrying oil. Vessels that deviate from their given courses, come to a sudden stop, or display other unusual behavior
+are good candidates for suspicion. 
+Moreover, there is the necessity to combine the information from the AIS with some environmental information, such as ocean
+currents and wind patterns, in order to construct an improved model about how the oil spill may spread. This leads to a better
+prediction of the spill's trajectory, while also providing insight about where to put containment and cleanup efforts. AIS records
+serve as justification for any legal case against vessels responsible for oil spills, therefore, making it a key aspect of maritime
+enforcement. Simply put, AIS gives the background needed to explain vessel activity, which is necessary for the identification of
+possible sources and the tracking of oil spill impacts.
+C. Ship Tracking (AIS) in Oil Spill Detection
+1) The Automatic Identification System (AIS) is a system for locating ships designed to provide information about the position,
+speed, course, and identity of vessels in real time. Ships do the information transmission via VHF radio signals. The
+transponders always send this data to authorities, researchers, and organizations interested in monitoring vessel movements.
+2) A Simple Explanation on the Role of AIS in Oil Spill Detection: This is the part is where it raises the question of "How does
+AIS help in the Oil Spill Detection?" It would look deep into this question by highlighting oil spills sources of the Marine
+environment as one of its major foci.
+3) The Four-Step Process of Using AIS in Oil Spill Detection:
+Step 1: Vessel Movements Surveillance:
+Gathering AIS data from the vessels in the questionable region of the sea; Close monitoring of ships particularly transporting oil or
+other hazardous matters;Data included ship identification, type of ship, route history, speed and current status (anchored, moving,
+etc.).
+Step 2: Flagging anomalous behavior that would:
+Draw attention with sudden speed variations, curbing their course, etc., thus being suspected of illegal discharge; Attention is given
+to ships that purportedly turn off their AIS transponders in open waters to evade detection and may be dumping illegally.
+Step 3: In combination with remote sensing data:
+Once a satellite image identifies the oil slick (SAR or optical or thermal sensors), the position is overlaid on the corresponding AIS
+data to check what ships could be in them. If an oil slick is identified, the AIS data will also allow the historic record of this
+flapping boat to be made.
+Step 4: Confirming the oil spill and alerting authorities for real-time response:
+Once an oil spill is confirmed and the ship identified, real-time alerts are given to authorities to make quick action; Environmental
+agencies and Coast Guard employ AIS data as legal torque in investigating and punishing polluters. Integrated with remote sensing
+and artificial intelligence-based analytics, AIS can provide better oil spill detection and monitoring. This suitable collaboration
+brings about quick reactions, improved enforcement, and the protection of marine ecosystems from impending damages. Future
+developments in AI-based anomaly detection coupled with satellite surveillance will only increase the potential of AI.

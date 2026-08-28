@@ -1,0 +1,49 @@
+# --- data (never committed; see PLAN/PREREQUISITES.md for how to obtain) ---
+data/
+demo/data/
+*.SAFE/
+*.tif
+*.tiff
+*.nc
+*.zst
+*.zip
+
+# --- model weights ---
+weights/
+*.pt
+*.pth
+*.onnx
+
+# --- secrets ---
+.env
+.netrc
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- node ---
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# --- editors / os ---
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+
+# --- outputs ---
+runs/
+outputs/
+*.log

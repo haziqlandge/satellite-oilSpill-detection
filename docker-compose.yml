@@ -1,0 +1,39 @@
+# Optional. Docker is not installed on the current dev machine -- see
+# scripts/SETUP_DATABASE.md for the native Windows route.
+#
+# The `ingest` service exists because ESA SNAP / esa_snappy is a known install
+# hazard on Windows (PLAN/CONSTRAINTS.md); SAR pre-processing runs in Linux.
+
+services:
+  postgis:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: oilspill
+      POSTGRES_PASSWORD: oilspill
+      POSTGRES_DB: oilspill
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oilspill -d oilspill"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ingest:
+    build:
+      context: .
+      dockerfile: docker/ingest.Dockerfile
+    depends_on:
+      postgis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://oilspill:oilspill@postgis:5432/oilspill
+    volumes:
+      - ./data:/app/data
+      - ./backend:/app/backend
+    profiles: ["ingest"]
+
+volumes:
+  pgdata:
