@@ -25,11 +25,12 @@ trivially rebuilt.
 | NVIDIA driver | recent | Must expose CUDA 12.x for current PyTorch wheels |
 | Git | any | Optional if `.git/` was excluded |
 | **ESA SNAP** | 14 | SAR preprocessing. `winget install EuropeanSpaceAgency.SNAP`. Installs `gpt.exe` to `C:\Program Files\esa-snap\bin\`, which `preprocess.py` finds automatically; override with `SNAP_GPT` |
-| **Docker** | — | **No longer required.** Supabase replaced the PostGIS container, and SNAP is now driven natively via `gpt` (see `CONSTRAINTS.md`, amended 2026-08-29) |
+| **Docker** | — | **No longer required.** Supabase replaced the PostGIS container, and SNAP is driven natively via `gpt` (see `CONSTRAINTS.md`, amended 2026-08-29) |
 
-> **Disk:** budget ~15 GB. Torch alone unpacks to ~2.6 GB and the three fixture
-> `.SAFE` products are ~0.9 GB each. A torch install that dies mid-extract with
-> `os error 112` is a full disk, not a broken wheel.
+> **Disk:** budget ~15 GB for the environment alone. Torch unpacks to ~2.6 GB and the three
+> fixture `.SAFE` products are ~1.6 GB each. A torch install that dies mid-extract with
+> `os error 112` is a full disk, not a broken wheel. The Zenodo corpus needs a further
+> **91 GB** — read `HANDOFF.md` before starting any of it.
 
 Check Python is present:
 
@@ -100,19 +101,18 @@ create a second project.** You only need to:
 
 1. Get the database password from whoever set it, or reset it at
    Dashboard > Project Settings > Database
-2. Put the connection URI in `.env` as `DATABASE_URL`, scheme
-   `postgresql+psycopg://`, with `sslmode=require`
+2. Put the connection URI in `.env` as `DATABASE_URL`, scheme `postgresql+psycopg://`,
+   with `sslmode=require`
 
-> **The direct host is IPv6-only.** `db.<ref>.supabase.co` resolves to an AAAA
-> record and nothing else. On a machine or network without working IPv6 — check
-> with `Test-NetConnection ipv6.google.com -Port 443` — psycopg fails with
-> `failed to resolve host ... getaddrinfo failed`, which reads like a wrong
-> hostname but is not.
+> **The direct host is IPv6-only.** `db.<ref>.supabase.co` resolves to an AAAA record and
+> nothing else. On a machine or network without working IPv6 — check with
+> `Test-NetConnection ipv6.google.com -Port 443` — psycopg fails with
+> `failed to resolve host ... getaddrinfo failed`, which reads like a wrong hostname but
+> is not. This is what happened on the 4060 Ti desktop.
 >
-> Use the **session pooler** instead. It is IPv4, still on port 5432, and still
-> supports prepared statements, so alembic and psycopg3 both work (the *transaction*
-> pooler on 6543 does not, and remains off-limits). The username becomes
-> `postgres.<project_ref>`:
+> Use the **session pooler** instead. It is IPv4, still on port 5432, and still supports
+> prepared statements, so alembic and psycopg3 both work (the *transaction* pooler on 6543
+> does not, and remains off-limits). The username becomes `postgres.<project_ref>`:
 >
 > ```
 > DATABASE_URL=postgresql+psycopg://postgres.hbctpozvofhxlioywcjw:<password>@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require
@@ -156,18 +156,19 @@ reports 11 passed / 1 skipped, the database is not connected - revisit step 4.
 
 ### If rasterio raises `CRSError ... DATABASE.LAYOUT.VERSION.MINOR = 2`
 
-A PostgreSQL/PostGIS install sets **machine-level `PROJ_LIB` and `GDAL_DATA`**
-pointing at its own bundled PROJ database, which shadows the one rasterio and
-pyproj ship. It breaks every Python geospatial stack on the machine, not just
-this project. Clear both (elevated), then open a new shell:
+A PostgreSQL/PostGIS install sets **machine-level `PROJ_LIB` and `GDAL_DATA`** pointing at
+its own bundled PROJ database, which shadows the one rasterio and pyproj ship. It breaks
+every Python geospatial stack on the machine, not just this project. The same cause makes
+`crs.to_epsg()` return `None` for a perfectly valid EPSG:4326 product, which is a very
+convincing false alarm. Clear both (elevated):
 
 ```powershell
 [Environment]::SetEnvironmentVariable('PROJ_LIB', $null, 'Machine')
 [Environment]::SetEnvironmentVariable('GDAL_DATA', $null, 'Machine')
 ```
 
-Already-running shells keep the stale values in their own process environment,
-so verify in a **freshly launched** one.
+Already-running shells keep the stale values in their own process environment, so verify in
+a **freshly launched** one.
 
 ## 6. Start work
 
@@ -180,17 +181,41 @@ Do not touch `frontDemo/` - it belongs to the session on the other machine.
 
 ## Producing the zip (from the source machine)
 
-Exclude the three rebuilt directories:
-
-```bash
-tar --exclude='.venv' --exclude='node_modules' --exclude='dist' -czf oilSpill.tar.gz oilSpill/
-```
-
-PowerShell equivalent, if a `.zip` is required:
+Windows ships bsdtar at `C:\Windows\System32	ar.exe`, which writes zip directly:
 
 ```powershell
-Get-ChildItem -Path . -Recurse -Force | Where-Object { $_.FullName -notmatch '\\(\.venv|node_modules|dist)\\' } | Compress-Archive -DestinationPath ..\oilSpill.zip
+& "$env:SystemRoot\System32	ar.exe" -a -c -f ..\oilSpill-transfer.zip --exclude=".venv" --exclude="node_modules" --exclude="dist" --exclude=".env" --exclude="*.zip" --exclude=".mypy_cache" --exclude=".ruff_cache" --exclude=".pytest_cache" --exclude="__pycache__" --exclude="*.egg-info" .
 ```
 
-**Do not include `.env`.** It holds the Supabase password. `.env.example` is the file that
-travels; secrets are re-entered on the new machine.
+A correct archive is **under 1 MB** and about 350 entries. If it comes out at tens or
+hundreds of MB, something on the exclude list slipped through - list it and find the
+offender before sending:
+
+```powershell
+& "$env:SystemRoot\System32	ar.exe" -t -v -f ..\oilSpill-transfer.zip | Sort-Object { [int]($_ -split '\s+')[4] } -Descending | Select-Object -First 10
+```
+
+Why each exclusion:
+
+| Excluded | Reason |
+|---|---|
+| `.venv` | ~315 MB, and a Windows virtualenv bakes absolute paths - it cannot work elsewhere |
+| `node_modules`, `dist` | Large, and rebuilt by `npm install` / `npm run build` |
+| `*.zip` | **A previous archive left in the project folder gets swept into the next one.** This happened once and produced a 139 MB zip |
+| `.mypy_cache`, `.ruff_cache`, `.pytest_cache`, `__pycache__`, `*.egg-info` | Tool caches, regenerated on first run |
+| `.env` | **Holds the live Supabase password.** See below |
+
+`.git/` is deliberately kept: it is small (~0.5 MB) and preserves the history even though
+the transfer is not happening over git.
+
+### The `.env` problem
+
+`.env` is excluded because it contains a real database password, and a zip is easy to
+forward by accident. The new machine needs it, so carry it separately:
+
+1. Copy `.env.example` to `.env` on the new machine
+2. Paste the `DATABASE_URL` password from your password manager, or reset it at
+   Dashboard > Project Settings > Database
+3. Fill the Copernicus credentials as you obtain them
+
+`.claude/` **is** included - the next session needs `launch.json`.

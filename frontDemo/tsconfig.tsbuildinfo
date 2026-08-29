@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/content.ts","./src/main.tsx","./src/components/layoutswitcher.tsx","./src/components/texture.tsx","./src/layouts/deepwater.tsx","./src/layouts/dossier.tsx","./src/layouts/orbit.tsx","./src/layouts/signal.tsx","./src/layouts/terminal.tsx","./src/layouts/registry.ts","./src/lib/motion.ts"],"version":"5.9.3"}

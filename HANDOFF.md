@@ -10,8 +10,9 @@ machine - see "Start here" below. Do not rebuild it from scratch.
 
 ## If you are the new session: start here
 
-You own the **backend and ML pipeline, PHASE-01 onward**. `frontDemo/` belongs to a
-session on the other laptop and is not present in this tree - leave it alone.
+You own the **backend and ML pipeline, PHASE-01 onward**. **Do not work on `frontDemo/`** -
+it is a separate frontend layout study owned by the session on the other laptop, with its
+own README and its own open issues. Touching it will collide.
 
 **The environment is already set up and green.** Verify rather than rebuild:
 
@@ -71,7 +72,7 @@ on disk or a dataset, switch to PHASE-05 rather than idling.
 | **PHASE-00** | **Complete.** Committed as `a9eb695`, pushed |
 | **PHASE-01** | **In progress, uncommitted.** Ingest modules, SNAP graph, fixture data and 37 tests exist locally. See the breakdown below |
 | **PHASE-02 onward** | Not started |
-| **frontDemo/** | Separate track, on the other machine. Not present in this tree |
+| **frontDemo/** | Separate track, owned by the session on the other laptop. Committed in `6c1bc25`. Do not touch |
 | **Repository** | https://github.com/haziqlandge/satellite-oilSpill-detection (public, `main`) |
 
 ### PHASE-01 breakdown as of 2026-08-29
