@@ -20,6 +20,7 @@ under demo pressure. **Each is a correctness requirement, not a style preference
 | C9 | **Wind gate is a continuous multiplier, surfaced in the UI**, not a silent hard cut | Band edges are soft and regionally variable | Detections silently disappearing |
 | C10 | **Synthetic AIS ground truth is authored, never detector-derived** | P003's circularity | Auto-labelling with Isolation Forest then evaluating against it |
 | C11 | **Do not cite P003's metrics or P001 refs [1]–[3]** | Unreliable / unverified (`CITATION_GRAPH`) | "Prior work achieves 0.85 mIoU" in the deck |
+| C12 | **The demo must degrade gracefully without network** | Amended from "runs fully offline". The database is hosted, so a snapshot export plus a `DEMO_OFFLINE=1` read path is now the mechanism (PHASE-09). Venue wifi must not be a single point of failure | Discovering on demo day that nothing loads |
 
 ## Data constraints
 
@@ -30,14 +31,16 @@ under demo pressure. **Each is a correctness requirement, not a style preference
 | **Zenodo masks are binary**; our scheme needs 2 foreground classes | Requires a relabelling pass — **the largest hidden cost in the plan** (PHASE-01/02) |
 | **Krestenitis/MKLab is request-gated** | Cannot be a dependency. Request day one; proceed without it |
 | **CMEMS resolution ~1/12°** is coarser than slick scale | Widens the origin field; must be reflected in the uncertainty interval, not hidden |
-| **Forcing must be cached to local NetCDF** | Demo runs offline; CMEMS auth/quota is the top live-demo failure risk |
+| **Forcing must be cached to local NetCDF** | CMEMS auth/quota is a top live-demo failure risk |
+| **Database is hosted (Supabase)** | Decision 2026-08-28. The pipeline now requires network. See the amended offline rule below and `scripts/SETUP_DATABASE.md` |
+| **AIS must be clipped at ingest** | Supabase free tier is 500 MB / Pro 8 GB. Clip to the AOI bbox and acquisition window *before* insert; keep raw CSVs on local disk |
 
 ## Technical constraints
 
 | Constraint | Detail |
 |---|---|
 | **Geocoding error < 1 px round-trip** | P004 §2.3: geometric correction is what makes SAR↔AIS matching valid. Any error propagates straight into proximity scoring. Asserted in Phase 1 tests |
-| **SNAP must run in a Linux container** | `esa_snappy` on Windows is a known install hazard. Do not attempt native |
+| **SNAP must not be driven through `esa_snappy` on Windows** | **Amended 2026-08-29.** Originally "SNAP must run in a Linux container", justified by `esa_snappy` being a known Windows install hazard. That hazard is specific to the *Python bindings*. `graphs/s1_grd_preprocess.xml` is a **GPT graph** run by `gpt`, a plain Java CLI with no Python binding involved, so `backend/ingest/sar/preprocess.py` invokes it by subprocess natively (SNAP 14, `winget install EuropeanSpaceAgency.SNAP`). The intent — never fight `esa_snappy` on Windows — is preserved. **Reason for the change:** Supabase removed the database's need for Docker, Docker Desktop would not start on the training machine, and `docker/ingest.Dockerfile` had already been deleted, so a container bought nothing but a blocker. Revert to a container if a Linux runner ever becomes the target |
 | **SAHI required for full scenes** | S1 IW scenes are far larger than 1024 px; downscaling loses small slicks |
 | **Rotation augmentation forbidden on geocoded imagery** | Invalidates the pixel↔geo mapping. Mirroring only (as P004 used) |
 | **Weights must declare their class scheme** | `backend/detect` refuses mismatched weights (`INTERFACES.md` §6) |
@@ -54,6 +57,11 @@ under demo pressure. **Each is a correctness requirement, not a style preference
 | Frontend: AIS points rendered | 50k+ without stutter | Why deck.gl over Leaflet |
 
 Nothing expensive runs while a judge is watching. Phase 9 pre-seeds everything.
+
+**Amended 2026-08-28 (Supabase).** Every figure above now includes a network round trip to
+a hosted database. Query latency depends on region choice, and a free-tier project waking
+from pause can take seconds on the first connection. `DB_CONNECT_TIMEOUT` defaults to 15 s
+for this reason. Measure against the real instance before treating these targets as met.
 
 ## Scope boundaries — explicitly out
 

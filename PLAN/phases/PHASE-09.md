@@ -1,8 +1,14 @@
 # PHASE-09 — Demo packaging
 
 ## Objective
-Make the system demonstrable end-to-end with **no network dependency**, with a seeded
-database, a scripted walkthrough, and documentation that lets someone else run it.
+Make the system demonstrable end-to-end with a **network failure path**, a seeded database,
+a scripted walkthrough, and documentation that lets someone else run it.
+
+> **Amended 2026-08-28.** The original objective was "no network dependency". The database
+> is now hosted on Supabase (`scripts/SETUP_DATABASE.md`), so full offline operation is no
+> longer available for free. C12 replaces it: the demo must **degrade gracefully** when the
+> network is unavailable, which now takes deliberate work rather than falling out of the
+> architecture.
 
 ## Why it exists
 An SIH demo fails on infrastructure far more often than on substance. CMEMS auth, a CDSE
@@ -14,20 +20,31 @@ PHASE-07 (UI), PHASE-08 (validated results).
 
 ## Files to create
 ```
-scripts/seed_demo.py            populate PostGIS with pre-processed scenes + results
+scripts/seed_demo.py            populate Supabase with pre-processed scenes + results
+scripts/export_snapshot.py      dump the result set to a local offline snapshot
 scripts/verify_offline.py       assert the demo runs with networking disabled
+backend/db/snapshot.py          DEMO_OFFLINE=1 read path
 demo/WALKTHROUGH.md             the 3-minute script
-demo/data/                      cached scenes, forcing NetCDF, AIS extracts (git-ignored)
-docker-compose.demo.yml         pinned, offline-capable stack
+demo/data/                      snapshot, cached scenes, forcing NetCDF, AIS extracts
 README.md                       updated: setup, run, architecture diagram
 docs/architecture.png
 ```
 
 ## Implementation details
 
-### Pre-seed everything
-Run the full pipeline offline for every demo scene and persist results, so that at demo time
-the API only reads. Pre-seed:
+### Pre-seed everything, then snapshot it locally
+Run the full pipeline for every demo scene and persist results to Supabase, so that at demo
+time the API only reads. Then **export that result set to a local snapshot** and add a
+`DEMO_OFFLINE=1` path that reads from the snapshot instead of the network.
+
+The post-PHASE-08 result set is small (scenes, detections, drift contours, ranked
+candidates, evidence cards), so a local SQLite or file-backed snapshot is cheap. Slick and
+track geometry can be served as GeoJSON straight from disk.
+
+**Test the snapshot path with the network actually disabled, not by mocking it.** An
+untested fallback is not a fallback.
+
+Pre-seed:
 - the three P004 GoM fixture scenes (pre-processed σ0 tiles + COGs)
 - all five synthetic Indian-waters scenarios
 - cached CMEMS/ERA5 forcing NetCDF for every window
@@ -36,7 +53,8 @@ the API only reads. Pre-seed:
   scores and evidence cards
 
 `scripts/verify_offline.py` runs the demo with networking disabled and fails loudly if
-anything reaches for the network. **Run it as the last check before presenting.**
+any code path *other than the sanctioned snapshot reader* reaches for the network.
+**Run it as the last check before presenting.**
 
 ### The walkthrough — structure
 
@@ -80,7 +98,7 @@ demo running from it.
 
 ## Inputs / outputs
 - In: validated pipeline, evaluation results
-- Out: a seeded, offline, one-command demo + walkthrough + README
+- Out: a seeded database, a local snapshot, a one-command demo + walkthrough + README
 
 ## Relevant interfaces
 None new.
@@ -90,14 +108,15 @@ None new.
 
 ## Tests
 - `scripts/verify_offline.py` passes with networking disabled
-- `docker compose -f docker-compose.demo.yml up` reaches a working UI from a clean clone
+- The demo starts from a clean checkout with only `.env` supplied
 - Every walkthrough step executes in order without manual intervention
 - Cold-start time measured and recorded
 
 ## Acceptance criteria
-- [ ] Demo runs fully offline; `verify_offline.py` green
-- [ ] All three GoM fixtures and all five synthetic scenarios pre-seeded
-- [ ] `docker compose -f docker-compose.demo.yml up` works from a clean clone
+- [ ] Demo runs from the local snapshot with networking disabled; `verify_offline.py` green
+- [ ] Snapshot export is reproducible from a single command, not hand-assembled
+- [ ] All three GoM fixtures and all five synthetic scenarios pre-seeded in Supabase **and** present in the local snapshot
+- [ ] The demo starts from a clean checkout with only `.env` supplied
 - [ ] `demo/WALKTHROUGH.md` fits in 3 minutes and covers all five acts
 - [ ] The Case 3 `S_drift` term-ablation is runnable **live** from the UI or one command
 - [ ] `insufficient_evidence` appears at least once in the walkthrough
@@ -107,8 +126,10 @@ None new.
 ## Known failure conditions
 - Demo data size (SAR scenes + forcing NetCDF) is large → git-ignore `demo/data/`; ship via
   an archive or a download script, and document expected size.
-- Docker volume mounts differing on Windows vs Linux → test on the actual demo machine, not
-  only the dev machine.
+- Supabase free-tier projects pause after about a week idle. **Resume the project the day
+  before**, and rely on the snapshot if it will not wake.
+- Snapshot drifting out of sync with Supabase after a late pipeline re-run → re-export as
+  the final step, never as an early one.
 - GPU unavailable at the venue → detection results are pre-seeded, so the demo does not need
   a GPU. **Verify this explicitly** by running the demo with CUDA disabled.
 - Live term-ablation being slow → precompute both scorings and toggle between stored results.

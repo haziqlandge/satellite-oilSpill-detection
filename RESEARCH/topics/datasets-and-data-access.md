@@ -61,6 +61,24 @@ Length, Width, Draft, Cargo, TransceiverClass
 
 Also mirrored to GCP/BigQuery and AWS by third parties (USCG NAIS 1-minute).
 
+### Which days to actually download
+
+Do not pull the year (about 3 GB compressed, 80 GB expanded). The fixtures need ten daily
+files, sized to the **72 h** backward horizon:
+
+| Case | Acquisition (UTC) | Days |
+|---|---|---|
+| 1 | 2023-04-09 00:02 | `2023-04-07`, `04-08`, `04-09` |
+| 2 | 2023-05-15 00:02 | `2023-05-13`, `05-14`, `05-15` |
+| 3 | 2023-12-05 23:57 | `2023-12-02`, `12-03`, `12-04`, `12-05` |
+
+Case 3 needs the extra day because its source vessel sailed at 18:06:50 and moored at
+18:59:12 on **3 December** - roughly 53 hours before acquisition, outside a 48 h window.
+That is the reason the horizon is 72 h and not 48 h.
+
+**Do not use a different year.** All three fixtures are 2023; AIS from any other year has no
+ground truth to validate against.
+
 **This is why the Gulf of Mexico is our validation region** — it is the only place where
 free real AIS coincides with a published, peer-reviewed attribution ground truth
 ([[P004]]'s three TPSL cases).

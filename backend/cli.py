@@ -30,7 +30,9 @@ def _todo(phase: str, what: str) -> None:
 @app.command("run-scene")
 def run_scene(
     scene: Annotated[str, typer.Option(help="Scene product id or local .SAFE path.")],
-    backward_hours: Annotated[int, typer.Option(help="Backward drift horizon.")] = 48,
+    # 72 h, not 48: P004 Case 3's source moored ~53 h before acquisition, so a
+    # 48 h window misses it entirely. See PLAN/phases/PHASE-04.md.
+    backward_hours: Annotated[int, typer.Option(help="Backward drift horizon.")] = 72,
     forward_hours: Annotated[int, typer.Option(help="Forward forecast horizon.")] = 72,
 ) -> None:
     """Run the full pipeline for one scene: ingest, detect, characterise, drift, attribute.
@@ -108,36 +110,38 @@ def doctor() -> None:
 
 
 def _report_gpu() -> None:
-    """Report CUDA usability honestly.
+    """Report the resolved device, why it was resolved that way, and the
+    training defaults that follow from it."""
+    from backend.device import resolve_device, suggest_batch_size, training_defaults
 
-    The local device found during PHASE-00 was a GeForce GT 710 (Kepler, compute
-    capability 3.5, 2 GB). Prebuilt PyTorch 2.x wheels target sm_50 and above, so
-    that device cannot run modern PyTorch, and 2 GB cannot train the PHASE-02
-    model at 1024 px regardless. See PLAN/PREREQUISITES.md.
-    """
-    if importlib.util.find_spec("torch") is None:
-        typer.echo("cuda              unknown (torch not installed)")
-        return
+    info = resolve_device()
 
-    import torch
+    if info.name:
+        cap = f"sm_{info.capability[0]}{info.capability[1]}" if info.capability else "?"
+        vram = f"{info.vram_gb:.1f} GB" if info.vram_gb else "? GB"
+        typer.echo(f"gpu               {info.name} ({cap}, {vram})")
+    else:
+        typer.echo("gpu               none detected")
 
-    if not torch.cuda.is_available():
-        typer.echo("cuda              unavailable -- CPU only")
-        return
+    colour = typer.colors.GREEN if info.is_cuda else typer.colors.YELLOW
+    typer.secho(f"device            {info.device}  ({info.reason})", fg=colour)
 
-    name = torch.cuda.get_device_name(0)
-    major, minor = torch.cuda.get_device_capability(0)
-    total_gb = torch.cuda.get_device_properties(0).total_memory / 1024**3
-    typer.echo(f"cuda              {name} (sm_{major}{minor}, {total_gb:.1f} GB)")
-    if (major, minor) < (5, 0):
+    if info.is_cuda and not info.can_train:
         typer.secho(
-            "  ! compute capability below sm_50 -- not supported by prebuilt PyTorch 2.x",
+            "  ! under 8 GB - too little VRAM to train the PHASE-02 model",
             fg=typer.colors.RED,
         )
-    if total_gb < 8:
+
+    if info.can_train:
+        d = training_defaults()
+        typer.echo(
+            f"train defaults    batch={d['batch']} nbs={d['nbs']} "
+            f"(accumulate x{d['accumulate']}) imgsz={d['imgsz']} amp={d['amp']}"
+        )
         typer.secho(
-            "  ! under 8 GB -- insufficient to train the PHASE-02 model locally",
-            fg=typer.colors.RED,
+            f"  i batch={suggest_batch_size(info.vram_gb)} is a starting point, not a "
+            "measured limit - confirm on the first run and record it",
+            fg=typer.colors.BLUE,
         )
 
 

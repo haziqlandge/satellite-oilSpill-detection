@@ -33,6 +33,9 @@ See [`RESEARCH/SYNTHESIS.md`](RESEARCH/SYNTHESIS.md) §4.
 **PHASE-00 complete** — environment, package scaffold, database schema, research corpus.
 No pipeline code yet. Current position and the exact next action: [`HANDOFF.md`](HANDOFF.md).
 
+`frontDemo/` is a parallel landing-page layout study feeding PHASE-07; it has its own
+[README](frontDemo/README.md) and is not part of the pipeline.
+
 ```
 PHASE-00  scaffold + research corpus          done
 PHASE-01  data acquisition + SAR preprocess   next
@@ -69,8 +72,13 @@ cp .env.example .env
 ```
 
 `doctor` reports what is present and what is missing; it is safe to run with nothing
-configured. PostGIS is not needed until PHASE-01 — see
-[`scripts/SETUP_DATABASE.md`](scripts/SETUP_DATABASE.md).
+configured.
+
+The database is **Supabase** (hosted Postgres + PostGIS), not a local container. Create the
+project `oilSpill-Detect` and wire it up per
+[`scripts/SETUP_DATABASE.md`](scripts/SETUP_DATABASE.md), which also records the trade-offs
+that choice carries. Setting up on a fresh machine:
+[`scripts/SETUP_NEW_MACHINE.md`](scripts/SETUP_NEW_MACHINE.md).
 
 Heavy dependencies are optional groups so they can fail independently:
 `.[api]`, `.[drift]`, `.[detect]`. Install `torch` from the correct CUDA index **before**
@@ -99,7 +107,7 @@ Read the indexes, not everything.
 | [`RESEARCH/INDEX.md`](RESEARCH/INDEX.md) | Four papers read in full, six topic syntheses, citation graph |
 | [`RESEARCH/SYNTHESIS.md`](RESEARCH/SYNTHESIS.md) | Every design decision and its justification |
 
-`PLAN/CONSTRAINTS.md` defines eleven scientific-integrity constraints (C1–C11). They are
+`PLAN/CONSTRAINTS.md` defines twelve scientific-integrity constraints (C1–C12). They are
 correctness requirements, not preferences — several are enforced structurally in
 `backend/db/models.py` (age cannot be stored as a scalar; there is no thickness column;
 a score cannot be stored without its terms and weights; dark vessels cannot be named).

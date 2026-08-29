@@ -16,20 +16,27 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.config import get_settings
 
-# Without an explicit timeout, psycopg retries every address `localhost`
-# resolves to (::1 then 127.0.0.1) using a very long default, so a probe against
-# an absent server blocks for minutes and makes the test suite unusable.
-CONNECT_TIMEOUT_SECONDS = 3
-
 
 @lru_cache(maxsize=1)
 def get_engine() -> Engine:
+    """Engine for the hosted database.
+
+    An explicit connect timeout is essential: without one, psycopg retries every
+    address the host resolves to on a very long default, so an unreachable
+    server blocks for minutes and makes the test suite unusable. The value is
+    configurable because the right number differs by an order of magnitude
+    between a local socket and a hosted instance (see DB_CONNECT_TIMEOUT).
+
+    pool_recycle guards against a hosted provider dropping idle connections
+    server-side and leaving a stale handle in the pool.
+    """
     settings = get_settings()
     return create_engine(
         settings.database_url,
         pool_pre_ping=True,
+        pool_recycle=1800,
         future=True,
-        connect_args={"connect_timeout": CONNECT_TIMEOUT_SECONDS},
+        connect_args={"connect_timeout": settings.db_connect_timeout},
     )
 
 
