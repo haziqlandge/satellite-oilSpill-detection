@@ -17,8 +17,6 @@ import { createTimeline, stagger, text, utils } from "animejs";
 import { MapCanvas } from "../../map/MapCanvas";
 import { useDesign } from "../../DesignContext";
 import {
-  primeReveal,
-  revealFallback,
   revealOnScroll,
   useAnimeScope,
 } from "../../lib/motion";
@@ -90,9 +88,7 @@ export default function Investigation({ state }: { state: RunState }) {
         "-=560",
       );
 
-    primeReveal(".sig-reveal", 28);
-    revealOnScroll(".sig-reveal", { delay: 70 });
-    revealFallback(".sig-reveal");
+    return revealOnScroll(".sig-reveal", { y: 28, delay: 70 });
   }, [run?.meta.id]);
 
   if (loading || !run) return <Composing />;

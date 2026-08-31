@@ -8,8 +8,6 @@
  */
 
 import {
-  primeReveal,
-  revealFallback,
   revealOnScroll,
   useAnimeScope,
 } from "../../lib/motion";
@@ -43,9 +41,7 @@ import {
 
 export default function Standards() {
   const root = useAnimeScope(() => {
-    primeReveal(".std-reveal", 24);
-    revealOnScroll(".std-reveal", { delay: 70 });
-    revealFallback(".std-reveal");
+    return revealOnScroll(".std-reveal", { y: 24, delay: 70 });
   }, []);
 
   return (

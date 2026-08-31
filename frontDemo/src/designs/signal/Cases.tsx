@@ -9,8 +9,6 @@
  */
 
 import {
-  primeReveal,
-  revealFallback,
   revealOnScroll,
   useAnimeScope,
 } from "../../lib/motion";
@@ -44,9 +42,7 @@ export default function Cases({
   const others = SCENARIOS.filter((s) => s.id !== state.scenario);
 
   const root = useAnimeScope(() => {
-    primeReveal(".case-reveal", 24);
-    revealOnScroll(".case-reveal", { delay: 80 });
-    revealFallback(".case-reveal");
+    return revealOnScroll(".case-reveal", { y: 24, delay: 80 });
   }, [state.scenario]);
 
   const open = (id: typeof state.scenario) => {
