@@ -47,3 +47,6 @@ desktop.ini
 runs/
 outputs/
 *.log
+
+# --- frontend scratch ---
+frontDemo/.tmp/

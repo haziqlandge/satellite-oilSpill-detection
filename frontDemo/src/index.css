@@ -1,29 +1,56 @@
 @import "tailwindcss";
 
-/* Self-hosted via @fontsource, not <link> to Google Fonts. */
-@import "@fontsource-variable/space-grotesk";
+/* Imported here rather than from the component, so its cascade position is
+   predictable relative to the utility layer. */
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+/*
+  Self-hosted via @fontsource, never a <link> to Google Fonts.
+
+  Four type systems, one per direction, chosen so that no two directions can be
+  mistaken for each other in a grayscale screenshot:
+
+    Signal    grotesk display over a serif reading column   -- a magazine
+    Terminal  one monospace, everywhere, no exceptions      -- a workstation
+    Orbit     technical geometric display, humanist body    -- an instrument
+    Dossier   serif display over a utilitarian sans body    -- a document
+
+  Signal and Dossier deliberately invert the same two families. A grotesk
+  headline over serif prose reads as editorial; a serif headline over sans prose
+  reads as official. Same ink, opposite institutions.
+*/
 @import "@fontsource-variable/archivo";
+@import "@fontsource-variable/newsreader";
+@import "@fontsource-variable/manrope";
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
 @import "@fontsource/ibm-plex-mono/600.css";
+@import "@fontsource/chakra-petch/400.css";
 @import "@fontsource/chakra-petch/500.css";
 @import "@fontsource/chakra-petch/600.css";
 @import "@fontsource/chakra-petch/700.css";
 
 @theme {
-  --font-display: "Space Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-archivo: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Newsreader Variable", ui-serif, Georgia, serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-grotesk: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Newsreader Variable", ui-serif, Georgia, serif;
   --font-tech: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
+  --font-geo: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
 }
 
 /*
-  The brief is explicitly dark ("darker colors mixed with few bright colors"),
-  so the page is dark-locked rather than dual-mode. Per PLAN theme-lock rules a
-  single theme governs the whole page; each layout below re-points the same
-  token names, so no component ever hard-codes a colour.
+  Colour is the last layer, not the differentiator.
 
-  No pure #000 anywhere. Bases sit between #06080a and #0d1014.
+  Three of the four directions are dark, because the primary surface of this
+  application is a map and a light map loses the low-opacity credible-region
+  contours entirely. Dossier is light, because a case file is paper and every
+  convention it borrows -- exhibit stamps, ruled margins, marginal notes,
+  redaction, footnotes -- is a convention of ink on a light ground. Its map is a
+  printed chart rather than a screen.
+
+  Token names are identical across all four, so nothing hard-codes a colour.
 */
 :root {
   --ink: #e8eaed;
@@ -33,76 +60,66 @@
   --base-2: #0f1216;
   --base-3: #161a20;
   --line: #232830;
-  --accent: #f0b429;
+  --accent: #ff7a2f;
   --accent-ink: #0a0c0f;
-  --signal: #f0b429;
-  --radius: 2px;
 }
 
-/* One accent per layout, locked across every section of that layout. */
-[data-layout="signal"] {
-  --ink: #ece8e1;
-  --ink-dim: #9a938a;
-  --ink-faint: #625c55;
-  --base: #0b0a09;
-  --base-2: #121110;
-  --base-3: #1a1917;
-  --line: #262421;
-  --accent: #ff8a3d; /* sodium orange */
-  --accent-ink: #120c06;
-  --radius: 0px;
+/* 01 SIGNAL -- warm newsprint negative. High contrast, sodium accent. */
+[data-design="signal"] {
+  color-scheme: dark;
+  --ink: #f4f1ea;
+  --ink-dim: #a49a8d;
+  --ink-faint: #6a625a;
+  --base: #0d0c0a;
+  --base-2: #141210;
+  --base-3: #1d1a17;
+  --line: #2a2723;
+  --accent: #ff7a2f;
+  --accent-ink: #140a03;
 }
 
-[data-layout="terminal"] {
-  --ink: #d7e0d9;
-  --ink-dim: #7d8d84;
-  --ink-faint: #4d5a53;
-  --base: #070a09;
-  --base-2: #0c110f;
-  --base-3: #121917;
-  --line: #1c2622;
-  --accent: #5df2a0; /* phosphor */
-  --accent-ink: #04120a;
-  --radius: 0px;
+/* 02 TERMINAL -- near-black, phosphor, amber for warnings. */
+[data-design="terminal"] {
+  color-scheme: dark;
+  --ink: #cfdad3;
+  --ink-dim: #76867d;
+  --ink-faint: #47554d;
+  --base: #050706;
+  --base-2: #0a0f0c;
+  --base-3: #101713;
+  --line: #1a2420;
+  --accent: #4fe08a;
+  --accent-ink: #02120a;
+  --warn: #ffbd2e;
+  --alarm: #ff5f56;
 }
 
-[data-layout="orbit"] {
+/* 03 ORBIT -- deep blue-black, ice. */
+[data-design="orbit"] {
+  color-scheme: dark;
   --ink: #e2ecf5;
   --ink-dim: #8698a8;
   --ink-faint: #556575;
-  --base: #070b10;
-  --base-2: #0c1219;
-  --base-3: #121a24;
-  --line: #1d2833;
-  --accent: #43d9e8; /* ice */
-  --accent-ink: #04141a;
-  --radius: 14px;
+  --base: #060a11;
+  --base-2: #0b1119;
+  --base-3: #111a24;
+  --line: #1c2732;
+  --accent: #4fd8e8;
+  --accent-ink: #03141a;
 }
 
-[data-layout="dossier"] {
-  --ink: #eae7e2;
-  --ink-dim: #948e86;
-  --ink-faint: #5d5851;
-  --base: #0c0b0b;
-  --base-2: #131111;
-  --base-3: #1b1818;
-  --line: #272322;
-  --accent: #e5484d; /* signal red */
-  --accent-ink: #150606;
-  --radius: 0px;
-}
-
-[data-layout="deepwater"] {
-  --ink: #eef2f3;
-  --ink-dim: #8d9ba0;
-  --ink-faint: #5a686d;
-  --base: #06090b;
-  --base-2: #0b1013;
-  --base-3: #10171a;
-  --line: #1b2427;
-  --accent: #ff4fa3; /* iridescent magenta, used sparingly */
-  --accent-ink: #16040c;
-  --radius: 999px;
+/* 04 DOSSIER -- paper. Ink on a warm light ground, oxide red for findings. */
+[data-design="dossier"] {
+  color-scheme: light;
+  --ink: #1c1815;
+  --ink-dim: #5d564c;
+  --ink-faint: #8b8377;
+  --base: #e9e4d9;
+  --base-2: #f1ede4;
+  --base-3: #ded8cb;
+  --line: #c3bcac;
+  --accent: #b8221f;
+  --accent-ink: #f7f4ec;
 }
 
 @layer base {
@@ -122,7 +139,22 @@
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    overflow-x: hidden;
+
+    /*
+      `clip`, not `hidden`.
+
+      `overflow-x: hidden` with `overflow-y: visible` is not a thing CSS will
+      give you: the used value of the other axis becomes `auto`, which turns the
+      body itself into the scroll container. The viewport then never scrolls, so
+      `window` scroll events never fire -- and anime.js's `onScroll()` observer
+      listens to the viewport. Every element primed to `opacity: 0` waiting to
+      be revealed on scroll stayed at zero forever, and the page below the fold
+      rendered as a black rectangle with nothing in the console.
+
+      `clip` has no such coupling. It still contains the full-bleed figures that
+      break out to `100vw`, and the viewport goes on being the scroller.
+    */
+    overflow-x: clip;
   }
 
   ::selection {
@@ -133,6 +165,10 @@
   :focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 3px;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
   }
 }
 
@@ -146,45 +182,13 @@
   .bg-base-3 { background-color: var(--base-3); }
   .bg-accent { background-color: var(--accent); }
   .border-line { border-color: var(--line); }
-  .rad { border-radius: var(--radius); }
 
-  /*
-    Halftone. A dot lattice whose dots are masked by the underlying image
-    luminance, which is what makes it read as print halftone rather than a
-    dot overlay. Size is driven by --dot so density can vary per section.
-  */
-  .halftone {
-    --dot: 5px;
-    background-image: radial-gradient(circle at center, currentColor 42%, transparent 44%);
-    background-size: var(--dot) var(--dot);
-  }
-
-  /* CRT scanlines. Fixed and pointer-events-none so it never repaints on scroll. */
-  .scanlines::after {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: 40;
-    pointer-events: none;
-    background: repeating-linear-gradient(
-      to bottom,
-      rgb(0 0 0 / 0.22) 0px,
-      rgb(0 0 0 / 0.22) 1px,
-      transparent 1px,
-      transparent 3px
-    );
-    mix-blend-mode: multiply;
-  }
-
-  .hairline-grid {
-    background-image:
-      linear-gradient(to right, var(--line) 1px, transparent 1px),
-      linear-gradient(to bottom, var(--line) 1px, transparent 1px);
-    background-size: 64px 64px;
-  }
-
-  .duotone {
-    filter: grayscale(1) contrast(1.35) brightness(0.78);
+  /* Numbers are tabular everywhere. In an interface whose job is comparing six
+     values across four candidates, digits that shift column between rows are
+     not a style choice. */
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -197,4 +201,129 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * Range inputs
+ *
+ * Each direction draws its own time control, but all four keep a real range
+ * input underneath: arrow keys, Home, End and screen-reader announcement all
+ * come from the platform rather than being reimplemented badly on a div. What
+ * varies is the furniture around it, set through these variables.
+ * ------------------------------------------------------------------ */
+
+@layer components {
+  .scrub {
+    --scrub-track: var(--line);
+    --scrub-thumb: var(--accent);
+    --scrub-thumb-w: 3px;
+    --scrub-thumb-h: 22px;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 26px;
+    background: transparent;
+    cursor: ew-resize;
+    width: 100%;
+  }
+
+  .scrub::-webkit-slider-runnable-track {
+    height: 2px;
+    background: var(--scrub-track);
+  }
+
+  .scrub::-moz-range-track {
+    height: 2px;
+    background: var(--scrub-track);
+  }
+
+  .scrub::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: var(--scrub-thumb-w);
+    height: var(--scrub-thumb-h);
+    margin-top: calc((var(--scrub-thumb-h) / -2) + 1px);
+    background: var(--scrub-thumb);
+    border: none;
+    border-radius: 0;
+  }
+
+  .scrub::-moz-range-thumb {
+    width: var(--scrub-thumb-w);
+    height: var(--scrub-thumb-h);
+    background: var(--scrub-thumb);
+    border: none;
+    border-radius: 0;
+  }
+
+  .scrub:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 40%, transparent);
+  }
+
+  .scrub:focus-visible::-moz-range-thumb {
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 40%, transparent);
+  }
+}
+
+/*
+  MapLibre chrome, re-pointed at the tokens.
+
+  The library ships light-mode controls. Left alone on a dark map they are two
+  white boxes, which is the most obvious sign of a map dropped in rather than
+  designed with. The icon inversion is conditional, because Dossier's map is a
+  light printed chart and inverting there would undo the fix.
+*/
+.maplibregl-ctrl-group {
+  background: color-mix(in oklab, var(--base-2) 88%, transparent) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(6px);
+}
+
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--line) !important;
+}
+
+[data-design="signal"] .maplibregl-ctrl-group button .maplibregl-ctrl-icon,
+[data-design="terminal"] .maplibregl-ctrl-group button .maplibregl-ctrl-icon,
+[data-design="orbit"] .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(1) opacity(0.62);
+}
+
+[data-design="signal"] .maplibregl-ctrl-group button:hover .maplibregl-ctrl-icon,
+[data-design="terminal"] .maplibregl-ctrl-group button:hover .maplibregl-ctrl-icon,
+[data-design="orbit"] .maplibregl-ctrl-group button:hover .maplibregl-ctrl-icon {
+  filter: invert(1) opacity(0.95);
+}
+
+[data-design="dossier"] .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: opacity(0.7);
+}
+
+.maplibregl-ctrl-scale {
+  background: transparent !important;
+  border-color: var(--ink-faint) !important;
+  color: var(--ink-dim) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 10px !important;
+}
+
+.maplibregl-ctrl-attrib {
+  background: color-mix(in oklab, var(--base) 76%, transparent) !important;
+  color: var(--ink-faint) !important;
+  font-size: 10px !important;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: var(--ink-dim) !important;
+}
+
+.maplibregl-canvas:focus {
+  outline: none;
+}
+
+/* Terminal and Orbit hide the default zoom furniture; each draws its own. */
+[data-design="terminal"] .maplibregl-ctrl-top-right,
+[data-design="orbit"] .maplibregl-ctrl-top-right {
+  display: none;
 }

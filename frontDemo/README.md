@@ -1,11 +1,11 @@
-# frontDemo - landing page layout study
+# frontDemo — four products, one scientific engine
 
-Five switchable landing-page directions for the oil spill attribution system. **Design
-exploration feeding PHASE-07, not PHASE-07 itself.** Nothing here is wired to the backend;
-all content is static and lives in `src/content.ts`.
+Four **independent interface concepts** over the same SAR + AIS oil-spill
+attribution system. **Design exploration feeding PHASE-07, not PHASE-07 itself.**
 
-> **Ownership:** this folder belongs to the session on the original laptop. The session on
-> the training machine owns `backend/` and `ml/` and should not edit it.
+> **Ownership:** this folder is worked on from the dev laptop. `backend/` and
+> `ml/` are worked on from the training machine. Keeping the two apart is what
+> stops the frontend and the pipeline colliding in the same tree.
 
 ## Run
 
@@ -24,84 +24,204 @@ Opens on port 5180. `.claude/launch.json` defines this as a preview target named
 npm run build --prefix frontDemo
 ```
 
-## The five directions
+---
 
-Switch between them from the rail on the right edge. The choice persists in `localStorage`.
+## What changed, and why
 
-| # | Name | Accent | Language |
+The previous version was **one website with five themes**. It had a theme
+abstraction whose `ui` object carried panel type, density, console arrangement,
+button shape and radius, and every component branched on it. The conceptual
+differences between the directions were much stronger than the visual ones,
+because five directions were being funnelled through one `Panel`, one
+`PageHeader`, one `Stat`, one `TopNav` and one twelve-column page.
+
+It is now **four separate products sharing a scientific engine**:
+
+```
+shared data + shared scientific logic + independent presentation systems
+```
+
+not
+
+```
+shared page + theme variables
+```
+
+`src/designs/signal/` imports nothing from `src/designs/terminal/`. There is no
+`designs/shared/`, deliberately — the moment one exists the four start
+converging on it again. A `SignalEvidenceBlock`, a `TerminalPane`, an
+`OrbitInstrument` and a `DossierExhibit` are conceptually different objects and
+are written as such.
+
+The four are lazy-loaded (`src/designs/registry.ts`). That is an isolation
+decision before it is a performance one: a build error in one direction must not
+take the other three down, and an error boundary per direction means a reader
+can always switch away from a broken one.
+
+---
+
+## The four directions
+
+Switch between them from the neutral control on the right edge. The choice
+persists in `localStorage`. **The control is not part of any of the four** — it
+uses none of their tokens and says on its face that it is a demo control,
+because a shared navigation element is exactly how four products become one.
+
+| # | Name | Product | Composition | Navigation | Map is |
+|---|---|---|---|---|---|
+| 01 | **Signal** | Investigative publication | Long-form editorial scroll, three-column spread with a fixed reading measure and real marginalia | Publication masthead, six sections of an issue | An evidence exhibit — one fixed plate with a caption |
+| 02 | **Terminal** | Operations workstation | Fixed-viewport workstation, no page scroll | Numbered command rail | The primary workspace, UI arranged around it |
+| 03 | **Orbit** | Mission control | Floating instrument rails over a full-bleed map | Mission status bar + mode rails | The product; everything orbits it |
+| 04 | **Dossier** | Evidence archive | Document spreads, numbered exhibits, ruled sections | Roman-numeral case index | A forensic exhibit — a printed chart |
+
+### Colour is the last layer
+
+The four are meant to be distinguishable **in grayscale**. Composition,
+navigation, density, typography and the relationship between text and map do the
+work; the palette is applied afterwards.
+
+**Dossier is the only light direction**, and not for variety's sake: a case file
+is paper, and every convention it borrows — exhibit stamps, ruled margins,
+marginal notes, redaction, footnotes — is a convention of ink on a light ground.
+Its map uses Esri's light grey canvas so it reads as a printed chart. The other
+three are dark, because the primary surface of this application is a map and a
+light map loses the low-opacity credible-region contours entirely.
+
+Each direction takes a different world underneath its data, and one of them
+tints it. Esri's rasters are neutral grey and `raster-saturation` cannot put
+colour into a source that has none, so `MapPaint.basemapTint` lays a translucent
+background layer between the raster and the data instead. Terminal is the only
+direction that uses it: a console wants the coastline present but subordinate
+and in its own ink, not a grey map borrowed from somewhere brighter.
+
+### Typography
+
+Signal and Dossier deliberately **invert the same two families**. A grotesk
+headline over a serif reading column is a magazine; a serif headline over a sans
+body is a document. Same ink, opposite institutions.
+
+| | Display | Body | Values |
 |---|---|---|---|
-| 1 | **Signal** | sodium orange `#ff8a3d` | Halftone print, asymmetric editorial, 0px corners, Space Grotesk |
-| 2 | **Terminal** | phosphor green `#5df2a0` | CRT console, monospace throughout, scanlines, a boot transcript as the hero |
-| 3 | **Orbit** | ice cyan `#43d9e8` | Mission control, radar scope, rounded panels, Chakra Petch |
-| 4 | **Dossier** | signal red `#e5484d` | Forensic case file, hairline rules, a redaction bar that retracts to reveal the headline |
-| 5 | **Deepwater** | iridescent magenta `#ff4fa3` | Atmospheric, very large light type, oil-on-water sheen, scroll-scrubbed parallax |
+| Signal | Archivo | Newsreader | IBM Plex Mono |
+| Terminal | IBM Plex Mono | IBM Plex Mono | IBM Plex Mono |
+| Orbit | Chakra Petch | Manrope | IBM Plex Mono |
+| Dossier | Newsreader | Archivo | IBM Plex Mono |
 
-Each direction locks one accent across every section. Dark-locked by design - the brief
-asked for dark with a few bright colours, so there is no light mode.
+---
 
-## The switcher
+## Architecture
 
-The interaction that was specifically requested:
+```
+src/
+  sim/            the simulation. Untouched by the redesign
+  map/            MapCanvas, layer definitions, particle overlay
+  lib/
+    format.ts     vocabulary: term labels, timestamps, ageStatement()
+    playback.ts   the event, hour by hour: phase, extent, contacts
+    project.ts    SVG projection arithmetic for figures
+    motion.ts     anime.js scope + scroll reveal
+    hash.ts       hash routing; each design defines its own sections
+  useRun.ts       scenario state, shared across every design
+  content.ts      the project's FACTS. Not its copy
+  design.ts       the four directions: map paint, fonts, accents
+  designs/
+    signal/  terminal/  orbit/  dossier/
+```
 
-- Sticky to the right edge, vertically centred
-- **Tucks itself away** after ~2.6 s idle: compresses on the x axis toward the right edge
-  (`scaleX(0.72)`) leaving a ~33 px grab tab
-- **Any click anywhere on the page brings it back**, as does hovering the tab
-- `Escape` tucks it deliberately
+**What is shared is science or arithmetic.** `content.ts` holds the pipeline
+stages, the six scoring terms, the prior-art comparison and the limits — those
+are the project's positions. It deliberately does **not** hold headlines, ledges
+or section names: a publication opening an investigation, a workstation
+reporting its state, an instrument coming online and a case file being unsealed
+are not the same sentence in four typefaces.
 
-Implemented in `src/components/LayoutSwitcher.tsx`. The tuck is a **CSS transition, not an
-anime.js tween** - it is a two-state toggle a user can interrupt at any moment, and CSS
-retargets from the current computed value for free. Driving it with a JS tween left the
-transform stranded part-way whenever the state flipped mid-flight.
+### The event playback
 
-Measured behaviour: 33 px tucked, opens within 200 ms of a click, holds 2.6 s, re-tucks.
+`src/lib/playback.ts` is the derivation all four share for showing the spill as
+something that **happened** rather than a finished shape. `momentAt(run, hour)`
+returns the phase, how much oil is in the water, the surface extent, and which
+vessels were within 12 km at that instant — from the first parcel entering the
+water through to the forecast horizon. Each direction renders it in its own
+grammar: Signal as small multiples across a spread, Terminal as an operational
+timeline with a log stream, Orbit as the mission's central animation, Dossier as
+a chronological register.
+
+The proximity list is explicitly **not a ranking**. It is who was in the
+neighbourhood, which is a far weaker claim than a candidate, and all four say so.
+
+---
+
+## Scientific integrity
+
+These are correctness requirements from `PLAN/CONSTRAINTS.md`, not disclaimer
+text, and they survive in all four directions:
+
+- **Age is never a bare scalar.** `ageStatement()` in `lib/format.ts` handles the
+  case the old UI got wrong: for an ongoing discharge the interval collapses to
+  `0–0 h`, and printing that as a measurement is false precision in the opposite
+  direction. It states "ongoing" instead, with the method beside it.
+- **Damping is a relative dB index, never a thickness.** There is no field for
+  microns or for spilled volume anywhere in the interface.
+- **`insufficient_evidence` is prominent, never an empty list.** The
+  `mumbai-null` scenario triggers it.
+- **Every score decomposes** into six named terms with weights and the geometry
+  that produced them. No bare totals.
+- **Backward drift is an ensemble** producing credible regions. Nothing implies
+  it recovers a precise point.
+- **Wind gate is a continuous multiplier**, surfaced, never a silent filter.
+- **Dark vessels are ranked but never named.** All identities are masked
+  (`MMSI 636•••••4`).
+- **Simulated data stays visibly simulated**, integrated per direction: a source
+  note in Signal, a status flag in Terminal, telemetry metadata in Orbit, an
+  evidence classification in Dossier.
+- Language is **candidate, suspected, score** — never responsible or confirmed.
+
+---
 
 ## Stack
 
-- **Vite + React 19 + TypeScript**
-- **Tailwind v4** via `@tailwindcss/vite`. Design tokens are CSS custom properties in
-  `src/index.css`; each layout re-points the same token names under `[data-layout="..."]`,
-  so no component hard-codes a colour
-- **anime.js v4.5** (`animate`, `createTimeline`, `stagger`, `svg.createDrawable`,
-  `text.split`, `onScroll`, `createScope`)
-- **@phosphor-icons/react** for icons
+- **Vite + React 19 + TypeScript**, `strict`, `noUnusedLocals`
+- **Tailwind v4** via `@tailwindcss/vite`. Tokens are CSS custom properties in
+  `src/index.css`, re-pointed under `[data-design="..."]`
+- **anime.js v4.5** — named exports (`animate`, `createTimeline`, `stagger`,
+  `svg.createDrawable`, `text.split`, `onScroll`, `createScope`, `utils`). Any v3
+  snippet found online will not work here
+- **MapLibre GL JS**, no API key. Esri basemaps, no token
 - Fonts self-hosted through `@fontsource`, never a `<link>` to Google Fonts
 
-### anime.js v4, not v3
+### Three bugs worth not reintroducing
 
-The API changed completely between v3 and v4. This project uses **named exports**
-(`import { animate } from "animejs"`), not the v3 default `anime({ targets })`. Any v3
-snippet found online will not work here.
+**Drawing the oil and the hindcast at the same weight.** They are the same kind
+of mark and they mean opposite things. The backward ensemble is at its widest at
+the far end of the backward horizon — reversal spreads, it does not focus —
+which is exactly the hour when least oil is in the water. Painted at equal
+weight, the playback claims the spill was larger before it began than at the
+moment it was photographed. `ParticleOverlay` keeps the oil bright and the
+hindcast a faint haze behind it while the two are on screen together, and gives
+the haze its full weight only when there is no oil cloud to be confused with.
 
-Scroll animation uses anime's **`onScroll()` observer**, never a
-`window.addEventListener("scroll")` handler - a scroll listener fires every frame and janks.
-Note the option is **`repeat: false`**, not `once: true`; `once` is silently ignored.
 
-Every layout wraps its animations in `createScope({ root })` so switching layouts reverts
-the previous one's animations instead of leaking timers.
+**`body { overflow-x: hidden }`.** CSS will not give you `overflow-x: hidden`
+with `overflow-y: visible` — the used value of the other axis becomes `auto`,
+which makes the body the scroll container. The viewport then never scrolls, so
+`window` scroll events never fire, so anime's `onScroll()` observer never
+triggers, so every element primed to `opacity: 0` stays there and the page below
+the fold renders as a black rectangle with nothing in the console. Use
+`overflow-x: clip`.
+
+**`onScroll({ enter: ... })` threshold order.** It reads
+`"<target edge> <container edge>"`. `"bottom-=80 top"` asks for the moment the
+target's bottom reaches the viewport's top — that is the element *leaving*
+upward. `"top bottom-=80"` is the one that means "arriving". `revealFallback()`
+in `lib/motion.ts` is the backstop: priming an element to invisible is a bet that
+something will set it back, and that bet losing must not produce a blank page.
+
+---
 
 ## Known issues
 
 | Issue | Detail |
 |---|---|
-| **Focus does not untuck the rail** | Tabbing to a switcher button while tucked leaves it hidden, so a keyboard user aims at an off-screen target. `onFocusCapture` on the wrapper does not fire. Fix is to bind `onFocus={wake}` on the buttons themselves; the edit was drafted and not applied |
-| Images are placeholders | `src/content.ts` points at `picsum.photos` seeds, duotoned and halftoned. **These are ordinary photographs, not radar.** Swap for real Sentinel-1 VV tiles before showing this to anyone who might mistake them for data |
-| Requires network | The placeholder images are remote, so the demo will not render imagery offline |
-
-## What is deliberate
-
-- **No real vessel names.** The published cases name real ships. Putting a real vessel's
-  name next to the word "polluter" on a marketing page is not something a layout study
-  should do, so identities are masked (`MMSI 636•••••4`)
-- **Every figure is sourced or marked illustrative.** The detection numbers come from
-  Zhao et al. 2025; the candidate scores are labelled as examples. No invented precision
-- **Dark vessels are ranked but never named**, matching the ethics constraints in
-  `PLAN/CONSTRAINTS.md`
-
-## Next steps
-
-1. Pick a direction, or a hybrid
-2. Fix the focus bug above
-3. Replace placeholder imagery with real SAR tiles
-4. Only then consider wiring it to the API in PHASE-07 - at which point the real work is
-   the map, the time slider and the evidence card, none of which exist here yet
+| Age interval is degenerate for ongoing releases | The simulation returns `[0, 0, 0]` for four of the five scenarios. `ageStatement()` presents this honestly, but the underlying `source_coincidence` estimator is worth revisiting in PHASE-04 |
+| Requires network for the basemap | True of all four now — Terminal used to draw no world at all. Everything else is generated locally; the map reports a tile failure in the corner and the graticule, scene, slick, origin field and traffic all still draw (C12) |
+| Not wired to the API | All content comes from `src/sim/`. PHASE-07 is where that becomes a transport change |
