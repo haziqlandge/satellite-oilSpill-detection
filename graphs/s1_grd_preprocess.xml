@@ -1,0 +1,53 @@
+<graph id="S1_GRD_preprocess">
+  <version>1.0</version>
+  <node id="Read">
+    <operator>Read</operator>
+    <parameters><file>${source}</file></parameters>
+  </node>
+  <node id="Apply-Orbit-File">
+    <operator>Apply-Orbit-File</operator>
+    <sources><sourceProduct refid="Read"/></sources>
+    <parameters><orbitType>Sentinel Precise (Auto Download)</orbitType></parameters>
+  </node>
+  <node id="Calibration">
+    <operator>Calibration</operator>
+    <sources><sourceProduct refid="Apply-Orbit-File"/></sources>
+    <parameters><outputSigmaBand>true</outputSigmaBand><outputImageScaleInDb>true</outputImageScaleInDb></parameters>
+  </node>
+  <node id="Speckle-Filter">
+    <operator>Speckle-Filter</operator>
+    <sources><sourceProduct refid="Calibration"/></sources>
+    <parameters><filter>Refined Lee</filter></parameters>
+  </node>
+  <node id="Land-Sea-Mask">
+    <operator>Land-Sea-Mask</operator>
+    <sources><sourceProduct refid="Speckle-Filter"/></sources>
+    <!-- `geometry` names a vector data node and applies only when useSRTM is
+         false. With useSRTM=true it must be omitted: SNAP parses the value as a
+         band-arithmetic expression, so a placeholder like "0,0" fails the whole
+         graph with "Undefined symbol '0,0'" in CreateLandMaskOp. -->
+    <parameters><useSRTM>true</useSRTM><landMask>true</landMask></parameters>
+  </node>
+  <node id="Terrain-Correction">
+    <operator>Terrain-Correction</operator>
+    <sources><sourceProduct refid="Land-Sea-Mask"/></sources>
+    <!-- `mapProjection` must be SNAP's own CRS name, NOT an "EPSG:nnnn" string.
+         With `EPSG:4326` here SNAP builds a degenerate CRS and computes a
+         zero-size target, surfacing as `ArithmeticException: / by zero` in
+         Terrain-Correction (and the clearer "Width (0) and height (0) must be
+         > 0" in Ellipsoid-Correction-GG) *at graph init*, on a perfectly valid
+         product. `WGS84(DD)` is geographic WGS84 and the written GeoTIFF does
+         read back as EPSG:4326. -->
+    <!-- `nodataValueAtSea` MUST be false. It defaults to true, and SRTM has no
+         data over water, so on a predominantly-marine scene terrain correction
+         nulls almost every pixel: the output is correctly sized and correctly
+         georeferenced and entirely zero. For an oil-spill pipeline the sea is
+         the signal, not the background. -->
+    <parameters><mapProjection>WGS84(DD)</mapProjection><pixelSpacingInMeter>10.0</pixelSpacingInMeter><nodataValueAtSea>false</nodataValueAtSea></parameters>
+  </node>
+  <node id="Write">
+    <operator>Write</operator>
+    <sources><sourceProduct refid="Terrain-Correction"/></sources>
+    <parameters><file>${target}</file><formatName>GeoTIFF-BigTIFF</formatName></parameters>
+  </node>
+</graph>

@@ -2,42 +2,66 @@
 
 Continuation state. **Read this first, then `PLAN/INDEX.md`, then your current phase file.**
 
-**Last updated:** 2026-08-28
-**Machine transfer:** this tree was zipped on the dev laptop and moved to the training
-machine (RTX 4060 Ti, 16 GB VRAM). See "If you are the new session" immediately below.
+**Last updated:** 2026-08-29
+**Machine:** RTX 4060 Ti desktop. Environment is **already built and verified** on this
+machine - see "Start here" below. Do not rebuild it from scratch.
 
 ---
 
-## If you are the new session on the 4060 Ti: start here
+## If you are the new session: start here
 
-You own the **backend and ML pipeline, PHASE-01 onward**. Another session on the original
-laptop owns `frontDemo/` in parallel.
+You own the **backend and ML pipeline, PHASE-01 onward**. **Do not work on `frontDemo/`** -
+it is a separate frontend layout study owned by the session on the other laptop, with its
+own README and its own open issues. Touching it will collide.
 
-**Do not work on `frontDemo/`.** It is a separate frontend layout study with its own
-session, its own README, and its own open issues. Touching it will collide.
+**The environment is already set up and green.** Verify rather than rebuild:
 
-Your first four actions, in order:
+```bash
+.venv/Scripts/python.exe -m backend.cli doctor
+.venv/Scripts/python.exe -m pytest -q
+```
 
-1. **Rebuild the environment.** The zip does not carry a working venv or `node_modules`.
-   Follow [`scripts/SETUP_NEW_MACHINE.md`](scripts/SETUP_NEW_MACHINE.md) end to end. It
-   finishes with `pytest` green and `oilspill doctor` reporting a usable CUDA device.
-   **Install PyTorch from the CUDA index before `ultralytics`**, or you get a CPU build.
-2. **Connect the database.** The project uses **Supabase**, not Docker or a local
-   Postgres (user decision, 2026-08-28). The project **`oilSpill-Detect`**
-   (ref `hbctpozvofhxlioywcjw`, `ap-south-1`, PG 17.6, PostGIS 3.3) **already exists** -
-   do not create another. You need to **set the database password** in the dashboard
-   (Project Settings > Database > Reset database password), put the **direct** connection
-   URI in `.env`, then run `alembic upgrade head`.
-   **Then enable RLS on every table before loading data** - Supabase exposes the `public`
-   schema over its REST API, which a local Postgres never did.
-   Full steps and accepted trade-offs: [`scripts/SETUP_DATABASE.md`](scripts/SETUP_DATABASE.md).
-3. **Email CERTH/MKLab for the Krestenitis dataset** if it has not already been sent
-   (check with the user). Request-gated, long lead time, cannot be accelerated. It is a
-   bonus, not a dependency, but the clock starts when you ask.
-4. **Begin PHASE-01** ([`PLAN/phases/PHASE-01.md`](PLAN/phases/PHASE-01.md)).
+Expect `doctor` to report python 3.12.10, database ok with PostGIS 3.3, torch /
+ultralytics / opendrift installed, `device cuda`, and **55 tests passing**.
+
+`doctor` also warns **"under 8 GB - too little VRAM to train the PHASE-02 model"**. That
+is correct and expected: this is the **8 GB** 4060 Ti, measured at 7.996 GB against
+`MIN_TRAIN_VRAM_GB = 8.0` in `backend/device.py`. PHASE-01 needs no GPU, but PHASE-02
+needs a decision - the 12 GB 5070 Ti laptop, a lowered floor with a smaller batch, or
+rented compute. Earlier revisions of this file claimed 16 GB; they were wrong.
+
+### The one thing blocking progress: disk
+
+**The Zenodo training corpus is 91 GB of archives and the machine had 59.9 GB free**
+(measured 2026-08-29). It does not fit, and 7z extraction roughly doubles the requirement.
+The user is arranging more space. **Do not start a Zenodo download until you have
+confirmed free space**; check first:
+
+| Record | Size | Role |
+|---|---|---|
+| `8346860` Part I | **37.92 GB** | primary training positives |
+| `8253899` Part II | **42.77 GB** | look-alike negative pool |
+| `13761290` Part III | **9.18 GB** | held-out test |
+| `15298010` Refined SOS | **1.10 GB** | corrected masks, prefer where overlapping |
+
+The **mask archives are tiny** (10-30 MB each) - the images are the entire bulk. PHASE-01
+targets only **~10% negatives per split**, so pulling all 42.77 GB of Part II to use a
+tenth of it is poor value, and 7z supports selective extraction. `backend/ingest/datasets/
+zenodo.py` is written, tested and ready; it verifies every file against Zenodo's published
+MD5, because a truncated multi-GB archive does not announce itself.
+
+Reclaimable now, if needed: the `_COG` products under `data/raw/sar/safe/` are unusable
+(see below) and the classic `.zip` archives are redundant once extracted - roughly 10 GB.
+
+### Then
+
+1. **Finish PHASE-01** ([`PLAN/phases/PHASE-01.md`](PLAN/phases/PHASE-01.md)) - see the
+   breakdown under "Current position".
+2. **Email CERTH/MKLab for the Krestenitis dataset** if not already sent (check with the
+   user). Request-gated, long lead time. A bonus, not a dependency.
 
 **PHASE-04 and PHASE-05 do not depend on PHASE-02/03** and need no GPU. If PHASE-01 stalls
-on a dataset download or a CDSE account, switch to PHASE-05 rather than idling.
+on disk or a dataset, switch to PHASE-05 rather than idling.
 
 ---
 
@@ -46,9 +70,146 @@ on a dataset download or a CDSE account, switch to PHASE-05 rather than idling.
 | | |
 |---|---|
 | **PHASE-00** | **Complete.** Committed as `a9eb695`, pushed |
-| **PHASE-01 onward** | Not started. This is the work to do |
-| **frontDemo/** | Separate track, in progress on the other machine, uncommitted |
+| **PHASE-01** | **In progress, uncommitted.** Ingest modules, SNAP graph, fixture data and 37 tests exist locally. See the breakdown below |
+| **PHASE-02 onward** | Not started |
+| **frontDemo/** | Separate track, owned by the session on the other laptop. Committed in `6c1bc25`. Do not touch |
 | **Repository** | https://github.com/haziqlandge/satellite-oilSpill-detection (public, `main`) |
+
+### PHASE-01 breakdown as of 2026-08-29
+
+| Done | Still to do |
+|---|---|
+| `sar/fetch.py`, `geo.py`, `tiling.py`, `cdse.py`, `preprocess.py` | Finish the SNAP chain on Cases 2 and 3 |
+| `ais/clean.py`, `loader.py`, `trajectory.py` | `datasets/relabel.py` (binary -> 2-class) |
+| `datasets/zenodo.py` (+ checksum verification) | Zenodo downloads - **blocked on disk** |
+| `graphs/s1_grd_preprocess.xml` - **debugged, now works** | SAR Fixed Infrastructure Dataset |
+| 3 classic fixture `.SAFE` products + 10 AIS days | Relabelling pass; coastline overlay check |
+| **55 tests passing**, ruff + mypy clean | Geocoding round-trip < 1 px on a real scene |
+
+**SNAP chain status: no scene is preprocessed yet.** Case 1 ran correctly with real data
+(2.5 GB written, growing steadily) but **hit the 1-hour timeout** and was killed. The
+truncated output was deleted; `data/processed/sar/` is empty. Nothing is wrong with the
+chain - it is simply slow.
+
+**Measured:** a full IW GRDH scene (25896 x 16734) through Refined Lee and
+Terrain-Correction at 10 m had written 2.5 GB and was **still running at 60 minutes** on
+this machine. `DEFAULT_TIMEOUT_S` is now **4 hours**. Budget hours per scene, three
+scenes, and run it when the machine is free:
+
+```bash
+.venv/Scripts/python.exe scripts/preprocess_fixtures.py --max-heap-gb 8
+```
+
+Re-running is safe: completed outputs are skipped, `_COG` products are skipped with a
+message, and a run that times out or fails now **deletes its partial output** so a
+truncated raster cannot be mistaken for a finished one.
+
+**Disk:** each output looked set to exceed 2.5 GB, so budget ~10 GB for three scenes on
+top of whatever the Zenodo corpus needs.
+
+**Do not trust "SNAP exited 0" as success.** It happily produces a correctly sized,
+correctly georeferenced, **entirely zero** raster (see the `nodataValueAtSea` trap below).
+`run_graph` now verifies both the CRS *and* that the output actually contains non-zero
+pixels (`check_has_data`), so this specific failure can no longer pass silently.
+
+**Four traps already paid for. Do not re-derive these.** Each cost real time on
+2026-08-29; all four are now guarded by tests in `tests/test_preprocess.py`.
+
+1. **`mapProjection` must be `WGS84(DD)`, not `EPSG:4326`.** SNAP wants its own CRS
+   name; an `EPSG:nnnn` string makes it compute a zero-size target and die at graph
+   init with `ArithmeticException: / by zero`. It looks exactly like a broken install
+   or a bad product and is neither - SNAP 12 and 14 fail identically, on both `.SAFE`
+   and DIMAP input, with a verified-healthy product. **SNAP 12 is installed at
+   `C:\esa-snap-12` but is NOT needed**; SNAP 14 at `C:\Program Files\esa-snap` works.
+   Uninstalling 12 needs UAC and was left for the user.
+2. **`nodataValueAtSea` must be `false` in Terrain-Correction.** It defaults to true and
+   SRTM has no data over water, so on a marine scene it nulls nearly every pixel: the
+   output is correctly sized, correctly georeferenced and **entirely zero**, and SNAP
+   still exits 0. For an oil-spill pipeline the sea is the signal.
+3. **`Land-Sea-Mask` must not carry a `geometry` parameter when `useSRTM=true`.** SNAP
+   parses the value as a band-arithmetic expression; the placeholder `0,0` that was in
+   the graph failed with `Undefined symbol '0,0'` in `CreateLandMaskOp`.
+4. **The measurement-band-only trap.** The first pass downloaded only `measurement/`
+   assets, which **cannot be calibrated** - the sigma0 LUTs live in
+   `annotation/calibration/`. Use `scripts/download_cdse_fixture_safe.py`, not
+   `download_cdse_fixture_vv.py`.
+
+Two hypotheses were pursued and proved **wrong**; they are recorded so nobody retries
+them: "COG packaging breaks SNAP" (classic products fail identically - though classic is
+still preferred, because SNAP flags the COG calibration LUT as unreliable) and "SNAP 14
+regression, install SNAP 12" (12 fails the same way).
+
+Full detail, including everything ruled out along the way, is in
+`PLAN/phases/PHASE-01.md` under "Confirmed on this hardware".
+
+### Open question for the next session: sigma0 in dB, and filter order
+
+Measured on 2026-08-29: `Calibration` with `outputImageScaleInDb=true` emitted **linear**
+sigma0, not dB - values 0-4.87, mean 0.004, where dB over water would sit around -20.
+The Zenodo training corpus is sigma0 **in dB**, so this has to be reconciled before
+PHASE-02 or the model trains on a different quantity than it will infer on.
+
+Related, and worth deciding together: the chain in `PLAN/phases/PHASE-01.md` (from P004
+§2.3) is calibrate-to-dB *then* Refined Lee. **Speckle is multiplicative in the linear
+domain, which is what Refined Lee assumes**, so filtering in dB is statistically wrong.
+Standard SNAP practice is calibrate -> speckle filter -> terrain correct -> `LinearToFromdB`
+last. Changing the documented order needs a recorded reason (`PLAN/CONSTRAINTS.md`), so it
+was deliberately **not** changed unilaterally. Put the evidence to the user and decide.
+
+## Changes made on 2026-08-29
+
+Everything below is **uncommitted**. The only commit in the repository is still
+PHASE-00's `a9eb695`.
+
+### New files
+
+| Path | What it is |
+|---|---|
+| `backend/ingest/sar/cdse.py` | CDSE OData client: token refresh + resume. **CDSE answers ranged requests with 200, not 206**, so resume restarts rather than corrupting the file |
+| `backend/ingest/sar/preprocess.py` | SNAP `gpt` invoker: locates `gpt`, sets the JVM heap, summarises Java stack traces down to the real cause, verifies the output CRS **and that it contains data**, and discards partial output on failure |
+| `backend/ingest/datasets/zenodo.py` | Zenodo record listing + download with **MD5 verification** |
+| `scripts/download_cdse_fixture_safe.py` | Downloads the three fixture scenes as complete `.SAFE` products |
+| `scripts/preprocess_fixtures.py` | Batch-runs the SNAP chain; skips `_COG` products with an explanation |
+| `tests/test_cdse.py`, `tests/test_preprocess.py`, `tests/test_zenodo.py` | 31 new tests (24 -> 55) |
+
+### Modified
+
+- `graphs/s1_grd_preprocess.xml` - three real bugs fixed (traps 1-3 above), each with a
+  comment explaining why, each guarded by a test.
+- `.env` - `DATABASE_URL` repointed at the **IPv4 session pooler**. The direct host
+  `db.<ref>.supabase.co` is **IPv6-only** and this machine has no IPv6 route, which
+  presents as `failed to resolve host ... getaddrinfo failed` and looks like a typo.
+- `scripts/SETUP_NEW_MACHINE.md` - SNAP install, the Supabase IPv6/pooler trap, the
+  `PROJ_LIB` fix, disk budget.
+- `PLAN/CONSTRAINTS.md` - SNAP-in-a-container constraint **amended** to
+  "not through `esa_snappy` on Windows", with the reason recorded. `gpt` is a plain Java
+  CLI, so **Docker is no longer needed for anything** - Supabase replaced PostGIS too.
+- `PLAN/phases/PHASE-01.md` - "Confirmed on this hardware" section.
+- `scripts/download_cdse_fixture_vv.py` - one lint fix. **Superseded**; it fetches only
+  measurement bands, which cannot be calibrated.
+
+### Machine changes outside the repo
+
+- **ESA SNAP 14** installed at `C:\Program Files\esa-snap` (`winget install
+  EuropeanSpaceAgency.SNAP`). SNAP 12 also installed at `C:\esa-snap-12` while chasing a
+  wrong hypothesis - **not needed**, safe to uninstall.
+- **Machine-level `PROJ_LIB` and `GDAL_DATA` removed.** A PostgreSQL/PostGIS install had
+  set them to its own outdated PROJ database, which shadows rasterio's and breaks every
+  Python geospatial stack on the machine. Symptom: `CRSError ... DATABASE.LAYOUT.VERSION.
+  MINOR = 2`, or `crs.to_epsg()` returning `None` for a valid EPSG:4326 product. **A shell
+  opened before the fix keeps the stale value** - if you see this, open a new one. Old
+  values are recorded in `scripts/SETUP_NEW_MACHINE.md`.
+- PostgreSQL 16 + PostGIS were installed early in the session under the superseded
+  local-Postgres plan. **The project uses Supabase**; the local instance is unused and
+  its only lasting effect was the `PROJ_LIB` pollution above.
+- Python 3.12.10 installed via `pymanager`; `.venv` rebuilt against it with torch
+  **cu128** (verified with a real CUDA allocation, not just `is_available()`).
+
+### Not done, deliberately
+
+- **No Zenodo downloads** - blocked on disk, see the top of this file.
+- **The dB / filter-order question** - raised, not decided. See above.
+- **No scene preprocessed** - the chain works; it needs an uninterrupted multi-hour run.
 
 ## What PHASE-00 delivered
 
@@ -71,10 +232,19 @@ Verified at the time of the commit: `pytest` 11 passed / 1 skipped, `ruff` clean
 
 | | Dev laptop (was) | Training machine (now) |
 |---|---|---|
-| GPU | GeForce GT 710, 2 GB, sm_35 - **unusable** | **RTX 4060 Ti 16 GB**, or **RTX 5070 Ti laptop 12 GB**. Either works; the code adapts |
+| GPU | GeForce GT 710, 2 GB, sm_35 - **unusable** | **RTX 4060 Ti — the 8 GB variant**, sm_89 (see the warning below), or **RTX 5070 Ti laptop 12 GB** |
 | Python | 3.12 (3.11 absent, 3.14 too new for the stack) | Install 3.12, same reason |
-| Database | Local Postgres planned | **Supabase**, hosted. Docker is now only for SNAP |
+| Database | Local Postgres planned | **Supabase**, hosted, reached via the **IPv4 session pooler** |
+| Docker | Required for PostGIS and SNAP | **Not required at all.** Supabase replaced PostGIS; SNAP runs natively via `gpt` |
 | `uv` | Not installed, plain `pip` + `venv` | Either |
+
+> **The desktop card is 8 GB, not 16 GB.** `nvidia-smi` reports 8188 MiB and
+> `doctor` resolves it to 7.996 GB, which falls *just under* `MIN_TRAIN_VRAM_GB
+> = 8.0` in `backend/device.py`. So `doctor` currently reports
+> "too little VRAM to train the PHASE-02 model" on this machine. PHASE-01 needs
+> no GPU, so this is not blocking yet, but **PHASE-02 needs a decision**: use the
+> 5070 Ti laptop, lower the floor and accept a smaller batch, or rent a GPU.
+> Do not assume the 16 GB figure that earlier revisions of this file asserted.
 
 The GT 710 notes scattered through the docs are historical. The floor is **sm_50 or later,
 8 GB+**, and it is enforced in code (`backend/device.py`), not by configuration. `FORCE_CPU`

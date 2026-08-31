@@ -40,7 +40,7 @@ under demo pressure. **Each is a correctness requirement, not a style preference
 | Constraint | Detail |
 |---|---|
 | **Geocoding error < 1 px round-trip** | P004 §2.3: geometric correction is what makes SAR↔AIS matching valid. Any error propagates straight into proximity scoring. Asserted in Phase 1 tests |
-| **SNAP must run in a Linux container** | `esa_snappy` on Windows is a known install hazard. Do not attempt native |
+| **SNAP must not be driven through `esa_snappy` on Windows** | **Amended 2026-08-29.** Originally "SNAP must run in a Linux container", justified by `esa_snappy` being a known Windows install hazard. That hazard is specific to the *Python bindings*. `graphs/s1_grd_preprocess.xml` is a **GPT graph** run by `gpt`, a plain Java CLI with no Python binding involved, so `backend/ingest/sar/preprocess.py` invokes it by subprocess natively (SNAP 14, `winget install EuropeanSpaceAgency.SNAP`). The intent — never fight `esa_snappy` on Windows — is preserved. **Reason for the change:** Supabase removed the database's need for Docker, Docker Desktop would not start on the training machine, and `docker/ingest.Dockerfile` had already been deleted, so a container bought nothing but a blocker. Revert to a container if a Linux runner ever becomes the target |
 | **SAHI required for full scenes** | S1 IW scenes are far larger than 1024 px; downscaling loses small slicks |
 | **Rotation augmentation forbidden on geocoded imagery** | Invalidates the pixel↔geo mapping. Mirroring only (as P004 used) |
 | **Weights must declare their class scheme** | `backend/detect` refuses mismatched weights (`INTERFACES.md` §6) |

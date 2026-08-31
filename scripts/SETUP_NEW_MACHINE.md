@@ -24,6 +24,13 @@ trivially rebuilt.
 | Node.js | 20 or 22 LTS | Only if you touch `frontDemo/`, which is **not your track** |
 | NVIDIA driver | recent | Must expose CUDA 12.x for current PyTorch wheels |
 | Git | any | Optional if `.git/` was excluded |
+| **ESA SNAP** | 14 | SAR preprocessing. `winget install EuropeanSpaceAgency.SNAP`. Installs `gpt.exe` to `C:\Program Files\esa-snap\bin\`, which `preprocess.py` finds automatically; override with `SNAP_GPT` |
+| **Docker** | — | **No longer required.** Supabase replaced the PostGIS container, and SNAP is driven natively via `gpt` (see `CONSTRAINTS.md`, amended 2026-08-29) |
+
+> **Disk:** budget ~15 GB for the environment alone. Torch unpacks to ~2.6 GB and the three
+> fixture `.SAFE` products are ~1.6 GB each. A torch install that dies mid-extract with
+> `os error 112` is a full disk, not a broken wheel. The Zenodo corpus needs a further
+> **91 GB** — read `HANDOFF.md` before starting any of it.
 
 Check Python is present:
 
@@ -94,8 +101,25 @@ create a second project.** You only need to:
 
 1. Get the database password from whoever set it, or reset it at
    Dashboard > Project Settings > Database
-2. Put the **direct** connection URI (port 5432, not the 6543 pooler) in `.env` as
-   `DATABASE_URL`, scheme `postgresql+psycopg://`, with `sslmode=require`
+2. Put the connection URI in `.env` as `DATABASE_URL`, scheme `postgresql+psycopg://`,
+   with `sslmode=require`
+
+> **The direct host is IPv6-only.** `db.<ref>.supabase.co` resolves to an AAAA record and
+> nothing else. On a machine or network without working IPv6 — check with
+> `Test-NetConnection ipv6.google.com -Port 443` — psycopg fails with
+> `failed to resolve host ... getaddrinfo failed`, which reads like a wrong hostname but
+> is not. This is what happened on the 4060 Ti desktop.
+>
+> Use the **session pooler** instead. It is IPv4, still on port 5432, and still supports
+> prepared statements, so alembic and psycopg3 both work (the *transaction* pooler on 6543
+> does not, and remains off-limits). The username becomes `postgres.<project_ref>`:
+>
+> ```
+> DATABASE_URL=postgresql+psycopg://postgres.hbctpozvofhxlioywcjw:<password>@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require
+> ```
+>
+> Confirm the exact host in the dashboard rather than assuming the `aws-0` prefix —
+> `aws-1-ap-south-1` also resolves but rejects this tenant.
 
 Confirm you are at the current revision rather than re-running blindly:
 
@@ -129,6 +153,22 @@ reports 11 passed / 1 skipped, the database is not connected - revisit step 4.
 ```bash
 .venv/Scripts/python.exe -m ruff check . && .venv/Scripts/python.exe -m mypy backend
 ```
+
+### If rasterio raises `CRSError ... DATABASE.LAYOUT.VERSION.MINOR = 2`
+
+A PostgreSQL/PostGIS install sets **machine-level `PROJ_LIB` and `GDAL_DATA`** pointing at
+its own bundled PROJ database, which shadows the one rasterio and pyproj ship. It breaks
+every Python geospatial stack on the machine, not just this project. The same cause makes
+`crs.to_epsg()` return `None` for a perfectly valid EPSG:4326 product, which is a very
+convincing false alarm. Clear both (elevated):
+
+```powershell
+[Environment]::SetEnvironmentVariable('PROJ_LIB', $null, 'Machine')
+[Environment]::SetEnvironmentVariable('GDAL_DATA', $null, 'Machine')
+```
+
+Already-running shells keep the stale values in their own process environment, so verify in
+a **freshly launched** one.
 
 ## 6. Start work
 
