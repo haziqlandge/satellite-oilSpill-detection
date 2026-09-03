@@ -194,6 +194,34 @@ export interface ScenarioMeta {
   expectedTop1: string;
 }
 
+/**
+ * The met-ocean forcing this event actually ran through, sampled hour by hour.
+ *
+ * Not a new model and not decoration: these are the same currents and winds
+ * `makeForcing` hands to the drift ensemble, read at the slick centroid across
+ * the event span. The home page charts them so a reader can see *why* the oil
+ * went where it went, rather than being asked to take the trajectory on faith.
+ *
+ * Wind direction follows the meteorological convention `field.ts` uses -- the
+ * direction the wind blows *from*. Current direction is the direction it sets
+ * *towards*, which is the oceanographic convention, and the two are opposite by
+ * discipline rather than by accident. Both are labelled in the interface.
+ */
+export interface Environment {
+  /** Hourly, first parcel in the water through to the forecast horizon. */
+  hours: number[];
+  /** 10 m wind speed, m/s. */
+  windMs: number[];
+  /** Direction the wind blows from, degrees true. */
+  windFromDeg: number[];
+  /** Surface current speed, m/s. */
+  currentMs: number[];
+  /** Direction the current sets towards, degrees true. */
+  currentTowardDeg: number[];
+  /** The semidiurnal tidal component alone, m/s, signed along its major axis. */
+  tideMs: number[];
+}
+
 export interface Run {
   meta: ScenarioMeta;
   detection: Detection;
@@ -218,6 +246,8 @@ export interface Run {
   /** Hour it stopped. Zero means it was still running at acquisition. */
   releaseEndHour: number;
   aisPointCount: number;
+  /** The forcing the drift ran through, for the environment charts. */
+  environment: Environment;
   /**
    * What the spatiotemporal gate considered and what it admitted.
    *

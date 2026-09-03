@@ -65,7 +65,9 @@ export function fieldProjection(
   height: number,
   hours: number[],
   pad = 1.16,
+  opts: { includeTrack?: boolean } = {},
 ): Projection {
+  const { includeTrack = true } = opts;
   const pts: LngLat[] = [];
   for (const h of hours) {
     const f = run.drift.frames.find((x) => x.hour === h);
@@ -73,7 +75,16 @@ export function fieldProjection(
     for (const ring of f.contour90) pts.push(...ring);
   }
   for (const ring of run.detection.parts) pts.push(...ring);
-  const matched = run.suspects[0]?.evidence.matchedSegment;
+  // The matched segment belongs in the fit for a *backward* figure -- it is
+  // the part of the track the origin field is being compared against, and a
+  // frame that cut it off would be hiding the comparison the figure exists to
+  // make.
+  //
+  // Forward it is the opposite. The vessel's track runs off in whatever
+  // direction it was steaming, which has nothing to do with where the oil is
+  // going, and fitting to both puts the data in a diagonal ribbon across a
+  // mostly empty plate. Draw the track, clip it, and frame on the forecast.
+  const matched = includeTrack ? run.suspects[0]?.evidence.matchedSegment : null;
   if (matched) pts.push(...matched);
   return fitProjection(pts, width, height, pad);
 }
@@ -86,6 +97,25 @@ export function fieldHours(run: Run, count = 7): number[] {
   );
   return Array.from({ length: count }, (_, i) =>
     -Math.round((outer * (count - 1 - i)) / (count - 1)),
+  );
+}
+
+/**
+ * Hours to draw an expanding stack of forecast contours over.
+ *
+ * The mirror of `fieldHours`, and deliberately simpler: the backward version
+ * has to decide how far back is worth framing, because an ensemble reversed
+ * past the age estimate is all frame and no argument. Forward there is no such
+ * judgement to make -- the horizon is the horizon, the simulation ran to it,
+ * and every hour in between is a state the forecast asserts.
+ *
+ * Runs from the pass outward, so index 0 is T0 and the last is the horizon.
+ */
+export function forecastHours(run: Run, count = 7): number[] {
+  const outer = run.drift.forwardHours;
+  if (outer <= 0) return [0];
+  return Array.from({ length: count }, (_, i) =>
+    Math.round((outer * i) / (count - 1)),
   );
 }
 

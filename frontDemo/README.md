@@ -1,7 +1,7 @@
-# frontDemo — four products, one scientific engine
+# SlickTrace — one product, two surfaces
 
-Four **independent interface concepts** over the same SAR + AIS oil-spill
-attribution system. **Design exploration feeding PHASE-07, not PHASE-07 itself.**
+A demonstration interface over the SAR + AIS oil-spill attribution system.
+**Design work feeding PHASE-07, not PHASE-07 itself.**
 
 > **Ownership:** this folder is worked on from the dev laptop. `backend/` and
 > `ml/` are worked on from the training machine. Keeping the two apart is what
@@ -26,86 +26,32 @@ npm run build --prefix frontDemo
 
 ---
 
-## What changed, and why
+## What this is now
 
-The previous version was **one website with five themes**. It had a theme
-abstraction whose `ui` object carried panel type, density, console arrangement,
-button shape and radius, and every component branched on it. The conceptual
-differences between the directions were much stronger than the visual ones,
-because five directions were being funnelled through one `Panel`, one
-`PageHeader`, one `Stat`, one `TopNav` and one twelve-column page.
+It was **four independent design studies** — Signal, Terminal, Orbit, Dossier —
+switchable from a rail on the right edge. That study is finished, and the
+directions have been recombined into one product with two surfaces:
 
-It is now **four separate products sharing a scientific engine**:
+| Surface | Route | What it is |
+|---|---|---|
+| **Home** | `#/` | A scroll page that tells a visitor what is happening in the ocean: detection, drift and its forcing, forecast, root cause, suspects, method |
+| **Console** | `#/console` | An operations workstation -- a map, dockable panels, an operational timeline -- and, below it, the same panels at a width you can read them at |
 
-```
-shared data + shared scientific logic + independent presentation systems
-```
+The harvest, in one line each:
 
-not
+- **Signal** gave the home page its composition, typography and masthead.
+- **Dossier** gave it the **graphs** — the chart frame, the origin-field and
+  convergence plates, the SAR plate, the width profile, the wind gate, the event
+  strip, the flag sparkline. Its *paper vocabulary* (stamps, redaction,
+  footnotes, Roman numerals) was deliberately left behind.
+- **Orbit** gave it the **live readouts** — gauges, segment bars, traces, rockers.
+- **Terminal** became the console whole, then grew a window manager.
 
-```
-shared page + theme variables
-```
-
-`src/designs/signal/` imports nothing from `src/designs/terminal/`. There is no
-`designs/shared/`, deliberately — the moment one exists the four start
-converging on it again. A `SignalEvidenceBlock`, a `TerminalPane`, an
-`OrbitInstrument` and a `DossierExhibit` are conceptually different objects and
-are written as such.
-
-The four are lazy-loaded (`src/designs/registry.ts`). That is an isolation
-decision before it is a performance one: a build error in one direction must not
-take the other three down, and an error boundary per direction means a reader
-can always switch away from a broken one.
-
----
-
-## The four directions
-
-Switch between them from the neutral control on the right edge. The choice
-persists in `localStorage`. **The control is not part of any of the four** — it
-uses none of their tokens and says on its face that it is a demo control,
-because a shared navigation element is exactly how four products become one.
-
-| # | Name | Product | Composition | Navigation | Map is |
-|---|---|---|---|---|---|
-| 01 | **Signal** | Investigative publication | Long-form editorial scroll, three-column spread with a fixed reading measure and real marginalia | Publication masthead, six sections of an issue | An evidence exhibit — one fixed plate with a caption |
-| 02 | **Terminal** | Operations workstation | Fixed-viewport workstation, no page scroll | Numbered command rail | The primary workspace, UI arranged around it |
-| 03 | **Orbit** | Mission control | Floating instrument rails over a full-bleed map | Mission status bar + mode rails | The product; everything orbits it |
-| 04 | **Dossier** | Evidence archive | Document spreads, numbered exhibits, ruled sections | Roman-numeral case index | A forensic exhibit — a printed chart |
-
-### Colour is the last layer
-
-The four are meant to be distinguishable **in grayscale**. Composition,
-navigation, density, typography and the relationship between text and map do the
-work; the palette is applied afterwards.
-
-**Dossier is the only light direction**, and not for variety's sake: a case file
-is paper, and every convention it borrows — exhibit stamps, ruled margins,
-marginal notes, redaction, footnotes — is a convention of ink on a light ground.
-Its map uses Esri's light grey canvas so it reads as a printed chart. The other
-three are dark, because the primary surface of this application is a map and a
-light map loses the low-opacity credible-region contours entirely.
-
-Each direction takes a different world underneath its data, and one of them
-tints it. Esri's rasters are neutral grey and `raster-saturation` cannot put
-colour into a source that has none, so `MapPaint.basemapTint` lays a translucent
-background layer between the raster and the data instead. Terminal is the only
-direction that uses it: a console wants the coastline present but subordinate
-and in its own ink, not a grey map borrowed from somewhere brighter.
-
-### Typography
-
-Signal and Dossier deliberately **invert the same two families**. A grotesk
-headline over a serif reading column is a magazine; a serif headline over a sans
-body is a document. Same ink, opposite institutions.
-
-| | Display | Body | Values |
-|---|---|---|---|
-| Signal | Archivo | Newsreader | IBM Plex Mono |
-| Terminal | IBM Plex Mono | IBM Plex Mono | IBM Plex Mono |
-| Orbit | Chakra Petch | Manrope | IBM Plex Mono |
-| Dossier | Newsreader | Archivo | IBM Plex Mono |
+Both plate and instrument files were already **100% token-driven** — no
+hardcoded colours anywhere — which is what made this a recombination rather than
+a rewrite. The one real adaptation was value, not hue: Dossier's plates were
+composed for ink on paper and had to be re-weighted for a near-black ground
+(see *Two things that were measured, not guessed* below).
 
 ---
 
@@ -113,67 +59,91 @@ body is a document. Same ink, opposite institutions.
 
 ```
 src/
-  sim/            the simulation. Untouched by the redesign
+  sim/            the simulation. Untouched by the recombination
   map/            MapCanvas, layer definitions, particle overlay
   lib/
     format.ts     vocabulary: term labels, timestamps, ageStatement()
-    playback.ts   the event, hour by hour: phase, extent, contacts
+    playback.ts   the event, hour by hour: phase, extent, contacts, checkpoints
     project.ts    SVG projection arithmetic for figures
     motion.ts     anime.js scope + scroll reveal
-    hash.ts       hash routing; each design defines its own sections
-  useRun.ts       scenario state, shared across every design
+    palette.tsx   the runtime colour overlay, both surfaces
+    hash.ts       hash routing
+    spill.ts      per-block scenario state
+  components/     shared by both surfaces
+    FloatShell      a draggable, resizable window with no opinions
+    PalettePanel    the RGB / token / basemap controls
+    SarTile
   content.ts      the project's FACTS. Not its copy
-  design.ts       the four directions: map paint, fonts, accents
-  designs/
-    signal/  terminal/  orbit/  dossier/
+  theme.ts        the two surfaces: map paint, fonts, accents
+  site/           the home page
+    SiteShell  Nav  SpillSelect  Loading  ShipTrail
+    components.tsx  figures.tsx   (from Signal)
+    scenery.tsx                   the tanker and the stage chain
+    plates.tsx                    (from Dossier)
+    instruments.tsx               (from Orbit)
+    env.tsx                       wind / current / growth charts
+    sections/  Ocean  Drift  Damage  Cause  Method
+  console/        the operations console
+    ConsoleShell  Workspace  Timeline  LogStream  panes  reports
+    (ConsoleShell also owns PanelDeck, the readable section below the fold)
+    SpillKey  PanelsMenu  Popover
+    dock/  useDock  DockRail  FloatWindow
 ```
 
-**What is shared is science or arithmetic.** `content.ts` holds the pipeline
-stages, the six scoring terms, the prior-art comparison and the limits — those
-are the project's positions. It deliberately does **not** hold headlines, ledges
-or section names: a publication opening an investigation, a workstation
-reporting its state, an instrument coming online and a case file being unsealed
-are not the same sentence in four typefaces.
+### Every figure owns its own spill
 
-### The event playback
+The rule the home page is built around: **each data block carries its own spill
+control, and changing one must not change any other.** `useSpill` in
+`lib/spill.ts` is one instance per block, with its own run, its own clock and
+its own selection.
 
-`src/lib/playback.ts` is the derivation all four share for showing the spill as
-something that **happened** rather than a finished shape. `momentAt(run, hour)`
-returns the phase, how much oil is in the water, the surface extent, and which
-vessels were within 12 km at that instant — from the first parcel entering the
-water through to the forecast horizon. Each direction renders it in its own
-grammar: Signal as small multiples across a spread, Terminal as an operational
-timeline with a log stream, Orbit as the mission's central animation, Dossier as
-a chronological register.
+Two things make that affordable: `buildRun` is memoised per `scenario:variant`,
+so the second block to ask for a case pays nothing; and a block does not build
+its run until it nears the viewport, so four half-second builds are never paid
+at once on load.
 
-The proximity list is explicitly **not a ranking**. It is who was in the
-neighbourhood, which is a far weaker claim than a candidate, and all four say so.
+Drift and its environment subsection share one control on purpose. Those charts
+*are* the forcing that drift ran through, and letting them disagree would be a
+lie about which ocean moved which oil.
+
+### The console is a window manager
+
+`console/dock/` is hand-rolled, about 600 lines. Panels dock left or right, tear
+off into floating windows on a double-click, close to a menu and come back from
+it. Dock widths drive `--panel-scale`, so widening a dock genuinely enlarges its
+type rather than giving small type more room.
+
+The state is one flat record of panel → placement, not the nested split-tree a
+dock library keeps: there are two fixed docks and no arbitrary splitting, and a
+tree would cost an order of magnitude more code for a rearrangement nobody asked
+for. Layout persists under `slicktrace:dock`, and **there is always a reset**.
 
 ---
 
 ## Scientific integrity
 
 These are correctness requirements from `PLAN/CONSTRAINTS.md`, not disclaimer
-text, and they survive in all four directions:
+text, and they survived the recombination:
 
 - **Age is never a bare scalar.** `ageStatement()` in `lib/format.ts` handles the
   case the old UI got wrong: for an ongoing discharge the interval collapses to
-  `0–0 h`, and printing that as a measurement is false precision in the opposite
-  direction. It states "ongoing" instead, with the method beside it.
+  `0–0 h`, and printing that as a measurement is false precision. It states
+  "ongoing" instead, with the method beside it.
 - **Damping is a relative dB index, never a thickness.** There is no field for
   microns or for spilled volume anywhere in the interface.
 - **`insufficient_evidence` is prominent, never an empty list.** The
   `mumbai-null` scenario triggers it.
 - **Every score decomposes** into six named terms with weights and the geometry
   that produced them. No bare totals.
-- **Backward drift is an ensemble** producing credible regions. Nothing implies
-  it recovers a precise point.
+- **Drift is an ensemble** producing credible regions, in either direction.
+  Nothing implies it recovers a precise point. Note that the *figures* now run
+  forward -- see "Which way the figures run" below -- while the attribution
+  underneath them is still conditioned on the backward field.
 - **Wind gate is a continuous multiplier**, surfaced, never a silent filter.
 - **Dark vessels are ranked but never named.** All identities are masked
   (`MMSI 636•••••4`).
-- **Simulated data stays visibly simulated**, integrated per direction: a source
-  note in Signal, a status flag in Terminal, telemetry metadata in Orbit, an
-  evidence classification in Dossier.
+- **Simulated data stays visibly simulated** — a source note on the home page, a
+  `SIM` flag in the console.
 - Language is **candidate, suspected, score** — never responsible or confirmed.
 
 ---
@@ -182,24 +152,40 @@ text, and they survive in all four directions:
 
 - **Vite + React 19 + TypeScript**, `strict`, `noUnusedLocals`
 - **Tailwind v4** via `@tailwindcss/vite`. Tokens are CSS custom properties in
-  `src/index.css`, re-pointed under `[data-design="..."]`
+  `src/index.css`, re-pointed under `[data-surface="..."]`
 - **anime.js v4.5** — named exports (`animate`, `createTimeline`, `stagger`,
   `svg.createDrawable`, `text.split`, `onScroll`, `createScope`, `utils`). Any v3
   snippet found online will not work here
 - **MapLibre GL JS**, no API key. Esri basemaps, no token
 - Fonts self-hosted through `@fontsource`, never a `<link>` to Google Fonts
 
-### Three bugs worth not reintroducing
+---
 
-**Drawing the oil and the hindcast at the same weight.** They are the same kind
-of mark and they mean opposite things. The backward ensemble is at its widest at
-the far end of the backward horizon — reversal spreads, it does not focus —
-which is exactly the hour when least oil is in the water. Painted at equal
-weight, the playback claims the spill was larger before it began than at the
-moment it was photographed. `ParticleOverlay` keeps the oil bright and the
-hindcast a faint haze behind it while the two are on screen together, and gives
-the haze its full weight only when there is no oil cloud to be confused with.
+## Which way the figures run
 
+Every drawn figure on both surfaces runs **forward from the satellite pass**.
+Figures 2A and 2B on the home page, the console's `FieldScope`,
+`ConvergencePlot`, `SpreadPlot` and `TrackScope`, the console timeline, and both
+maps' particle clouds all start at T0 and end at the forecast horizon.
+
+This was a deliberate change of subject and it costs something worth naming. The
+backward origin field is what the AIS gate is conditioned on -- it is the
+project's actual contribution -- and it is no longer *drawn* anywhere. The
+system still computes it, `run.drift` still carries it, the score decomposition
+still rests on it, and the panes still state the age interval as a value. What
+has gone is the picture of it.
+
+Two consequences to know before editing:
+
+- `run.drift.convergence` is pre-filtered to backward hours in `sim/drift.ts`
+  and has no forward analogue. Anything forward reads
+  `run.drift.frames.filter(f => f.hour >= 0)`, whose frames already carry
+  `area90Km2` and `spreadKm`
+- `fieldHours()` and `forecastHours()` in `lib/project.ts` are mirrors of each
+  other. `fieldProjection` takes `{ includeTrack }` because a forward plate
+  framed on a vessel's track is mostly empty plate
+
+## Traps worth not re-entering
 
 **`body { overflow-x: hidden }`.** CSS will not give you `overflow-x: hidden`
 with `overflow-y: visible` — the used value of the other axis becomes `auto`,
@@ -209,12 +195,56 @@ triggers, so every element primed to `opacity: 0` stays there and the page below
 the fold renders as a black rectangle with nothing in the console. Use
 `overflow-x: clip`.
 
-**`onScroll({ enter: ... })` threshold order.** It reads
-`"<target edge> <container edge>"`. `"bottom-=80 top"` asks for the moment the
-target's bottom reaches the viewport's top — that is the element *leaving*
-upward. `"top bottom-=80"` is the one that means "arriving". `revealFallback()`
-in `lib/motion.ts` is the backstop: priming an element to invisible is a bet that
-something will set it back, and that bet losing must not produce a blank page.
+**`overflow-x: auto` on a bar that carries a menu.** The console header had it so
+its content could scroll on a narrow viewport, and it silently clipped both
+dropdowns hung off it: they opened, set their state correctly, and rendered as a
+few-pixel sliver. Raising `z-index` fixes nothing — no z-index escapes an
+overflow clip, and a `z-50` inside a header is only `z-50` *within the header*.
+Both menus now render into `document.body` through a portal (`console/Popover`).
+
+**Drawing the oil and the hindcast at the same weight.** They are the same kind
+of mark and they mean opposite things. The backward ensemble is at its widest at
+the far end of the backward horizon — reversal spreads, it does not focus —
+which is exactly the hour when least oil is in the water. Painted at equal
+weight, the playback claims the spill was larger before it began than at the
+moment it was photographed.
+
+**An animation that primes its targets to `opacity: 0`.** A hidden tab throttles
+`requestAnimationFrame` to roughly one frame a second, so a one-second reveal
+takes most of a minute and anything reading the page meanwhile -- a screenshot,
+a scrape, a reader coming back to the tab -- finds blank space. `revealOnScroll`
+has carried a timed backstop for this since it was written;
+`useAnimeScopeInView` takes a `backstop` selector for the same reason. If a
+setup hides something, arrange for it to come back even when the timeline does
+not run. Prime with `opacity` as well as any transform, so the rescue has one
+uniform signal to look for.
+
+**A CSS custom property set from an effect, consumed by the same element.**
+`DockRail` set `--dock-w` in a `useEffect` keyed on `[size, side]`. Close every
+panel in a dock and the rail unmounts; reopen one and it mounts a fresh element
+whose deps have not changed, so the effect never re-runs, `width: var(--dock-w)`
+resolves to `auto`, and the panel takes the whole viewport. The resting width is
+rendered now; only the drag writes to the DOM.
+
+---
+
+## Two things that were measured, not guessed
+
+**The console map was not lighter until `brightness-min` moved.** Lowering
+`raster-brightness-max` pushes a basemap back but never makes it greyer — Esri's
+dark canvas over open ocean has almost no bright pixels for a ceiling to act on.
+`raster-brightness-min` is the control that lifts the floor. And the lift was
+invisible until the scanline overlay came down from `opacity: 0.22` with a
+radial vignette to a flat `0.1`: the paint properties read back exactly as set
+while a full-viewport wash put the grey straight back to near-black.
+
+**The wind chart is about direction because the speed is constant.**
+`makeForcing` holds wind *speed* fixed per scenario and veers only direction, so
+a speed time series is a dead-flat line and an area fill under it implies an
+accumulation that is not happening. The chart makes the veer the subject, draws
+the speed as the single value it is against the detectability band, and says in
+its caption that the constancy is a property of the simulation rather than a
+calm.
 
 ---
 
@@ -223,5 +253,6 @@ something will set it back, and that bet losing must not produce a blank page.
 | Issue | Detail |
 |---|---|
 | Age interval is degenerate for ongoing releases | The simulation returns `[0, 0, 0]` for four of the five scenarios. `ageStatement()` presents this honestly, but the underlying `source_coincidence` estimator is worth revisiting in PHASE-04 |
-| Requires network for the basemap | True of all four now — Terminal used to draw no world at all. Everything else is generated locally; the map reports a tile failure in the corner and the graticule, scene, slick, origin field and traffic all still draw (C12) |
-| Not wired to the API | All content comes from `src/sim/`. PHASE-07 is where that becomes a transport change |
+| Requires network for the basemap | Everything else is generated locally; the map reports a tile failure in the corner and the graticule, scene, slick, origin field and traffic all still draw (C12) |
+| Not wired to the API | All content comes from `src/sim/`. PHASE-07 is where that becomes a transport change — the shapes already mirror `PLAN/INTERFACES.md` §2 |
+| No automated tests | There is no test harness in `frontDemo/` |

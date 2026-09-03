@@ -7,17 +7,13 @@
 /*
   Self-hosted via @fontsource, never a <link> to Google Fonts.
 
-  Four type systems, one per direction, chosen so that no two directions can be
-  mistaken for each other in a grayscale screenshot:
+  Two type systems, one per surface:
 
-    Signal    grotesk display over a serif reading column   -- a magazine
-    Terminal  one monospace, everywhere, no exceptions      -- a workstation
-    Orbit     technical geometric display, humanist body    -- an instrument
-    Dossier   serif display over a utilitarian sans body    -- a document
+    Home     grotesk display over a serif reading column  -- a magazine
+    Console  one monospace, everywhere, no exceptions     -- a workstation
 
-  Signal and Dossier deliberately invert the same two families. A grotesk
-  headline over serif prose reads as editorial; a serif headline over sans prose
-  reads as official. Same ink, opposite institutions.
+  The home page is read and the console is operated, and the type says so
+  before the colour does.
 */
 @import "@fontsource-variable/archivo";
 @import "@fontsource-variable/newsreader";
@@ -64,8 +60,16 @@
   --accent-ink: #0a0c0f;
 }
 
-/* 01 SIGNAL -- warm newsprint negative. High contrast, sodium accent. */
-[data-design="signal"] {
+/*
+  HOME -- warm newsprint negative. High contrast, sodium accent.
+
+  `--warn` and `--alarm` are defined on both surfaces now. They used to exist
+  only under Terminal, which meant the instrument components harvested from
+  Orbit had to reach into the map paint for a caution ink. They are real states
+  the home page can also be in -- a degraded wind gate, a withheld attribution
+  -- so they are real tokens.
+*/
+[data-surface="site"] {
   color-scheme: dark;
   --ink: #f4f1ea;
   --ink-dim: #a49a8d;
@@ -76,50 +80,43 @@
   --line: #2a2723;
   --accent: #ff7a2f;
   --accent-ink: #140a03;
+  --warn: #f0c419;
+  --alarm: #ff4d4d;
+  /*
+    The console call to action, and nothing else.
+
+    A distinct orange-red rather than a reuse of `--accent`: it is the only
+    filled button on the page, and a filled button in exactly the accent colour
+    reads as another highlight rather than as the one door out of the document.
+  */
+  --cta: #ff4a1c;
+  --cta-ink: #160702;
 }
 
-/* 02 TERMINAL -- near-black, phosphor, amber for warnings. */
-[data-design="terminal"] {
+/*
+  CONSOLE -- phosphor on graphite.
+
+  The ground is deliberately off near-black. Terminal ran at `--base: #050706`,
+  which is a hole in the screen; every rule, every inactive label and the map
+  underneath all had to fight it. Lifting the whole ladder keeps the phosphor
+  reading as phosphor while giving the panel chrome somewhere to sit.
+*/
+[data-surface="console"] {
   color-scheme: dark;
-  --ink: #cfdad3;
-  --ink-dim: #76867d;
-  --ink-faint: #47554d;
-  --base: #050706;
-  --base-2: #0a0f0c;
-  --base-3: #101713;
-  --line: #1a2420;
+  --ink: #d5e0d9;
+  --ink-dim: #83978c;
+  --ink-faint: #5a6b62;
+  --base: #0e1211;
+  --base-2: #141a17;
+  --base-3: #1b231f;
+  --line: #26322c;
   --accent: #4fe08a;
   --accent-ink: #02120a;
   --warn: #ffbd2e;
   --alarm: #ff5f56;
-}
-
-/* 03 ORBIT -- deep blue-black, ice. */
-[data-design="orbit"] {
-  color-scheme: dark;
-  --ink: #e2ecf5;
-  --ink-dim: #8698a8;
-  --ink-faint: #556575;
-  --base: #060a11;
-  --base-2: #0b1119;
-  --base-3: #111a24;
-  --line: #1c2732;
-  --accent: #4fd8e8;
-  --accent-ink: #03141a;
-}
-
-/* 04 DOSSIER -- paper. Ink on a warm light ground, oxide red for findings. */
-[data-design="dossier"] {
-  color-scheme: light;
-  --ink: #1c1815;
-  --ink-dim: #5d564c;
-  --ink-faint: #8b8377;
-  --base: #e9e4d9;
-  --base-2: #f1ede4;
-  --base-3: #ded8cb;
-  --line: #c3bcac;
-  --accent: #b8221f;
-  --accent-ink: #f7f4ec;
+  /* The header band that names a group of controls. */
+  --group: #1c4a33;
+  --group-ink: #bdf5d5;
 }
 
 @layer base {
@@ -269,8 +266,7 @@
 
   The library ships light-mode controls. Left alone on a dark map they are two
   white boxes, which is the most obvious sign of a map dropped in rather than
-  designed with. The icon inversion is conditional, because Dossier's map is a
-  light printed chart and inverting there would undo the fix.
+  designed with. Both surfaces are dark, so the inversion is unconditional.
 */
 .maplibregl-ctrl-group {
   background: color-mix(in oklab, var(--base-2) 88%, transparent) !important;
@@ -284,20 +280,12 @@
   border-top: 1px solid var(--line) !important;
 }
 
-[data-design="signal"] .maplibregl-ctrl-group button .maplibregl-ctrl-icon,
-[data-design="terminal"] .maplibregl-ctrl-group button .maplibregl-ctrl-icon,
-[data-design="orbit"] .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
   filter: invert(1) opacity(0.62);
 }
 
-[data-design="signal"] .maplibregl-ctrl-group button:hover .maplibregl-ctrl-icon,
-[data-design="terminal"] .maplibregl-ctrl-group button:hover .maplibregl-ctrl-icon,
-[data-design="orbit"] .maplibregl-ctrl-group button:hover .maplibregl-ctrl-icon {
+.maplibregl-ctrl-group button:hover .maplibregl-ctrl-icon {
   filter: invert(1) opacity(0.95);
-}
-
-[data-design="dossier"] .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
-  filter: opacity(0.7);
 }
 
 .maplibregl-ctrl-scale {
@@ -322,8 +310,203 @@
   outline: none;
 }
 
-/* Terminal and Orbit hide the default zoom furniture; each draws its own. */
-[data-design="terminal"] .maplibregl-ctrl-top-right,
-[data-design="orbit"] .maplibregl-ctrl-top-right {
+/* The console draws its own zoom furniture. */
+[data-surface="console"] .maplibregl-ctrl-top-right {
   display: none;
+}
+
+/* ------------------------------------------------------------------ *
+ * The console's panel reader
+ * ------------------------------------------------------------------ */
+
+/*
+  The same panes as the docks, rendered to be read rather than monitored.
+
+  The console proper is dense on purpose: it is a room you stand in, everything
+  has to be visible at once, and nine-pixel type in a three-hundred-pixel rail
+  is the cost of that. The reader below it exists precisely because that bargain
+  is a bad one when you actually want to *read* a pane.
+
+  Three layouts have been tried here. Two were wrong and it is worth saying how,
+  because neither failure is visible from the markup.
+
+    1. Poured into dock-width columns. Used the page, kept every compact
+       decision -- the same clunky dashboard, rearranged.
+    2. One column at `zoom: 1.32` in a 52rem measure. `zoom` scales a pane and
+       everything in it by one factor, so the *type* held its proportions. What
+       it never touches is a `w-full` SVG with a fixed viewBox, which sizes to
+       its container and not to the zoom. Given 480px, a plot composed at 320
+       units ran at 1.5x -- 2.2x for the track scope's 220 -- and carried its
+       tick labels up with it, so a caption drawn at 7 units came out at twenty
+       pixels, larger than the pane title above it and the prose beside it.
+    3. A margin column: every block label turned ninety degrees into a 12rem
+       gutter with its body in a measure alongside. It measured correctly and
+       read wrongly. A section label with a rule running off it is what makes
+       one of these panes a console pane rather than a document, and moving all
+       of them into a margin traded the surface's own furniture for tidiness.
+
+  What is here now keeps the labels where they were -- full width, ruled, meta
+  at the far end -- and spends the extra width inside the body instead, where a
+  figure can sit beside the rows and the note that explain it. `Split` is that
+  pairing, and it is used only where there is genuinely both to pair.
+
+  `zoom` stays. It is still the only way to lift a dozen files of hard-coded
+  pixel sizes at once. The thing it never governed -- figure scale -- is now
+  governed directly, by `--fig-w` set beside each viewBox in
+  `console/instruments.tsx`.
+*/
+
+[data-panel-reader] [data-pane-host] {
+  zoom: 1.32;
+  /* Sized by the split, not by a reading measure: a 408px figure, a 1.75rem
+     gutter and enough left for the text beside it to run about fifty
+     characters, plus the body's own padding. Centred, so the slack falls
+     either side rather than leaving the pane hard against the left. */
+  max-width: 52rem;
+  margin-inline: auto;
+}
+
+/* Flow with the page. The workstation above still scrolls inside itself. */
+[data-panel-reader] [data-pane-body],
+[data-panel-reader] [data-pane-narrow] {
+  height: auto;
+  overflow: visible;
+}
+
+/* A pane is a flex child in a dock and a plain block here. */
+[data-panel-reader] [data-pane-body],
+[data-panel-reader] [data-pane-narrow],
+[data-panel-reader] section {
+  min-height: 0;
+  flex: initial;
+}
+
+/* Room to breathe. In a rail the blocks are stacked tight because there is no
+   room to spare; here there is. */
+[data-panel-reader] [data-pane-body],
+[data-panel-reader] [data-pane-narrow] {
+  padding: 1.15rem 1.35rem 1.6rem;
+}
+
+[data-panel-reader] [data-pane-body] > * + * {
+  margin-top: 1.65rem;
+}
+
+/* ---- a figure beside its text ------------------------------------ *
+ *
+ * The figure column is `auto`, so it is the figure's own `--fig-w` that sets
+ * it and the text takes whatever is left. That is deliberate: the field scope
+ * is a square and asks for less width than a wide plot, and the text beside it
+ * should get the difference rather than the layout forcing every figure to one
+ * size.
+ *
+ * Placement is explicit rather than by source order, so a dock rail keeps the
+ * sequence it already had -- figure, then the readings under it.
+ */
+
+[data-panel-reader] [data-block-split] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 1.75rem;
+  align-items: start;
+}
+
+[data-panel-reader] [data-split-text] {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+[data-panel-reader] [data-split-figure] {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+/*
+  The figure needs a definite width, not just a cap.
+
+  An `auto` grid track sizes to its content's max-content contribution, and for
+  a `width: 100%` SVG that is the replaced-element default of 300px -- not the
+  viewBox, and not `max-width`. So the wind gate came out at 300 and the radar
+  tile, which is a canvas carrying real `width` and `height` attributes, came
+  out at its full 408: two figures in the same pane at two different scales for
+  a reason nothing in the markup showed. Reading `--fig-w` as the width as well
+  as the cap makes the track resolve to the number the instrument stated.
+*/
+[data-panel-reader] [data-split-figure] svg,
+[data-panel-reader] [data-split-figure] canvas,
+[data-panel-reader] [data-split-figure] [data-fig] {
+  width: var(--fig-w, 25rem);
+}
+
+/* In a rail these stack, and the note under a plot needs its own gap. */
+[data-block-split] > [data-split-text] {
+  margin-top: 0.5rem;
+}
+
+[data-panel-reader] [data-block-split] > [data-split-text] {
+  margin-top: 0;
+}
+
+/*
+  Prose gets a measure. Everything else on a pane is a row, a box or a table,
+  and those are meant to run the width -- a dotted leader carrying a label
+  across to its value is the whole idiom. A paragraph is not: `Note` bodies and
+  the track scope's caption are the longest text on either surface, and at full
+  width here they ran to a hundred and twenty characters a line.
+*/
+[data-panel-reader] [data-prose] {
+  max-width: 66ch;
+}
+
+/*
+  A row of stat boxes is a readout, not a banner.
+
+  Left to the full measure each cell came out around 260px holding a nine-pixel
+  label and five digits -- fifteen per cent ink and the rest air, which is the
+  same complaint the figures answered. 26rem puts a two-up cell at 208px and a
+  three-up at 139px, which is within a few pixels of what the same grid gets in
+  a 430px dock rail: the proportion these boxes were drawn at.
+*/
+[data-panel-reader] [data-fields] {
+  max-width: 26rem;
+}
+
+
+/*
+  Figures sit at the scale they were composed for.
+
+  `--fig-w` is set on each instrument beside its viewBox; the fallback catches
+  anything that has not stated one. `canvas` is in the selector because the
+  radar tile is one, and a rule that said `svg` let the single largest element
+  in the reader straight through it.
+*/
+[data-panel-reader] [data-pane-body] svg,
+[data-panel-reader] [data-pane-body] canvas,
+[data-panel-reader] [data-pane-body] [data-fig] {
+  max-width: var(--fig-w, 25rem);
+}
+
+/* The log is the one panel with no natural end -- it holds a hundred and sixty
+   transitions. It keeps its own scroller here rather than running the page
+   several thousand pixels past the bottom of every other panel. */
+[data-panel-reader] [role="log"] {
+  max-height: 30rem;
+}
+
+/*
+  Narrow: back to the dock's own shape.
+
+  Below the breakpoint `useNarrow` already uses there is no room to set a figure
+  beside anything, and the split becomes what it is in a rail -- one column,
+  figure then text, which is the layout every one of these components was drawn
+  for in the first place.
+*/
+@media (max-width: 1023px) {
+  [data-panel-reader] [data-block-split] {
+    display: block;
+  }
+
+  [data-panel-reader] [data-block-split] > [data-split-text] {
+    margin-top: 0.5rem;
+  }
 }

@@ -22,10 +22,11 @@ import {
   dataLayers,
   graticule,
   hasLabels,
+  slickInk,
   type LayerToggles,
 } from "./basemap";
 import { ParticleOverlay } from "./ParticleOverlay";
-import type { MapPaint } from "../design";
+import type { MapPaint } from "../theme";
 import type { LngLat, Run, Suspect } from "../sim/types";
 import { positionAt } from "../sim/ais";
 
@@ -34,6 +35,20 @@ interface Props {
   paint: MapPaint;
   /** Hours from acquisition. Negative is backward. */
   hour: number;
+  /**
+   * How much of the event the particle clouds are allowed to draw.
+   *
+   * `"both"` is the whole run: the release accumulating before the pass, and
+   * the ensemble either side of it -- held back to a faint haze while the oil
+   * is on screen, because reversal spreads and a backward cloud painted at the
+   * weight of the oil claims a spill larger than the one photographed.
+   *
+   * `"forward"` starts at the pass. Nothing from before acquisition is drawn:
+   * no release accumulation, no hindcast haze, only the forecast ensemble and
+   * the mask the segmenter returned. A figure about where the oil *goes* should
+   * not have the hindcast sitting behind it under a different meaning.
+   */
+  direction?: "both" | "forward";
   toggles: LayerToggles;
   selected: Suspect | null;
   onSelect?: (id: string | null) => void;
@@ -126,6 +141,7 @@ export function MapCanvas({
   run,
   paint,
   hour,
+  direction = "both",
   toggles,
   selected,
   onSelect,
@@ -297,6 +313,15 @@ export function MapCanvas({
       map.setPaintProperty("basemap", "raster-opacity", paint.basemapOpacity);
       map.setPaintProperty("basemap", "raster-saturation", paint.basemapSaturation);
       map.setPaintProperty("basemap", "raster-contrast", paint.basemapContrast);
+      // The floor as well as the ceiling. `min` is the control that actually
+      // greys a dark raster -- see `MapPaint.basemapBrightnessMin` -- and
+      // leaving it out of the live path made it the one basemap number that
+      // could not be changed without a reload.
+      map.setPaintProperty(
+        "basemap",
+        "raster-brightness-min",
+        paint.basemapBrightnessMin,
+      );
       map.setPaintProperty(
         "basemap",
         "raster-brightness-max",
@@ -319,7 +344,15 @@ export function MapCanvas({
     overlayRef.current?.setReleaseColour(paint.target);
     overlayRef.current?.setAdditive(isDarkGround(paint.water));
 
-    const repaint: [string, string, string][] = [
+    // Every layer `dataLayers` paints from the theme, not a subset of them.
+    //
+    // This list used to stop at the contours and the tracks, which meant the
+    // slick mask, the release, the CFAR targets and the head/tail markers were
+    // painted once at construction and never again -- a paint change appeared
+    // to work everywhere except on the two marks the map is most about. The
+    // data-driven ones carry the same expressions `dataLayers` builds;
+    // `setPaintProperty` takes an expression as happily as a colour.
+    const repaint: [string, string, unknown][] = [
       ["contour50-line", "line-color", paint.contour50],
       ["contour50-fill", "fill-color", paint.contour50],
       ["contour90-line", "line-color", paint.contour90],
@@ -333,6 +366,33 @@ export function MapCanvas({
       ["infrastructure", "circle-color", paint.infrastructure],
       ["infrastructure", "circle-stroke-color", paint.infrastructure],
       ["graticule", "line-color", paint.graticule],
+
+      ["slick-fill", "fill-color", slickInk(paint)],
+      ["slick-line", "line-color", slickInk(paint)],
+      ["slick-axis", "line-color", paint.target],
+      ["release-fill", "fill-color", paint.target],
+      ["release-line", "line-color", paint.target],
+      [
+        "targets",
+        "circle-stroke-color",
+        ["case", ["get", "matched"], paint.target, paint.dark],
+      ],
+      [
+        "markers",
+        "circle-color",
+        [
+          "match",
+          ["get", "kind"],
+          "head",
+          paint.slick,
+          "tail",
+          paint.slickUnknown,
+          "vessel",
+          paint.suspect,
+          paint.target,
+        ],
+      ],
+      ["markers", "circle-stroke-color", paint.water],
     ];
     for (const [layer, prop, value] of repaint) {
       if (map.getLayer(layer)) map.setPaintProperty(layer, prop, value);
@@ -407,13 +467,23 @@ export function MapCanvas({
       ),
     );
 
+    // Under `direction: "forward"` the two clouds that only exist before the
+    // pass are never handed over at all, rather than being filtered at draw
+    // time: the overlay's own weighting rule ("held back while the oil is on
+    // screen") is about the pre-pass regime, and the cleanest way to leave that
+    // rule intact is to give it nothing from before the pass to reason about.
+    const forwardOnly = direction === "forward";
     overlayRef.current?.setFrames(
-      run.drift.frames.map((f) => ({ hour: f.hour, particles: f.particles })),
+      run.drift.frames
+        .filter((f) => (forwardOnly ? f.hour >= 0 : true))
+        .map((f) => ({ hour: f.hour, particles: f.particles })),
     );
     overlayRef.current?.setReleaseFrames(
-      run.release.map((f) => ({ hour: f.hour, particles: f.particles })),
+      forwardOnly
+        ? []
+        : run.release.map((f) => ({ hour: f.hour, particles: f.particles })),
     );
-  }, [run, ready, paint.graticuleStepDeg]);
+  }, [run, ready, direction, paint.graticuleStepDeg]);
 
   /* --- time -------------------------------------------------------- */
 

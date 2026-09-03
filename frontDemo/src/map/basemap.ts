@@ -18,7 +18,7 @@ import type {
   LayerSpecification,
   StyleSpecification,
 } from "maplibre-gl";
-import type { MapPaint } from "../design";
+import type { MapPaint } from "../theme";
 
 /*
   Basemaps, from Esri's public ArcGIS services.
@@ -90,7 +90,7 @@ export function buildStyle(paint: MapPaint): StyleSpecification {
   ];
 
   if (paint.basemap !== "none") {
-    const cfg = BASEMAPS[paint.basemap];
+    const cfg = BASEMAPS[paint.basemap as Exclude<MapPaint["basemap"], "none">];
     sources.basemap = {
       type: "raster",
       tiles: [...cfg.tiles],
@@ -106,6 +106,7 @@ export function buildStyle(paint: MapPaint): StyleSpecification {
         "raster-opacity": paint.basemapOpacity,
         "raster-saturation": paint.basemapSaturation,
         "raster-contrast": paint.basemapContrast,
+        "raster-brightness-min": paint.basemapBrightnessMin,
         "raster-brightness-max": paint.basemapBrightnessMax,
       },
     });
@@ -192,6 +193,24 @@ export const EMPTY: GeoJSON.FeatureCollection = {
   type: "FeatureCollection",
   features: [],
 };
+
+/**
+ * The mask's ink, keyed on the detected class.
+ *
+ * Shared with `MapCanvas`'s live re-paint rather than written out at each use:
+ * the two classes are the detector's own output and the difference between
+ * them is the whole point of the two-class scheme, so an expression that
+ * drifted between construction and re-paint would silently start colouring an
+ * `oos` mask as an unknown one.
+ */
+export function slickInk(paint: MapPaint): ExpressionSpecification {
+  return [
+    "case",
+    ["==", ["get", "class"], "oos"],
+    paint.slick,
+    paint.slickUnknown,
+  ];
+}
 
 /**
  * Every data layer, in draw order.
@@ -338,12 +357,7 @@ export function dataLayers(paint: MapPaint): LayerSpecification[] {
       type: "fill",
       source: SOURCE.slick,
       paint: {
-        "fill-color": [
-          "case",
-          ["==", ["get", "class"], "oos"],
-          paint.slick,
-          paint.slickUnknown,
-        ],
+        "fill-color": slickInk(paint),
         "fill-opacity": byConfidence,
       },
     },
@@ -352,12 +366,7 @@ export function dataLayers(paint: MapPaint): LayerSpecification[] {
       type: "line",
       source: SOURCE.slick,
       paint: {
-        "line-color": [
-          "case",
-          ["==", ["get", "class"], "oos"],
-          paint.slick,
-          paint.slickUnknown,
-        ],
+        "line-color": slickInk(paint),
         "line-width": 1.4 * k,
       },
     },

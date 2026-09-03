@@ -33,7 +33,8 @@ See [`RESEARCH/SYNTHESIS.md`](RESEARCH/SYNTHESIS.md) §4.
 **PHASE-00 complete** — environment, package scaffold, database schema, research corpus.
 No pipeline code yet. Current position and the exact next action: [`HANDOFF.md`](HANDOFF.md).
 
-`frontDemo/` is a parallel landing-page layout study feeding PHASE-07; it has its own
+`frontDemo/` is **SlickTrace**, the demonstration interface feeding PHASE-07 -- a home page
+and an operations console over the same simulation. It has its own
 [README](frontDemo/README.md) and is not part of the pipeline.
 
 ```

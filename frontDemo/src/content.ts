@@ -20,7 +20,7 @@
 import type { ScoreTermKey } from "./sim/types";
 
 export const PRODUCT = {
-  name: "Slickline",
+  name: "SlickTrace",
   /** Used only where a direction wants a one-line statement of the system. */
   summary:
     "Detect oil at sea from radar satellites, run the drift backwards to where it started, and rank the vessels that were there.",
@@ -223,4 +223,78 @@ export const SIMULATED = [
   "Every AIS track. Real traffic is not redistributed here, and Indian-waters scenarios are authored because free real AIS covers United States waters only.",
   "Every score. No model has been trained yet, and no number on these pages is a measurement of one.",
   "Radar imagery, generated from a speckle model rather than photographed, so nothing on screen can be mistaken for an acquisition.",
+];
+
+/* ------------------------------------------------------------------ *
+ * Why spills happen
+ *
+ * General to the problem, not to any one case: this is the part of the page
+ * that stays put when the reader changes which spill a figure is showing. The
+ * split matters because the two causes leave different evidence, and the
+ * system treats them differently -- one is a vessel that can be identified from
+ * its own broadcasts, the other is a vessel that has stopped making them.
+ * ------------------------------------------------------------------ */
+
+export interface Cause {
+  key: string;
+  title: string;
+  /** One clause, for the directions that list rather than set. */
+  short: string;
+  body: string;
+  /** What this cause leaves behind that the system can actually key on. */
+  signature: string;
+}
+
+export const CAUSES: Cause[] = [
+  {
+    key: "operational",
+    title: "Operational and accidental discharge",
+    short: "Routine practice and equipment failure, transponder on",
+    body: "Most oil at sea does not come from a tanker breaking up. It comes from routine practice -- tank washings, oily bilge water, fuel transfer, a valve left open -- and from equipment that fails while a vessel is going about its business. The vessel is usually still broadcasting throughout, because nothing about it is trying to hide, and often nobody aboard has registered that anything happened at all.",
+    signature: "A continuous AIS track that passes through the origin window at the right time. The discharge is visible as a trail because the source was moving while it leaked, and the trail runs parallel to the track.",
+  },
+  {
+    key: "deliberate",
+    title: "Deliberate release with the transponder off",
+    short: "The gap in the record is the tell, and a gap is not proof",
+    body: "The other kind is deliberate: discharge at night, far from a coast, with the transponder switched off for the duration. AIS is a cooperative system and it can simply be turned off, so a vessel that intends not to be seen will not be in the traffic record at the hour that matters. What remains is a radar contact with nothing broadcasting from it.",
+    signature: "A bright radar target with no AIS association, or a track that stops before the origin window and resumes after it. Both are ranked; neither is named. A gap is measured against the reception the region actually supports, because there are legitimate reasons to go dark and a raw gap on its own is not evidence.",
+  },
+];
+
+/* ------------------------------------------------------------------ *
+ * How the detector is trained
+ *
+ * Kept deliberately short and free of numbers this demo cannot stand behind.
+ * No model has been trained yet; what is stated here is the design and the
+ * corpus it will be trained on, not a result.
+ * ------------------------------------------------------------------ */
+
+export interface MethodNote {
+  key: string;
+  title: string;
+  body: string;
+}
+
+export const METHOD: MethodNote[] = [
+  {
+    key: "corpus",
+    title: "What it learns from",
+    body: "A published corpus of Sentinel-1 scenes with the slicks outlined by hand, plus a deliberately large pool of look-alikes: low-wind cells, biogenic films, sea ice, ship wakes. Roughly a tenth of every split is a look-alike that is not oil, because look-alikes are the dominant failure mode and the single highest-leverage intervention available is to show the model plenty of them.",
+  },
+  {
+    key: "architecture",
+    title: "What it looks for",
+    body: "Instance segmentation rather than boxes, in two classes: an operational discharge, and a slick whose origin is unknown. Contours rather than boxes because the drift ensemble is seeded inside the mask, and a bounding box would seed the sea around it. A large-kernel attention stage sits at the detection heads, which is what lets the model weigh a dark patch against its surroundings rather than in isolation.",
+  },
+  {
+    key: "gate",
+    title: "How a suspect is reached",
+    body: "The detection is characterised, run backward through an ensemble of drift members, and turned into a probability field over space and time. Historic traffic is then filtered against that field at matching hours -- the one filter in the system with physics behind it -- and whatever survives is scored on six weighted terms. Vessels, unlit contacts and fixed infrastructure compete on one scale, so a platform can outrank a passing tanker without any rule in the code saying it should.",
+  },
+  {
+    key: "honesty",
+    title: "What it refuses to do",
+    body: "No model has been trained yet, and every number on this page comes from the simulation running in your browser. When the origin field is too diffuse to separate one candidate from another, the system reports that instead of producing a suspect. A candidate is never called responsible, and a contact with no transponder is ranked but never given a name.",
+  },
 ];

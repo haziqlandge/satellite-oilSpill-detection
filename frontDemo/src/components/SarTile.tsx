@@ -53,6 +53,19 @@ interface Props {
    */
   width?: number;
   height?: number;
+  /**
+   * Display stretch.
+   *
+   * How bright the amplitude is drawn, not what it is. SAR analysts pick a
+   * stretch for the display they are looking at, and the right one here depends
+   * on the page: the plate was composed against paper, where a bright tile sits
+   * naturally, and the same values on a near-black editorial ground read as a
+   * lit slab that the rest of the page has to work around.
+   *
+   * Lowering it changes no pixel's *relative* value, so the slick is damped by
+   * exactly as much as it was. 300 is the original paper stretch.
+   */
+  gain?: number;
 }
 
 /** Resolve `var(--token)` against an element, since canvas cannot. */
@@ -75,6 +88,7 @@ export function SarTile({
   className = "",
   width = 720,
   height = 720,
+  gain = 300,
 }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
 
@@ -155,7 +169,7 @@ export function SarTile({
 
         // Displayed as amplitude, which is the usual convention and keeps the
         // dynamic range readable without a log stretch.
-        const g = Math.max(0, Math.min(255, Math.sqrt(intensity) * 300));
+        const g = Math.max(0, Math.min(255, Math.sqrt(intensity) * gain));
         img.data[i * 4] = g;
         img.data[i * 4 + 1] = g;
         img.data[i * 4 + 2] = g;
@@ -186,7 +200,7 @@ export function SarTile({
       }
       ctx.globalAlpha = 1;
     }
-  }, [parts, bounds, seed, dampingDb, looks, windMs, showMask, maskColour, width, height]);
+  }, [parts, bounds, seed, dampingDb, looks, windMs, showMask, maskColour, width, height, gain]);
 
   return (
     <canvas

@@ -1,9 +1,9 @@
 {
-  "name": "frontdemo",
+  "name": "slicktrace",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Landing page layout exploration for the SAR + AIS oil spill attribution system. Five switchable directions.",
+  "description": "SlickTrace — SAR + AIS oil spill detection, hindcast and vessel attribution. Home page and operations console.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

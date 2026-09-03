@@ -17,8 +17,8 @@
  */
 
 import { advect, fieldProbabilityAt, runDrift, runRelease } from "./drift";
-import { makeForcing, type FieldConfig } from "./field";
-import { bearingDeg, circleRing, destination, distanceKm } from "./geo";
+import { makeForcing, type FieldConfig, type Forcing } from "./field";
+import { bearingDeg, centroid, circleRing, destination, distanceKm } from "./geo";
 import { makeRng, seedFrom } from "./rng";
 import {
   berthedDischarge,
@@ -29,7 +29,7 @@ import {
 } from "./ais";
 import { score, type DriftVariant } from "./scoring";
 import { buildSlick, characterise, seedPoints, windGate } from "./slick";
-import type { LngLat, Run, ScenarioMeta, Vessel } from "./types";
+import type { Environment, LngLat, Run, ScenarioMeta, Vessel } from "./types";
 
 export type ScenarioId =
   | "gom-moving"
@@ -534,6 +534,67 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
 };
 
 /* ------------------------------------------------------------------ *
+ * The forcing, sampled
+ * ------------------------------------------------------------------ */
+
+/**
+ * The wind and current this event ran through, hour by hour.
+ *
+ * Read from the same `Forcing` the drift ensemble and the release both step
+ * through, at the centroid of the detected slick, across the whole event span.
+ * Nothing is modelled here that was not already modelled: this is the interface
+ * being given access to the physics the simulation was already using, so the
+ * environment charts are a window onto the run rather than a second story about
+ * it.
+ *
+ * The tidal component is recovered analytically rather than by differencing,
+ * because `FieldConfig` states it directly -- the semidiurnal ellipse is a term
+ * in the sum, not an emergent property of it.
+ */
+function sampleEnvironment(
+  cfg: FieldConfig,
+  forcing: Forcing,
+  at: LngLat,
+  fromHour: number,
+  toHour: number,
+): Environment {
+  const hours: number[] = [];
+  const windMs: number[] = [];
+  const windFromDeg: number[] = [];
+  const currentMs: number[] = [];
+  const currentTowardDeg: number[] = [];
+  const tideMs: number[] = [];
+
+  for (let h = Math.floor(fromHour); h <= Math.ceil(toHour); h++) {
+    const [wu, wv] = forcing.wind(at, h);
+    const [cu, cv] = forcing.current(at, h);
+
+    hours.push(h);
+    windMs.push(Math.hypot(wu, wv));
+    // `wind()` returns the vector the air travels along; the reported direction
+    // is the one it comes from, so the vector is reversed before conversion.
+    windFromDeg.push((Math.atan2(-wu, -wv) * 180) / Math.PI);
+    currentMs.push(Math.hypot(cu, cv));
+    currentTowardDeg.push((Math.atan2(cu, cv) * 180) / Math.PI);
+
+    // The semidiurnal term on its own, along its major axis. 12.42 h is the
+    // M2 period `makeForcing` uses.
+    const w = ((h + cfg.tidePhaseHours) / 12.42) * 2 * Math.PI;
+    tideMs.push(cfg.tideMs * Math.cos(w));
+  }
+
+  const norm = (d: number) => ((d % 360) + 360) % 360;
+  return {
+    hours,
+    windMs,
+    windFromDeg: windFromDeg.map(norm),
+    currentMs,
+    currentTowardDeg: currentTowardDeg.map(norm),
+    tideMs,
+  };
+}
+
+/* ------------------------------------------------------------------ *
  * Builder
  * ------------------------------------------------------------------ */
 
@@ -815,6 +876,17 @@ function assemble(id: ScenarioId, variant: DriftVariant): Run {
 
   const aisPointCount = vessels.reduce((s, v) => s + v.points.length, 0);
 
+  // Sampled at the slick centroid over the same span the playback covers,
+  // so a reader scrubbing the event and a reader reading the wind chart are
+  // looking at the same hours.
+  const environment = sampleEnvironment(
+    spec.field,
+    forcing,
+    centroid(geom.parts.flat()),
+    Math.min(releaseStartHour, -spec.drift.backwardHours),
+    spec.drift.forwardHours,
+  );
+
   const meta: ScenarioMeta = { ...spec.meta, acquiredAt };
 
   return {
@@ -845,6 +917,7 @@ function assemble(id: ScenarioId, variant: DriftVariant): Run {
     releaseStartHour,
     releaseEndHour,
     aisPointCount,
+    environment,
     gate: scored.gate,
     separability: scored.separability,
     truth,

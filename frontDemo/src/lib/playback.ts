@@ -176,12 +176,40 @@ export function momentAt(
   };
 }
 
-/** The full span the event playback covers, first parcel to forecast horizon. */
+/**
+ * The span the event playback covers: the satellite pass to the forecast
+ * horizon.
+ *
+ * It used to open at the first parcel in the water, which put the whole
+ * backward horizon and a long approach leg on the scale. That is the wrong
+ * subject for a transport control. What a reader or an operator scrubs through
+ * is the forecast -- the part of the event that has not happened yet and that
+ * the system is actually asserting something about -- and everything before the
+ * pass is a reconstruction whose figures say so in their own frames.
+ *
+ * T0 is therefore the floor on both surfaces, and `checkpointsFor` supplies the
+ * marks along it.
+ */
 export function eventSpan(run: Run): [number, number] {
-  return [
-    Math.min(run.releaseStartHour, -run.drift.backwardHours),
-    run.drift.forwardHours,
-  ];
+  return [0, run.drift.forwardHours];
+}
+
+/**
+ * The hours the forecast envelope is drawn at.
+ *
+ * `scenarios.ts` builds `forwardImpact` from `hour > 0 && hour % 12 === 0`, so
+ * these are exactly the rings a reader sees on the map. Deriving them from the
+ * frames rather than writing `[12, 24, 36, 48]` means the marks cannot drift
+ * out of step with the picture if a scenario changes its horizon.
+ *
+ * Shared by the home page's transport and the console's timeline so the two
+ * cannot disagree about where a checkpoint is.
+ */
+export function checkpointsFor(run: Run): number[] {
+  const steps = run.drift.frames
+    .filter((f) => f.hour > 0 && f.hour % 12 === 0)
+    .map((f) => f.hour);
+  return [0, ...steps];
 }
 
 /** Growth curve for the whole event, for the designs that chart it. */

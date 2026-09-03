@@ -388,10 +388,12 @@ Do not load all papers or all phases. Follow the indexes.
 Owned by the session on the original laptop. Summarised here only so you know what it is
 and leave it alone.
 
-A five-direction landing-page layout study (Vite + React + Tailwind v4 + anime.js v4),
-switchable from a sticky right-edge rail. It is **design exploration for PHASE-07**, not
-PHASE-07 itself. State, running instructions and open bugs are in
-[`frontDemo/README.md`](frontDemo/README.md).
+**SlickTrace** (Vite + React 19 + Tailwind v4 + anime.js v4): one product with two
+surfaces -- a home page that explains what is happening in the ocean, and an operations
+console with a dockable panel workspace. It began as a five- then four-direction layout
+study; those directions were recombined into this on 2026-09-01. It is **design
+exploration for PHASE-07**, not PHASE-07 itself. State, running instructions and the
+traps worth not re-entering are in [`frontDemo/README.md`](frontDemo/README.md).
 
 It is uncommitted as of this handoff. Do not commit it from the training machine; the other
 session will.

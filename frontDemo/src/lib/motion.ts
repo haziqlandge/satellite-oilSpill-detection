@@ -36,26 +36,167 @@ export function useReducedMotion(): boolean {
 export function useAnimeScope(
   setup: (scope?: Scope) => void | (() => void),
   deps: unknown[] = [],
+  opts: { backstop?: string; backstopAfter?: number } = {},
 ) {
   const root = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion();
+  const { backstop, backstopAfter = 1600 } = opts;
 
   useEffect(() => {
     if (!root.current) return;
     if (reduced) return;
 
+    const el = root.current;
     let teardown: (() => void) | void;
-    const scope = createScope({ root: root.current }).add((s) => {
+    const scope = createScope({ root: el }).add((s) => {
       teardown = setup(s);
     });
+
+    // Same guarantee as `useAnimeScopeInView`: a setup that hides its targets
+    // has to arrange for them to come back even when the timeline does not run.
+    const timer = backstop
+      ? window.setTimeout(() => settle(el, backstop), backstopAfter)
+      : 0;
+
     return () => {
+      if (timer) window.clearTimeout(timer);
       if (typeof teardown === "function") teardown();
       scope.revert();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reduced, ...deps]);
+  }, [reduced, backstop, backstopAfter, ...deps]);
 
   return root;
+}
+
+/**
+ * The same scope, held until the container reaches the viewport.
+ *
+ * `useAnimeScope` builds its timeline at mount. That is right for a block whose
+ * mount is already gated -- the plates only build once their block nears the
+ * viewport, so mount and arrival are near enough the same moment -- and wrong
+ * for anything in a section that renders immediately. A timeline that runs four
+ * screens below the fold has finished before the reader gets there, and all
+ * they see is the finished state, which is the same as having written no
+ * animation at all.
+ *
+ * So: identical contract, two extra conditions. The scope is not created until
+ * the root has intersected once, and it is never created at all under reduced
+ * motion, in which case whatever the setup would have animated has to already
+ * be in its resting state in the markup.
+ *
+ * The second condition is `backstop`, and it is not optional in spirit. A setup
+ * that primes its targets to `opacity: 0` and reveals them from a timeline is
+ * betting that the timeline will run, and there is a specific, reproducible way
+ * for that bet to lose: **a hidden tab throttles `requestAnimationFrame` to
+ * roughly one frame a second**, so a one-second reveal takes the better part of
+ * a minute and anything reading the page in the meantime -- a screenshot, a
+ * scrape, a reader returning to the tab -- finds blank space where the figure
+ * should be. `revealOnScroll` already carries a timed backstop for exactly this
+ * reason. Pass a selector and anything under it still invisible after a beat is
+ * simply shown.
+ */
+export function useAnimeScopeInView(
+  setup: (scope?: Scope) => void | (() => void),
+  deps: unknown[] = [],
+  opts: { backstop?: string; backstopAfter?: number } = {},
+) {
+  const root = useRef<HTMLDivElement>(null);
+  const reduced = useReducedMotion();
+  const [arrived, setArrived] = useState(false);
+  const { backstop, backstopAfter = 1600 } = opts;
+
+  useEffect(() => {
+    const el = root.current;
+    if (!el || arrived) return;
+    // No observer, no gate: run it rather than never running it.
+    if (typeof IntersectionObserver === "undefined") {
+      setArrived(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setArrived(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "0px 0px -60px 0px", threshold: 0 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [arrived]);
+
+  useEffect(() => {
+    if (!root.current) return;
+    if (reduced || !arrived) return;
+
+    const el = root.current;
+    let teardown: (() => void) | void;
+    const scope = createScope({ root: el }).add((s) => {
+      teardown = setup(s);
+    });
+
+    const timer = backstop
+      ? window.setTimeout(() => settle(el, backstop), backstopAfter)
+      : 0;
+
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      if (typeof teardown === "function") teardown();
+      scope.revert();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reduced, arrived, backstop, backstopAfter, ...deps]);
+
+  return root;
+}
+
+/**
+ * Show anything a timeline primed and never brought back.
+ *
+ * Only elements that actually lost the bet are touched, so a timeline running
+ * normally is never interfered with. Two ways of being hidden are recognised,
+ * because anime hides things two ways:
+ *
+ *  - **transparent**, from a `utils.set({ opacity: 0 })`
+ *  - **undrawn**, from `svg.createDrawable`, which leaves a stroked path with a
+ *    `stroke-dasharray` whose visible run is effectively zero. That one is not
+ *    transparent at all, so an opacity check alone walks straight past it --
+ *    which is how a plate can be fully "visible" and completely blank
+ */
+function settle(root: HTMLElement, selector: string) {
+  for (const target of root.querySelectorAll<HTMLElement>(selector)) {
+    if (Number(getComputedStyle(target).opacity) < 0.05) {
+      utils.set(target, {
+        opacity: 1,
+        translateX: 0,
+        translateY: 0,
+        scale: 1,
+        scaleY: 1,
+      });
+    }
+
+    const geo = target as unknown as SVGGeometryElement;
+    if (typeof geo.getTotalLength !== "function") continue;
+    let total = 0;
+    try {
+      total = geo.getTotalLength();
+    } catch {
+      continue;
+    }
+    if (!total) continue;
+    const dash = Number.parseFloat(getComputedStyle(target).strokeDasharray);
+    if (Number.isNaN(dash) || dash > total * 0.02) continue;
+    // Undrawn. Take the dash off entirely and let the element's own attribute
+    // -- which is where a *designed* dash pattern lives -- come back.
+    target.style.removeProperty("stroke-dasharray");
+    target.style.removeProperty("stroke-dashoffset");
+    target.removeAttribute("stroke-dashoffset");
+    if (Number.parseFloat(getComputedStyle(target).strokeDasharray) < total * 0.02) {
+      target.removeAttribute("stroke-dasharray");
+    }
+  }
 }
 
 /**

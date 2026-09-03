@@ -1,254 +1,316 @@
-# frontDemo — redesign handoff
+# frontDemo — recombination handoff
 
-**Last updated:** 2026-08-31 (second pass; see section 4b)
-**Scope of this document:** `frontDemo/` only. The backend/ML track has its own
-`../HANDOFF.md` and is unaffected by anything here.
+**Last updated:** 2026-09-01
+**Scope:** `frontDemo/` only. The backend/ML track has its own `../HANDOFF.md`
+and is unaffected by anything here.
 
-Read this, then [`README.md`](README.md) (architecture and the two bug traps),
-then the `NOTES.md` inside whichever `src/designs/<name>/` you are working in.
+Read this, then [`README.md`](README.md) (architecture and the traps), then
+`src/console/NOTES.md`.
 
 ---
 
-## 1. What this was
+## 0. The forward-figures pass (latest)
 
-The brief was `REDESIGN FRONTDEMO AS 4 GENUINELY DISTINCT WEBSITE EXPERIENCES`.
-The old `frontDemo` was **one website with five themes**: a `ThemeUI` object
-carried panel type, density, console arrangement and button shape, and every
-component branched on it, so five directions shared one `Panel`, one
-`PageHeader`, one `Stat`, one `TopNav` and one twelve-column page.
+Everything below §0 describes the recombination that produced the two surfaces.
+This section is what changed after it.
 
-It is now **four independent products over one simulation engine**. Five
-directions became four; Deepwater was removed as instructed.
+**A next session should start at [`ISSUES.md`](ISSUES.md)**, which carries the
+whole of this pass in compressed form plus what is left to do, what was verified
+and what was deliberately decided. This section is the detail behind it.
+
+### What changed
+
+| Area | Change |
+|---|---|
+| **Direction** | Every drawn figure on both surfaces now runs forward from the satellite pass. See *Which way the figures run* in the README, which names what this costs |
+| **Figure 2A** | Forward stack, framed without the suspect track, with a `StackReadout` column carrying each hour's 90% area. The hatch moved from T0 to the horizon: at the pass the 50% region sits under the slick outline, which is already hatched |
+| **Figure 2B** | Was the convergence basin; now the forward spread of the 90% region, at 620px to match 2A. The age interval left this figure with it and is stated as a value in the map's readout |
+| **Maps** | `MapCanvas` takes `direction`. Under `"forward"` neither the hindcast haze nor the release accumulation is handed to the overlay at all |
+| **Colour** | `lib/palette.tsx` is a session-only overlay of CSS tokens and `MapPaint`, driven by `components/PalettePanel` — a floating window on the home page, a dock panel in the console. Export writes every field with its default, its current value and the file and key that owns it |
+| **Dock** | Drag the grip past ~62% of its minimum and the rail shuts to a 10px `EdgeHandle`. Click it to reopen at the stored width, or drag inward to reopen at the width you drag to |
+| **Console** | The page scrolls. The workstation is a `h-[100dvh]` wrapper, and `PanelDeck` below it renders any panel in one comfortable column with a sticky tab bar. The narrow tab strip is gone — the reader replaces it at every size |
+| **Reader scale** | The reader renders the identical panes at `zoom: 1.32` inside a 52rem measure (`[data-panel-reader] [data-pane-host]` in `index.css`). Two earlier attempts were wrong and both are worth not repeating: a fixed-height host that scrolled internally, which is just the dock again; and dock-width columns, which used the page but kept every compact decision and read as a second dashboard. `zoom` is what keeps a figure and the label under it in the proportion they were drawn at |
+| **Console type** | The panel family had a panel title at 10.5px and a paragraph at 10.5px — the top and bottom of the hierarchy set identically. Five roles, one setting each, tabulated in the docblock of `console/components.tsx`. The rule: uppercase and tracked means a label, sentence case and untracked means prose |
+| **Colour panel** | Per-field revert (a drawn reload glyph beside the attribute) as well as revert-all, both the same control. Every field carries a plain-language sentence naming what it changes on screen — "the shade of the ocean", "the path of whichever vessel is selected" — because a token name means nothing from outside the code |
+| **Timeline** | `eventSpan` is `[0, forwardHours]`. Marks come from `checkpointsFor`, shared with the home page's transport. The trace under the ruler is the 90% region's area, because `growthCurve` is entirely pre-pass and drew nothing on the new scale |
+
+### Two things that were measured, not guessed
+
+**`MapCanvas`'s live re-paint was applying about half the theme.** Its `repaint`
+array covered the contours and the tracks and silently omitted `slick-fill`,
+`slick-line`, `slick-axis`, `release-*`, `targets`, `markers` and
+`raster-brightness-min` — so the slick mask and the basemap floor were painted
+once at construction and never again. This did not matter while paint was a
+frozen literal and mattered immediately once a panel could change it. Verified
+by setting the slick to magenta and watching the mask change on the console map.
+
+**A forward stack does not fit a landscape plate.** The forecast ribbon runs
+tens of kilometres downwind and stays a few hundred metres across, so a
+fit-to-contain is limited by height and uses almost none of the width. Figure 2A
+biases the geography left and gives the recovered third to a readout column;
+that column carries the same areas figure 2B charts, so the two figures share
+their numbers rather than asserting the same thing twice.
+
+### Verified in the browser
+
+- Slick recolour repaints the console map live; `--accent` recolours page,
+  figures and console chrome together
+- Left dock: drag past minimum shuts it; click reopens at 214; drag-to-330
+  reopens at 330 with `--panel-scale` 1.244
+- Close all nine panels, reopen one → 430px, `--panel-scale: 1` (the old bug)
+- Panels menu still opens full width outside the header subtree, with the new
+  panel in it
+- Timeline: `min=0 max=48`, marks at T0/+12/+24/+36/+48, ruler every 6h, no
+  negative hour anywhere
+- Console at 375×812: no horizontal overflow, no rails, deck is the only reader
+- Home: no error boundary, four plates render, no horizontal overflow
+
+### Land and sea cannot be coloured separately
+
+Asked for, and not possible with this basemap. `buildStyle` stacks a flat
+`water` background, one **raster** tile layer from Esri, and an optional tint
+background over it. The raster is a single photograph carrying the coastline and
+the open sea in the same pixels; a raster layer can be filtered as a whole
+(opacity, saturation, contrast, brightness floor and ceiling) or washed from
+above, and nothing can repaint half of it, because the style has no idea which
+pixels are land.
+
+Two routes were checked and rejected:
+
+- **`raster-color`**, which maps raster luminance onto a colour ramp and would
+  have separated a dark sea from lighter land, is a Mapbox GL JS v3 property.
+  It is **not in MapLibre 5.24** — confirmed by grep over the shipped bundles.
+- **Vector tiles** with land and water as distinct features would do it
+  properly, and every no-cost provider of them wants an account key. The map is
+  deliberately keyless (`README`, *Stack*).
+
+What is genuinely available is now said in the panel itself, under *Why land and
+sea move together*: on the dark basemap the open sea is the darkest thing in the
+picture and the land the lightest, so `basemapBrightnessMin` acts mostly on the
+sea and `basemapBrightnessMax` mostly on the land; and taking `basemapOpacity`
+to zero removes the photograph, at which point the `water` colour **is** the sea
+and the graticule carries the geography. If a keyed vector basemap is ever
+acceptable, this becomes two real fields and that note comes out.
+
+### Still open
+
+- **The Browser pane reports `document.visibilityState: "hidden"`**, which
+  throttles `requestAnimationFrame` to about 1 Hz and clamps timers. Every
+  animation therefore takes tens of seconds to settle under automation. This is
+  what `useAnimeScopeInView`'s `backstop` exists for; the plates' own
+  `useAnimeScope` timelines have **no** such backstop and are the remaining
+  place where a stalled timeline leaves a figure blank
+- `frontDemo/vite.config.ts` now reads `process.env.PORT`, and
+  `.claude/launch.json` sets `autoPort`, so a second dev server can run beside
+  a first
+- The tanker and the stage chain are in `site/scenery.tsx`; the gutter ship is
+  `site/ShipTrail.tsx` and moors to `[data-ship-start]` / `[data-ship-end]`
+
+---
+
+## 1. What this was, and what happened
+
+The previous state was **four independent design studies** over one simulation
+engine — Signal, Terminal, Orbit, Dossier — switchable from a rail on the right
+edge, with zero cross-design imports and deliberately no `designs/shared/`.
+
+That study did its job, and the decision was taken to **recombine rather than
+overhaul**: Terminal becomes the console, Signal supplies the home page's
+structure and masthead, Dossier supplies its graphs, Orbit supplies its live
+readouts. The product is **SlickTrace**, with two surfaces.
+
+The old constraint — no shared presentation layer — was the right rule for a
+comparison study and is deliberately retired now that there is one product.
+`site/` and `console/` do share `sim/`, `map/`, `lib/`, `content.ts` and
+`theme.ts`, and share nothing else with each other.
 
 ---
 
 ## 2. Status: complete
 
-All four directions are built, typecheck clean, and build clean.
-
 ```bash
-npx tsc -b --force        # 0 errors
-npm run build             # succeeds; four shells code-split into own chunks
+npx tsc --noEmit          # 0 errors
+npm run build             # succeeds; both shells code-split into own chunks
 ```
 
-| # | Direction | Sections | Lines | State |
-|---|---|---|---|---|
-| 01 | **Signal** — investigative publication | `/` `picture` `water` `candidates` `cases` `method` | ~4.5k | Done |
-| 02 | **Terminal** — operations workstation | `detect` `drift` `traffic` `attribute` `evidence` `method` | ~4.5k | Done |
-| 03 | **Orbit** — mission control | `observe` `reconstruct` `traffic` `attribute` `brief` | ~4.1k | Done |
-| 04 | **Dossier** — evidence archive | `""` `satellite` `drift` `record` `candidates` `finding` `limitations` | ~5.4k | Done |
+| Surface | Route | State |
+|---|---|---|
+| **Home** | `#/` | Opening, Detection, Drift + Environment, Forecast, Attribution, Method |
+| **Console** | `#/console` | Map, two docks, floating windows, timeline, event log |
 
-Each has its own navigation model, its own page composition, its own component
-family, its own typography, its own animation language, and its own interactive
-console. **Zero cross-design imports** — verified by grep. There is no
-`designs/shared/`, deliberately.
-
-The shared foundation -- `sim/`, `map/`, `lib/`, `useRun` and `content.ts` --
-was built first, and each direction was then built against it independently.
-That order is what made zero cross-design imports achievable rather than
-aspirational.
+Deleted after harvesting: `src/designs/` entirely, `designs/registry.ts`,
+`components/DesignSwitcher.tsx`, `DesignContext.tsx`, `design.ts`, `useRun.ts`.
 
 ---
 
-## 3. What was actually verified
+## 3. What was verified in the browser
 
-Verified in the browser, not just typechecked:
+Not just typechecked:
 
-- All four render and switch cleanly; the scenario, hour and selection survive a
-  design switch (they live in `useRun` at `App` level, above the shells).
-- Signal's three-column editorial spread, bled SAR strip with annotation plates
-  and leader lines, and the release small-multiples sequence.
-- Terminal's boot transcript printing real run numbers, command rail, dense
-  analysis pane, operational timeline and event log. Map container measured at
-  824×734 after the zero-height fix.
-- Orbit's floating instrument rails over a full-bleed bathymetric chart, the
-  node-based temporal strip and the mode bank.
-- Dossier's paper ground, Roman-numeral index, exhibit plates, and — the
-  strongest single screen in the redesign — **Part VI FINDING** rendering
-  `INSUFFICIENT EVIDENCE` with a stamped `NO ATTRIBUTION ISSUED`, the tightest
-  90% region, candidates considered/admitted/scored, and `Candidates named:
-  None`.
-- The brief's grayscale test: with `filter: grayscale(1)` forced on `html`, the
-  four remain obviously different products.
-- The five scenarios: the authored source ranks #1 in all five; `mumbai-null`
-  correctly triggers `insufficientEvidence` (90% contour ≈ 130 km²).
+- All home sections render; no element stranded at `opacity: 0`.
+- **Per-figure spill isolation** — changing the drift block's case changes its
+  map, playback and all three environment charts, and leaves the detection,
+  forecast and attribution blocks untouched.
+- Drift playback runs; the transport scrubs.
+- Attribution overlay toggles switch layers; the block has no playback control.
+- Suspect list renders five candidates with masked identities and decomposed
+  scores.
+- **Console docking**: collapse and expand a rail; drag to resize (measured
+  214 → 383 px, `--panel-scale` 1.35, font 21.6 px, persisted); double-click a
+  tab to float; drag a window (pixel-accurate against the drag delta); resize;
+  double-click its title bar to dock it back.
+- **Close every panel, reopen one** → it comes back at its proper 430 px, not
+  full-viewport. (This was a real bug; see §5.)
+- Both header menus open and are fully visible.
+- Console map is visibly grey, and both credible-region contours still read.
+- Mobile 375 × 812: home is a single column with no horizontal overflow and the
+  console falls back to its tab strip.
+- Console messages clean on both surfaces on a fresh tab.
 
 ---
 
-## 4. Bugs found and fixed along the way
+## 4. Two findings worth keeping
 
-These were pre-existing or introduced during the work; all are fixed. They are
-listed because two of them are the kind that come back.
+**The lighter console map needed `raster-brightness-min`, not `max`.** Lowering
+`max` pushes a basemap back without ever making it greyer, because Esri's dark
+canvas over open ocean has almost no bright pixels for a ceiling to act on. And
+the lift stayed invisible until the scanline overlay came down: the map's paint
+properties read back exactly as set while a full-viewport wash at `opacity:
+0.22` plus a radial vignette put the grey straight back to near-black. Texture
+over a surface has to be cheap enough to be free; that one was charging.
+
+**The wind chart is about direction because the speed is constant.**
+`makeForcing` holds wind speed fixed per scenario and veers only the direction.
+Plotting speed as a time series draws a flat line under an area fill that implies
+an accumulation which is not happening. The chart makes the veer the subject and
+says in its caption that the constancy is a property of the simulation rather
+than a calm — this is the kind of thing that has to be stated, not smoothed.
+
+---
+
+## 5. Bugs found and fixed during the recombination
 
 | Bug | Where | Why it mattered |
 |---|---|---|
-| `body { overflow-x: hidden }` made the **body** the scroll container | `index.css` | The viewport never scrolled, so `window` scroll events never fired, so anime's `onScroll()` never triggered, so every element primed to `opacity: 0` stayed invisible and the page below the fold was a black rectangle **with nothing in the console**. Now `overflow-x: clip`. |
-| `onScroll({ enter: "bottom-=80 top" })` threshold was inverted | `lib/motion.ts` | That asks for the element *leaving* upward, not arriving. Now `"top bottom-=80"`, plus a new `revealFallback()` backstop so priming to invisible can never strand content. |
-| `SOURCE.release` never added to the map | `map/MapCanvas.tsx` | `dataLayers` added two layers against a missing source; MapLibre rejected them and unwound the rest of the `load` handler, so the map came up entirely empty. |
-| `ctx.strokeStyle = "var(--accent)"` silently ignored | `components/SarTile.tsx` | Canvas cannot resolve CSS variables, so the instance mask outline drew in the previous colour. Now resolved via `getComputedStyle`. |
-| Map pane collapsed to `height: 0` | `designs/terminal/Workspace.tsx` | Map reported `loaded() === true` with 20 live layers and composited nothing. |
-| `EvidenceCard.originWindow` treated as hours | `designs/terminal` | It is epoch **milliseconds**; the pane printed `T+1701691039000h`. |
-| Age interval printed raw | everywhere | The sim returns `[0, 0, 0]` for ongoing discharges; printing that as an interval is false precision. New `ageStatement()` in `lib/format.ts` states "ongoing" instead, with the method beside it. |
-| Gated-candidate tracks painted near-white | `design.ts` | 20+ candidates turned every map into spaghetti and buried the selected track. Dimmed across all four. |
-| Graticule painted in the rejected-traffic ink | `design.ts` / `basemap.ts` | Terminal had `basemap: "none"` at the time, so the graticule was its **only** geography and it was one step off the ground. `MapPaint.graticule` is now its own token. (Terminal gained a basemap in the second pass; see §4b.) |
-| Headline named the wrong sea | `designs/signal` | Copy derived the place from `region`, but Indian waters holds both Kutch and Mumbai High. `ScenarioMeta.place` added. |
-
----
-
-## 4b. Second pass, 2026-08-31 — playback, map ground and controls
-
-A review pass over the four directions. Everything here is fixed and verified in
-the browser; `npx tsc --noEmit` is clean. **Rollback point for the map and
-animation work: [`.backup/2026-08-31-animation/`](.backup/2026-08-31-animation/README.md).**
-
-### The release read as smaller than the hindcast
-
-The single loudest problem. At `T-28h` the map showed a wide bright cloud while
-the readout beside it said `discharged 0% · surface 0.00 km2`, and at `T0` it
-showed a tight slick — so the playback said the spill had been **larger before
-it started** than at the moment it was photographed.
-
-The cloud at `T-28h` was the hindcast ensemble, not oil, and it is at its widest
-at the far end of the backward horizon precisely because reversal spreads. Both
-clouds were being drawn at nearly the same weight, and a viewer has no way to
-tell a hypothesis from a measurement when they are the same mark.
-
-`ParticleOverlay` now distinguishes them:
-
-| | Before the pass | After the pass |
-|---|---|---|
-| **Release cloud** — the oil | bright, and now held at its first frame before the release begins, so the playback opens on a single seed parcel at the source and accumulates until it fills the observed extent | not drawn; the map draws contours |
-| **Origin field cloud** — the ensemble | faint haze at 1/7 the ink, behind the oil | full weight — forward, the ensemble *is* oil |
-
-The haze returns to full weight whenever the release cloud is off, because then
-it is the subject of the panel and there is nothing to confuse it with. That is
-what Signal's *origin field* view and Dossier's ensemble plate want.
-
-Nothing in the simulation changed. `runRelease` already emitted parcel by parcel
-from the first hour of the discharge; the playback simply was not showing it.
-
-### The other fixes
-
-| Fix | Where | Why it mattered |
-|---|---|---|
-| `phaseAt()` had `discharging` and `adrift` inverted | `lib/playback.ts` | Both release hours are negative and `releaseStartHour <= releaseEndHour <= 0`, so the comparison was the wrong way round. The timeline read `ADRIFT, NO LONGER DISCHARGING` on the very hour the first parcel entered the water, and `OIL ENTERING THE WATER` for the hours after it had stopped |
-| `particles` toggle controlled nothing | `map/MapCanvas.tsx` | It was `setVisible(toggles.particles \|\| toggles.release)`. ORed together, turning the ensemble off did nothing at all while the release was on. One toggle each now: `particles` is the ensemble, `release` is the oil |
-| Particles composited additively on the paper ground | `map/MapCanvas.tsx`, `map/ParticleOverlay.ts` | `lighter` is what makes overlapping parcels read as density on a dark ground. On Dossier's paper it drove every pixel towards white and the cloud vanished into the sheet. Compositing is now derived from the luminance of `MapPaint.water` |
-| Terminal had no world at all | `design.ts`, `map/basemap.ts` | `basemap: "none"` left the graticule carrying all the geography, and a degree grid cannot say where the coast is. It now draws the dark grey canvas, held right back and washed in its own green through a new `basemap-tint` background layer between the raster and the data. **The tint layer exists because `raster-saturation` cannot colour a source that is neutral grey — there is no chroma in it to rotate** |
-| Orbit's candidate tracks were invisible against its own chart | `design.ts` | Orbit is the one direction whose ground is genuinely blue, and a grey-blue candidate sat *inside* the bathymetry. Now orange: separated from the sea by hue and from the cyan selection by weight. This is a deliberate, scoped exception to §6.2 below, which still holds for the other three |
-| The demo switcher answered clicks meant for the page | `components/DesignSwitcher.tsx` | It woke on `pointerdown` anywhere in the document, so selecting a candidate, opening a case or scrubbing the timeline all popped out a control that is not part of any direction. It now wakes only from its own rail, and the wrapper is `pointer-events: none` so its tucked footprint stops swallowing presses |
-| Dossier's case switcher looked inert | `designs/dossier/` | Clicking a case in *Other files in this series* did rebuild the run, but nothing the reader could see changed: no scroll to top, the running head far above the fold, and parts — Part VII worst — that are almost entirely case-independent prose. Now scrolls to top on scenario change, the running head is sticky, the case rows carry their own identity, and a page-turn marks the change |
-| Orbit's withheld finding blocked the map | `designs/orbit/OrbitShell.tsx` | `ATTRIBUTION WITHHELD` was a centred panel over the full-bleed map with no dismiss control, in every mode. It is now a permanent annunciator band plus a dockable panel: dismissible with `Esc` or its close control, reopened from the header HOLD key, and re-announced per run. **The state cannot be dismissed into invisibility** — the band and the hold lamp stay |
-| The evidence track plot read as contradicting the live map | `designs/terminal/instruments.tsx`, `reports.tsx` | `TrackScope` draws the **backward** origin field while the map at `T+8h` draws the **forward** forecast, so they point opposite ways by construction — and nothing on the plot said so. It now states the case, the direction and the hour span it covers, and takes `hour` so it marks the contour for the hour being scrubbed instead of looking static |
-
-## 5. What is left
-
-Nothing is blocking. In rough priority order:
-
-### 5.1 Close the last documented workaround (small, worth doing)
-
-`src/designs/terminal/Workspace.tsx` still picks the MapLibre instance up from
-the `window.__map` **debug handle** to drive its crosshair, coordinate readouts
-and its own zoom furniture. `MapCanvas` now has the proper interface —
-`onMap?: (map: MapLibreMap | null) => void`, fired on `load` and again with
-`null` before teardown — but Terminal has **not been switched over to it yet**.
-
-Do this: replace the `window.__map` polling in `Workspace.tsx` with the `onMap`
-prop, then delete the workaround note from `src/designs/terminal/NOTES.md`.
-The global assumes exactly one map is mounted and has no teardown signal.
-
-### 5.2 Use the data now carried on `Run`
-
-Two fields were added to `Run` during integration and are only partly consumed:
-
-- `run.gate` (`{considered, admitted, reason}`) — Dossier's **Part IV** still
-  approximates the gate's numerator by counting proximity across the register.
-  It should print `run.gate` directly. Part VI already does.
-- `run.separability` — Parts V and VI recompute the margin locally. Note their
-  local versions are **ablation-aware** and `run.separability` is not, so this
-  is only worth changing if the ablation-off case is what is wanted.
-
-### 5.3 Per-design notes not yet actioned
-
-Each direction left a `NOTES.md`. Resolved items are marked; the open ones are:
-
-- **Terminal** — `toggles.labels` controls nothing under `basemap: "none"`;
-  `ScenarioMeta.id` is typed `string` rather than `ScenarioId`, forcing one cast
-  in `LogStream.tsx`.
-- **Dossier** — `momentAt` is O(vessels × extent vertices) per call. Fine at the
-  current register scale (20–35 calls, memoised), but a batched
-  `momentsOver(run, hours)` would be the place to optimise if the register ever
-  covers the full forecast horizon.
-- **Orbit** — items 1 and 2 are now marked RESOLVED (the camera API landed and
-  `controls="scale"` already did what was wanted). Its `<style>`-element
-  workaround for pseudo-element rules remains, scoped with an `orbit-` prefix.
-
-### 5.4 Known issues, unfixed by choice
-
-- **The age interval is degenerate.** The simulation returns `[0, 0, 0]` for
-  four of five scenarios because `source_coincidence` puts the freshest oil at
-  hour zero for an ongoing discharge. `ageStatement()` presents this honestly,
-  but **the estimator itself is worth revisiting in PHASE-04**. This is a
-  science-layer question and was deliberately not "fixed" from the frontend.
-- **Basemap needs network — now on all four.** Terminal used to draw no world at
-  all, so it was the one direction that did not care. It does now. Everything
-  else is still generated locally and the map reports a tile failure in the
-  corner while still drawing the graticule, scene, slick, origin field and
-  traffic (C12).
-- **The seed parcel before the release is one dot.** `runRelease` emits its
-  first parcel at `floor(startHour)`, so holding that frame gives the playback
-  exactly one marker to open on. `ParticleOverlay.releaseSize()` grows the
-  marker as the cloud thins so it is findable. If the release rate is ever
-  raised, that size ladder is the thing to re-check.
-- **Not wired to the API.** All content comes from `src/sim/`. PHASE-07 makes
-  that a transport change, not a rewrite — the shapes already mirror
-  `PLAN/INTERFACES.md` §2.
-- `frontDemo/.tmp/` holds one-off debug scripts and `frontDemo.zip` is a stale
-  archive. Both are gitignored and untouched; delete if unwanted.
-
-### 5.5 Not attempted
-
-- Mobile was built per direction but only **Terminal's** mobile console mode was
-  verified in the browser (375×812). Signal, Orbit and Dossier have responsive
-  strategies written but not visually checked.
-- No automated tests. There is no test harness in `frontDemo/`.
+| `overflow-x: auto` on the console header clipped both dropdowns | `ConsoleShell` | Spill key and panels menu both opened, set state correctly, and rendered as a few-pixel sliver. No z-index escapes an overflow clip, and `z-50` inside a header is only `z-50` within it. Both menus now render into `document.body` through a portal |
+| Reopening a panel after closing all took the whole viewport | `dock/DockRail` | `--dock-w` was set by an effect keyed on `[size, side]`. Closing every panel unmounts the rail; reopening mounts a fresh element whose deps have not changed, so the effect never re-runs and `width: var(--dock-w)` resolves to `auto`. The resting width is rendered now |
+| The panels menu was unusable once panels were closed | `PanelsMenu` | It was a bordered text button the same weight as everything else, with cramped rows. Now a filled green key matching the spill key, with a row-wide toggle, multi-select that never dismisses the menu, and open-all / reset |
+| `window.__map` debug global drove the console's furniture | `console/Workspace` | It assumed exactly one map was mounted and had no teardown signal — survivable with a single fixed map, and not once a panel can be torn off into a window that mounts its own. Switched to `MapCanvas`'s `onMap` prop |
+| Dossier's SAR plate was a lit white slab on the dark ground | `components/SarTile` | The display stretch was composed for paper. `SarTile` gained a `gain` prop — a display choice, not a change to the data, so the damping contrast the figure is about is untouched |
+| Navbar CTA clipped off a 375 px viewport | `site/Nav` | The redundant Home link (the wordmark already goes home) is dropped below `sm`, and the CTA shortens to "Console" |
+| Orbit's instruments reached into map paint for a caution ink | `site/instruments` | `--warn` and `--alarm` existed only under Terminal. Both surfaces define them now, so the instruments no longer depend on the map at all |
 
 ---
 
 ## 6. Things not to undo
 
-1. **Do not add a `designs/shared/`.** The four converge on it immediately, and
-   that is exactly the failure the redesign existed to fix.
-2. **Do not re-brighten `MapPaint.candidate` on Signal, Terminal or Dossier.**
-   The separation that matters is candidate versus *selected*, not candidate
-   versus traffic, and twenty-odd bright tracks bury the one track the reader is
-   being asked to look at. **Orbit is a deliberate exception** (see §4b): it is
-   the only direction whose ground is genuinely blue, its candidates were
-   invisible *inside* the bathymetry rather than merely quiet, and they are now
-   orange. Hue carries the separation from the sea; weight still carries the
-   separation from the selection.
-3. **Do not make `body` `overflow-x: hidden` again.** See §4.
-4. **Do not print `run.drift.ageHours` directly.** Use `ageStatement()`.
-5. **Dossier is light on purpose.** Its whole vocabulary is ink on paper.
-6. The scientific-integrity constraints in `PLAN/CONSTRAINTS.md` are correctness
+1. **Do not make `body` `overflow-x: hidden` again**, and do not put
+   `overflow-x: auto` on a bar that carries a dropdown. Both are in the README.
+2. **Do not print `run.drift.ageHours` directly.** Use `ageStatement()`.
+3. **Keep the release cloud bright and the hindcast a faint haze** while both are
+   on screen, or the playback claims the spill was larger before it began.
+4. **Candidate tracks stay dim** relative to the selected track.
+5. **Every figure keeps its own spill control**, and changing one must not change
+   another. The one deliberate exception is the environment subsection, which
+   follows the drift block because those charts are that drift's forcing.
+6. **The dock layout must always be recoverable** — the panels menu is the only
+   route back from a closed panel, and reset must stay reachable.
+7. The scientific-integrity constraints in `PLAN/CONSTRAINTS.md` are correctness
    requirements. `insufficient_evidence` must stay the loudest thing on screen
    when set; scores must stay decomposed; dark vessels must stay unnamed.
 
 ---
 
-## 7. Running it
+## 7. What is left
 
-```bash
-npm install --prefix frontDemo
-```
+Nothing is blocking.
+
+- **`run.gate` and `run.separability`** are carried on `Run` and only partly
+  consumed. The attribution block prints `run.gate` directly; nothing recomputes
+  separability locally any more, but neither is surfaced on the home page.
+- **Mobile was verified for the console and the home page**, at 375 × 812 only.
+- **No automated tests.** There is no harness in `frontDemo/`.
+- **Not wired to the API.** All content comes from `src/sim/`; PHASE-07 makes
+  that a transport change, not a rewrite.
+- `frontDemo/.tmp/` holds one-off debug scripts and `frontDemo.zip` /
+  `frontDemoworking.zip` are stale archives. All gitignored; delete if unwanted.
+
+---
+
+## 8. Running it
 
 ```bash
 npm run dev --prefix frontDemo
 ```
 
-Port 5180. `.claude/launch.json` defines it as a preview target named
-`frontDemo`. Switch directions from the neutral control on the right edge; the
-choice persists in `localStorage` under `slickline:design`.
+Port 5180. To reach the insufficient-evidence state, pick **Look-alike, no
+spill** (`mumbai-null`) on the attribution block, or from the console's spill
+key.
 
-To reach the insufficient-evidence state, pick the **Look-alike, no spill**
-scenario (`mumbai-null`) — then Dossier Part VI, or Terminal's `attribute` pane.
+---
+
+## 9. Next session: start here
+
+The recombination is complete and both surfaces work. What follows is the list of
+things that are **done but not visually verified**, in the order they are most
+likely to bite.
+
+### 9.1 Measure these before changing anything
+
+Run the dev server and confirm the baseline still holds, because several of these
+were bugs once and the fixes are the kind that regress quietly:
+
+| Check | Expected | How it was measured |
+|---|---|---|
+| Per-figure isolation | Changing the drift picker moves **only** drift + its environment charts | Read the environment caption's `scene sat at X m/s` before and after: `7.2` (platform) → `5.1` (berthed), with the other three picker labels unchanged |
+| Dock resize + type scale | 214 → 383 px gives `--panel-scale: 1.35`, computed `font-size: 21.6px`, persisted to `slicktrace:dock` | Drag the left grip, then read `getComputedStyle(host)` |
+| Close all panels, reopen one | Comes back at **430 px**, not full viewport | Toggle every row in the panels menu off, then one on, and measure the rail's `getBoundingClientRect().width` |
+| Header menus | Both open **fully visible**, not as a sliver | They render into `document.body`; confirm `[role=dialog]` exists outside the header subtree |
+| Console map | Visibly grey, both credible contours still readable | `raster-brightness-min` is the control; `max` alone does nothing here |
+
+### 9.2 A verification trap that cost real time here
+
+**The Browser pane throttles a hidden page.** When `document.hidden` is true,
+`setTimeout` is clamped to ~1 s, and `useSpill` builds its run behind a 16 ms
+timer. A block therefore sits on its `Loading` placeholder for many seconds and
+looks broken when it is merely throttled. Symptoms: `role=status` elements that
+never clear, `document.body.scrollHeight` growing slowly, a scroll-walk loop
+timing out at 45 s.
+
+Check `document.visibilityState` before concluding anything is wrong, and give
+each block several seconds rather than a few hundred milliseconds.
+
+**Screenshots also lie intermittently on the home page.** The `mix-blend-soft-light`
+grain layer breaks the capture compositor: the page renders correctly in the
+browser while the screenshot comes back black, or with the sticky header drawn at
+the bottom of the frame. The DOM is the source of truth. Hide
+`[aria-hidden].fixed.inset-0` before capturing if a screenshot is needed.
+
+### 9.3 Not yet verified — do these first
+
+1. **The Dossier plate density pass is only half done.** `SarPlate` was fixed —
+   it was a lit white slab on the dark ground and now takes `gain={205}`, a
+   display stretch that leaves the damping contrast untouched. The others were
+   **not** individually checked against the near-black ground:
+   `OriginFieldPlate`, `ConvergencePlate`, `WidthProfilePlate`, `EventStrip`,
+   `FlagSeries`. All were composed for ink on paper. Look specifically at hatch
+   density, neat-line weight and the registration crosses.
+2. **`mumbai-null` on the home page.** The insufficient-evidence branch in
+   `sections/Cause.tsx` was read but never triggered in the browser. It must be
+   the loudest thing in that block and must print `Candidates named: none`.
+3. **Console interactions not exercised:** the float window's resize corner,
+   `Escape` to dock a focused window, and the timeline's play/pause and speed
+   buttons.
+4. **`prefers-reduced-motion` and `filter: grayscale(1)`** on both surfaces.
+5. **Performance on the home page.** Three MapLibre contexts plus four run builds.
+   The viewport gate spreads the cost, but it has not been profiled on a slow
+   machine.
+
+### 9.4 Smaller things left
+
+- `run.gate` is printed on the attribution block; `run.separability` is carried on
+  `Run` and surfaced nowhere on the home page.
+- `ScenarioMeta.id` is typed `string`, forcing one cast in `LogStream.tsx`. The
+  fix belongs in `sim/types.ts`.
+- The `MapCanvas` chunk is 1.18 MB (MapLibre). Pre-existing, not introduced here.
+- No automated tests, and no harness to put them in.
