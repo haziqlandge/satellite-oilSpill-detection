@@ -199,7 +199,7 @@ export function DockRail({
         {side === "left" ? "‹" : "›"}
       </span>
       <span
-        className="text-[8.5px] tracking-[0.24em] whitespace-nowrap uppercase"
+        className="text-[9px] tracking-[0.24em] whitespace-nowrap uppercase"
         style={{ writingMode: "vertical-rl", color: "var(--ink-faint)" }}
       >
         hide

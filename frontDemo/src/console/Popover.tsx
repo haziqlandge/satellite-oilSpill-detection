@@ -19,6 +19,26 @@
  * `document.body` through a portal, positions itself from the trigger's
  * measured rect, and sits above everything the console draws.
  *
+ * **Which is why the panel has to carry the surface with it.** Escaping the
+ * clip means escaping `<div data-surface="console">` as well: the portal is a
+ * sibling of `#root`, not a descendant, so it inherits the token ladder from
+ * `:root` instead of the console's. That ladder is the generic fallback at the
+ * top of `index.css`, and the difference is not subtle -- `--accent` there is
+ * the home page's *orange*, so a menu hanging off a green console drew itself
+ * with an orange border and orange checkmarks. Worse, `--warn`, `--alarm`,
+ * `--group` and `--group-ink` are declared only under the two `[data-surface]`
+ * blocks and not at `:root` at all, so `background: var(--group)` on the menu's
+ * group band was invalid at computed-value time and resolved to nothing.
+ *
+ * The same break is what `§4.7` is about from the other end: token overrides
+ * from the colour panel are inline custom properties on the surface root, and
+ * an element that is not inside it cannot see them. Moving `--accent` recoloured
+ * the whole console *except* its two menus.
+ *
+ * So the portal root repeats what `App.tsx`'s `SurfaceRoot` does -- the surface
+ * attribute, then the overrides last so they win. It is a second surface root,
+ * deliberately, and it has to stay in step with the first one.
+ *
  * It stays open until the viewer dismisses it -- an outside press, `Escape`, or
  * the trigger again. Acting on a row never closes it, because opening four
  * panels should be four clicks rather than four round trips through the button.
@@ -30,10 +50,13 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
+import { tokenStyle, usePalette } from "../lib/palette";
+import { SURFACES } from "../theme";
 
 /** Above the float windows (40+z) and above the scanline layer (60). */
 export const POPOVER_Z = 200;
@@ -90,6 +113,8 @@ export function Popover({
   const { open, close, triggerRef } = anchor;
   const panel = useRef<HTMLDivElement | null>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const palette = usePalette();
+  const fonts = SURFACES[palette.surface].fonts;
 
   /**
    * Measured from the trigger, before paint.
@@ -151,19 +176,47 @@ export function Popover({
       ref={panel}
       role="dialog"
       aria-label={label}
+      // The surface this menu belongs to, restated outside its root. Without
+      // it every `var(--…)` below and in `children` resolves against `:root`.
+      data-surface={palette.surface}
       className="fixed border"
-      style={{
-        top: pos.top,
-        left: pos.left,
-        width,
-        zIndex: POPOVER_Z,
-        borderColor: "var(--accent)",
-        background: "var(--base-2)",
-        boxShadow: "0 0 0 3px color-mix(in oklab, var(--base) 78%, transparent)",
-        maxHeight: `calc(100dvh - ${pos.top + 12}px)`,
-        overflowY: "auto",
-        scrollbarWidth: "thin",
-      }}
+      style={
+        {
+          top: pos.top,
+          left: pos.left,
+          width,
+          zIndex: POPOVER_Z,
+          // The font stacks travel with the tokens for the same reason, and
+          // `fontFamily` travels with them because the portal inherits from
+          // `<html>` rather than from the surface root -- which meant Tailwind
+          // preflight`s system sans, measured rendering `-apple-system` across
+          // all 39 text nodes of the panels menu while every character of the
+          // console around it was IBM Plex Mono. Nothing inside either menu
+          // sets a font of its own, so the variables alone fixed nothing.
+          //
+          // It is `fonts.body` and not `fonts.mono` so that this line stays a
+          // copy of `SurfaceRoot`s (`App.tsx`), which is the thing it has to
+          // keep in step with. They are the same stack on the console, where
+          // the whole surface is monospace; on the site they are not, and a
+          // popover opened there should read as that surface`s prose, not as
+          // its code.
+          "--font-display": fonts.display,
+          "--font-body": fonts.body,
+          "--font-mono": fonts.mono,
+          fontFamily: fonts.body,
+          // Last, so an override from the colour panel beats the block the
+          // `data-surface` attribute above just selected -- the same ordering
+          // `SurfaceRoot` uses, and the reason an inline custom property wins.
+          ...tokenStyle(palette.tokens),
+          borderColor: "var(--accent)",
+          background: "var(--base-2)",
+          boxShadow:
+            "0 0 0 3px color-mix(in oklab, var(--base) 78%, transparent)",
+          maxHeight: `calc(100dvh - ${pos.top + 12}px)`,
+          overflowY: "auto",
+          scrollbarWidth: "thin",
+        } as CSSProperties
+      }
     >
       {children}
     </div>,

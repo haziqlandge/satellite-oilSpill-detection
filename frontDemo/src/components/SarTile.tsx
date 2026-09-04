@@ -24,6 +24,7 @@
  */
 
 import { useEffect, useRef } from "react";
+import { usePalette } from "../lib/palette";
 import { makeRng, seedFrom } from "../sim/rng";
 import type { LngLat } from "../sim/types";
 
@@ -68,11 +69,17 @@ interface Props {
   gain?: number;
 }
 
+/** The custom property a `var(--token)` string names, or `null` for a literal. */
+function tokenIn(value: string): string | null {
+  const match = /^var\((--[\w-]+)\)$/.exec(value.trim());
+  return match ? match[1] : null;
+}
+
 /** Resolve `var(--token)` against an element, since canvas cannot. */
 function resolveColour(value: string, el: HTMLElement | null): string {
-  const match = /^var\((--[\w-]+)\)$/.exec(value.trim());
-  if (!match || !el) return value;
-  const resolved = getComputedStyle(el).getPropertyValue(match[1]).trim();
+  const name = tokenIn(value);
+  if (!name || !el) return value;
+  const resolved = getComputedStyle(el).getPropertyValue(name).trim();
   return resolved || "#ffffff";
 }
 
@@ -92,6 +99,57 @@ export function SarTile({
 }: Props) {
   const ref = useRef<HTMLCanvasElement>(null);
 
+  /**
+   * The token override the mask outline is currently subject to, if any.
+   *
+   * Everything else on both surfaces reads its colour through `var(--…)` at
+   * paint time, so the colour panel recolours it the instant a token moves. A
+   * canvas cannot: `ctx.strokeStyle` takes a resolved string, so the token is
+   * read once, inside the effect, and baked into pixels that no later style
+   * change can reach. The draw is therefore only as current as the last time
+   * the effect ran -- and every other dependency here (`parts`, `bounds`,
+   * `seed`, and `maskColour`, which is the *literal string* `"var(--accent)"`)
+   * is unchanged by a token override. The tile went on showing the outgoing
+   * accent while every SVG figure beside it had already changed.
+   *
+   * Depending on the override's *value* rather than on the whole override
+   * record keeps that narrow: moving `--base` does not force a redraw of a
+   * 720x720 speckle field that would come out identical. Reading it through
+   * the context also means a cleared override (`clearToken`, `reset`) is a
+   * change too, so the tile goes back to the shipped colour rather than
+   * sticking at whatever it was last dialled to.
+   *
+   * `usePalette` falls back to an inert overlay with no provider mounted, so a
+   * tile rendered outside a surface keeps working and simply never redraws --
+   * which is correct, because outside a surface there is nothing to override.
+   */
+  const palette = usePalette();
+  const maskToken = tokenIn(maskColour);
+  const maskOverride = maskToken ? palette.tokens[maskToken] : undefined;
+
+  /**
+   * The generated acquisition, held so a recolour does not re-run the physics.
+   *
+   * Redrawing on a token change is only affordable because the expensive half
+   * of this effect is skipped when nothing generative moved. The speckle loop
+   * is per-pixel with an inner average of `looks` logarithms, and the plate on
+   * the home page is 459x620: measured at ~37 ms of pure arithmetic before the
+   * two `ImageData` round trips the mask raster also needs. The colour panel's
+   * channel sliders fire on every step of a drag, so regenerating would have
+   * put a 40-100 ms block between each frame of a slider the reader is holding
+   * -- a fix for a colour that does not follow, paid for with a control that
+   * does not move.
+   *
+   * The key is the same set of values the effect's own dependency array
+   * compares, minus the mask's colour, and compared the same way -- `Object.is`
+   * on each entry. So it is exactly as stale-proof as the effect gate already
+   * was: `parts` and `bounds` are the only non-primitives, both arrive
+   * memoised from their call sites, and a caller that hands over fresh arrays
+   * every render already re-ran this effect every render and simply misses the
+   * cache too.
+   */
+  const held = useRef<{ key: unknown[]; img: ImageData } | null>(null);
+
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
@@ -100,7 +158,6 @@ export function SarTile({
 
     const W = canvas.width;
     const H = canvas.height;
-    const rng = makeRng(seedFrom(seed));
     const [w, s, e, n] = bounds;
 
     const toPx = (p: LngLat): [number, number] => [
@@ -108,75 +165,93 @@ export function SarTile({
       (1 - (p[1] - s) / (n - s)) * H,
     ];
 
-    // Mask raster: rasterise the polygons once so the speckle loop can ask
-    // "is this pixel oil" in constant time.
-    const mask = new Uint8Array(W * H);
-    {
-      const off = document.createElement("canvas");
-      off.width = W;
-      off.height = H;
-      const octx = off.getContext("2d");
-      if (octx) {
-        octx.fillStyle = "#fff";
-        for (const ring of parts) {
-          octx.beginPath();
-          ring.forEach((p, i) => {
-            const [x, y] = toPx(p);
-            if (i === 0) octx.moveTo(x, y);
-            else octx.lineTo(x, y);
-          });
-          octx.closePath();
-          octx.fill();
+    const key: unknown[] = [parts, bounds, seed, dampingDb, looks, windMs, gain, W, H];
+    const cached = held.current;
+    let img: ImageData | null =
+      cached &&
+      cached.key.length === key.length &&
+      cached.key.every((v, i) => Object.is(v, key[i]))
+        ? cached.img
+        : null;
+
+    if (!img) {
+      const rng = makeRng(seedFrom(seed));
+
+      // Mask raster: rasterise the polygons once so the speckle loop can ask
+      // "is this pixel oil" in constant time.
+      const mask = new Uint8Array(W * H);
+      {
+        const off = document.createElement("canvas");
+        off.width = W;
+        off.height = H;
+        const octx = off.getContext("2d");
+        if (octx) {
+          octx.fillStyle = "#fff";
+          for (const ring of parts) {
+            octx.beginPath();
+            ring.forEach((p, i) => {
+              const [x, y] = toPx(p);
+              if (i === 0) octx.moveTo(x, y);
+              else octx.lineTo(x, y);
+            });
+            octx.closePath();
+            octx.fill();
+          }
+          const data = octx.getImageData(0, 0, W, H).data;
+          for (let i = 0; i < W * H; i++) mask[i] = data[i * 4] > 127 ? 1 : 0;
         }
-        const data = octx.getImageData(0, 0, W, H).data;
-        for (let i = 0; i < W * H; i++) mask[i] = data[i * 4] > 127 ? 1 : 0;
       }
+
+      // Background modulation: wind streaks aligned with the wind, plus a slow
+      // large-scale trend. This is what a look-alike is made of.
+      const streakStrength = Math.min(0.22, 0.03 + windMs * 0.018);
+      const phase = rng.range(0, Math.PI * 2);
+      const trendX = rng.range(-0.12, 0.12);
+      const trendY = rng.range(-0.12, 0.12);
+
+      img = ctx.createImageData(W, H);
+      // Linear-scale mean backscatter. The damping is specified in dB, which is
+      // how the characteriser reports it, so it converts here rather than being
+      // stored as a made-up linear ratio.
+      const dampLinear = Math.pow(10, dampingDb / 10);
+
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const i = y * W + x;
+
+          const u = x / W;
+          const v = y / H;
+          const streak =
+            Math.sin((u * 9 + v * 3) * Math.PI + phase) * streakStrength +
+            Math.sin((u * 21 - v * 6) * Math.PI + phase * 1.7) *
+              streakStrength *
+              0.4;
+          const trend = trendX * (u - 0.5) + trendY * (v - 0.5);
+
+          let mean = 0.34 * (1 + streak + trend);
+          if (mask[i]) mean *= dampLinear;
+
+          // Gamma speckle with shape `looks`, by averaging exponentials.
+          let acc = 0;
+          for (let l = 0; l < looks; l++) acc += -Math.log(1 - rng.next());
+          const intensity = mean * (acc / looks);
+
+          // Displayed as amplitude, which is the usual convention and keeps the
+          // dynamic range readable without a log stretch.
+          const g = Math.max(0, Math.min(255, Math.sqrt(intensity) * gain));
+          img.data[i * 4] = g;
+          img.data[i * 4 + 1] = g;
+          img.data[i * 4 + 2] = g;
+          img.data[i * 4 + 3] = 255;
+        }
+      }
+
+      held.current = { key, img };
     }
 
-    // Background modulation: wind streaks aligned with the wind, plus a slow
-    // large-scale trend. This is what a look-alike is made of.
-    const streakStrength = Math.min(0.22, 0.03 + windMs * 0.018);
-    const phase = rng.range(0, Math.PI * 2);
-    const trendX = rng.range(-0.12, 0.12);
-    const trendY = rng.range(-0.12, 0.12);
-
-    const img = ctx.createImageData(W, H);
-    // Linear-scale mean backscatter. The damping is specified in dB, which is
-    // how the characteriser reports it, so it converts here rather than being
-    // stored as a made-up linear ratio.
-    const dampLinear = Math.pow(10, dampingDb / 10);
-
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const i = y * W + x;
-
-        const u = x / W;
-        const v = y / H;
-        const streak =
-          Math.sin((u * 9 + v * 3) * Math.PI + phase) * streakStrength +
-          Math.sin((u * 21 - v * 6) * Math.PI + phase * 1.7) *
-            streakStrength *
-            0.4;
-        const trend = trendX * (u - 0.5) + trendY * (v - 0.5);
-
-        let mean = 0.34 * (1 + streak + trend);
-        if (mask[i]) mean *= dampLinear;
-
-        // Gamma speckle with shape `looks`, by averaging exponentials.
-        let acc = 0;
-        for (let l = 0; l < looks; l++) acc += -Math.log(1 - rng.next());
-        const intensity = mean * (acc / looks);
-
-        // Displayed as amplitude, which is the usual convention and keeps the
-        // dynamic range readable without a log stretch.
-        const g = Math.max(0, Math.min(255, Math.sqrt(intensity) * gain));
-        img.data[i * 4] = g;
-        img.data[i * 4 + 1] = g;
-        img.data[i * 4 + 2] = g;
-        img.data[i * 4 + 3] = 255;
-      }
-    }
-
+    // Repainted from the acquisition every time, cached or not. The outline
+    // below fills at 16% alpha, so drawing it over the previous draw instead
+    // of over the raster would compound the wash a shade darker each redraw.
     ctx.putImageData(img, 0, 0);
 
     if (showMask) {
@@ -200,7 +275,10 @@ export function SarTile({
       }
       ctx.globalAlpha = 1;
     }
-  }, [parts, bounds, seed, dampingDb, looks, windMs, showMask, maskColour, width, height, gain]);
+    // `maskOverride` is in here for its side effect on the dependency check
+    // rather than because the body reads it: it is what makes a token move
+    // re-run a draw that resolves the token again. See the note above it.
+  }, [parts, bounds, seed, dampingDb, looks, windMs, showMask, maskColour, maskOverride, width, height, gain]);
 
   return (
     <canvas

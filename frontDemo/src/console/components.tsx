@@ -13,22 +13,32 @@
  *    was meant to introduce
  *
  *    Narrow is not the same as undifferentiated, and this family drifted into
- *    the second thing. There are five roles and each one now has exactly one
- *    setting, so that what a piece of text *is* can be read off how it looks:
+ *    the second thing. There are **seven rungs** and every piece of text in the
+ *    console stands on one of them, so that what a piece of text *is* can be
+ *    read off how it looks:
  *
- *    | Role | Size | Treatment |
+ *    | Size | Rung | Where |
  *    |---|---|---|
- *    | Panel title (`Pane` h2) | 11.5px | uppercase, 0.30em, weight 600, `--ink` |
- *    | Section heading (`Block`, `GroupHead` h3) | 9.5px | uppercase, 0.26em, weight 500, toned |
- *    | Small label (`Field`, `Note` label, units) | 9px | uppercase, 0.20em, `--ink-faint` |
- *    | Prose (`Note` body, hints) | 10.5-11px | sentence case, **untracked**, 1.6 leading, `--ink-dim` |
- *    | Value (`Field`, meters, readouts) | 11.5-13px | `num`, tabular, toned |
+ *    | 13px | Boxed value | `Field`'s value. `num`. The only 13px here |
+ *    | 11.5px | Title, and inline value | `Pane` h2 (uppercase 0.30em w600), the console wordmark, `Row`'s value (`num`), `Alarm`'s title |
+ *    | 11px | Prose and body values | `Note` body, `Table` cell, `Meter` value, `AsciiBar`, `Prompt` |
+ *    | 10.5px | Secondary prose | `Toggle`, `Alarm` body, `GroupHead` hint, `Table`'s empty state |
+ *    | 10px | Row and control labels | `Row` label, `Meter` label, `Btn`, `Pane` index, `Alarm` code, the header's link state |
+ *    | 9.5px | Section headings and units | `Block` / `GroupHead` h3, `Row` and `Field` units, a block's right-hand meta, `FigLine` |
+ *    | 9px | Smallest labels | `Field` and `Note` labels, `Flag`, table head, the disclosure glyphs |
+ *
+ *    This table used to name five roles and it was wrong twice over: it left
+ *    out 10px and 11px, which between them carry `Row`'s label, every `Btn`,
+ *    the table cells and the `Note` bodies -- most of the words on the surface.
+ *    A scale that omits its two busiest rungs cannot be followed, and the
+ *    chrome duly did not follow it, arriving at 8, 8.5 and 12px. Those are gone
+ *    and the table now describes what is actually there.
  *
  *    The two failures that made the panels look arbitrary were a panel title at
  *    10.5px and a paragraph at 10.5px -- the top and the bottom of the
  *    hierarchy set identically, with nothing but letter-spacing telling them
  *    apart -- and headings only one pixel below the title. Anything added here
- *    picks one of the five rows above rather than a new size
+ *    picks one of the seven rungs above rather than a new size
  *
  *    The rule that keeps it honest: **uppercase and tracked means a label,
  *    sentence case and untracked means prose.** Never mix them.
@@ -50,7 +60,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { animate } from "animejs";
+import { animate, steps } from "animejs";
 import { useReducedMotion } from "../lib/motion";
 import { seriesPath } from "../lib/project";
 
@@ -64,6 +74,29 @@ import { seriesPath } from "../lib/project";
  * ------------------------------------------------------------------ */
 
 export type Tone = "ok" | "warn" | "alarm" | "ink" | "dim" | "faint";
+
+/**
+ * A tone reinforces a state. It must never be the only thing carrying one.
+ *
+ * Measured under `filter: grayscale(1)`, which is how this surface looks to a
+ * monochrome display and close to how `ok` and `warn` look to a red-green
+ * colour deficiency. Relative luminance out of 255:
+ *
+ *     ink 221 · warn 193 · ok 187 · dim 146 · alarm 128 · faint 103
+ *
+ * `ok` and `warn` land **5.7 apart**. They are the same grey. Everything else
+ * separates: `alarm` is 59 clear of `ok`, `dim` 41, `faint` 84.
+ *
+ * So an `ok` / `warn` pair is decoration, not information, and every existing
+ * one is written that way -- the state is already in the value beside it. The
+ * class name changes (`oos` / `slick_unknown`), or the number does (`x1.00` /
+ * `x0.42`), or the meter's bar is a different length, or the word is different
+ * (`drift field` / `ambiguous`). Audited: there is currently no state on either
+ * surface that a reader would lose in grayscale.
+ *
+ * Keep it that way. If a new readout needs to say "this one is a problem",
+ * change what it says, not only how it is inked.
+ */
 
 export const TONE: Record<Tone, string> = {
   ok: "var(--accent)",
@@ -86,6 +119,13 @@ export const TONE: Record<Tone, string> = {
  * this one sits in a header that also carries a live readout. `steps(2)` is
  * what makes it blink rather than pulse -- a fade reads as a notification, a
  * hard on/off reads as a terminal.
+ *
+ * It is the imported `steps` function and not the string `"steps(2)"`. anime
+ * removed the string form from the core in v4 and warns about it at runtime,
+ * and a rejected easing does not fail -- it falls back to the default, which
+ * is a fade. So the string form left this caret doing the exact thing the
+ * paragraph above says it must not do, silently, with only a console warning
+ * to say so.
  */
 export function Caret({ tone = "ok" }: { tone?: Tone }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -98,7 +138,7 @@ export function Caret({ tone = "ok" }: { tone?: Tone }) {
       opacity: [1, 0],
       duration: 1060,
       loop: true,
-      ease: "steps(2)",
+      ease: steps(2),
     });
     return () => {
       a.revert();

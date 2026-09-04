@@ -276,6 +276,30 @@ export function Drift({
   const first = forward[0] ?? null;
   const last = forward[forward.length - 1] ?? null;
   const next = d.frames.find((f) => f.hour === rounded + 1) ?? null;
+  // The tightest the *backward* origin contour ever gets. This -- not anything
+  // on the forward plot -- is the number the insufficient-evidence rule is
+  // tested against, and `drift.convergence` is already the backward leg.
+  const originMin = useMemo(
+    () => d.convergence.reduce((m, c) => Math.min(m, c.area90Km2), Infinity),
+    [d.convergence],
+  );
+  /*
+    The diffuse test's own result, recomputed from the two numbers printed
+    beside it rather than read off `insufficientEvidence`.
+
+    They are not the same question, and reading the flag here states a
+    falsehood on four of the five cases. `scenarios.ts` fills
+    `drift.insufficientEvidence` from the *scorer*, which withholds for any of
+    four reasons -- a wind gate below 0.15, this diffuse test, no candidate
+    surviving the gate, or a top two closer than 0.015. On `mumbai-null` the
+    cause is a wind gate at 1.9 m/s while the origin contour closes to 15 km2
+    against a 300 km2 threshold: the field constrains perfectly well and the run
+    is still withheld. A row labelled "verdict" beside those two numbers would
+    have been the same mistake this block was being fixed for.
+  */
+  const tooDiffuse = Number.isFinite(originMin)
+    ? originMin > d.diffuseThresholdKm2
+    : false;
 
   return (
     <Pane
@@ -400,9 +424,20 @@ export function Drift({
             }
           >
             <Note>
-              Published as the model emits it. The insufficient-evidence rule is
-              written against this curve, so smoothing it to look like a cleaner
-              basin would be hiding the measurement the refusal depends on.
+              Published as the model emits it, unsmoothed. What it shows is the
+              forward horizon: how much the region has stopped ruling out by the
+              time the forecast runs out.{" "}
+              <strong style={{ color: "var(--ink)", fontWeight: 500 }}>
+                The insufficient-evidence rule is not tested on this curve.
+              </strong>{" "}
+              It is tested on the backward leg, at the tightest the origin
+              contour ever gets, and that measurement and its threshold are
+              printed below — so the refusal can be checked rather than taken on
+              trust.{" "}
+              Those rows report that one test and nothing more: a run can still
+              be withheld by a closed wind gate, by no candidate surviving the
+              gate, or by a top two too close to separate, none of which this
+              curve or that contour can see.
             </Note>
             {/*
               The two ends of the curve, and the second trace named.
@@ -432,6 +467,37 @@ export function Drift({
                 unit="km"
               />
               <Row label="frames" value={forward.length} tone="dim" />
+            </div>
+            {/*
+              The refusal, stated as a test rather than as an outcome.
+
+              `origin min` is the backward contour at its tightest and
+              `refuse above` is this scenario's threshold; the run is withheld
+              when the first exceeds the second. Both are on `run.drift` now,
+              which is what makes this printable at all -- the threshold used to
+              live only inside the simulation, so the pane could assert that a
+              rule existed and never show it being applied.
+            */}
+            <div className="mt-2">
+              <Row
+                label="origin min"
+                value={Number.isFinite(originMin) ? originMin.toFixed(0) : "--"}
+                unit="km2"
+                tone={tooDiffuse ? "alarm" : "ink"}
+                title="The backward 90% origin contour at its tightest, over the whole hindcast."
+              />
+              <Row
+                label="refuse above"
+                value={d.diffuseThresholdKm2.toFixed(0)}
+                unit="km2"
+                tone="dim"
+              />
+              <Row
+                label="this test"
+                value={tooDiffuse ? "too diffuse" : "constrains"}
+                tone={tooDiffuse ? "alarm" : "ok"}
+                title="The result of the diffuse test alone. The run can still be withheld for reasons this test does not see."
+              />
             </div>
           </Split>
         </Block>

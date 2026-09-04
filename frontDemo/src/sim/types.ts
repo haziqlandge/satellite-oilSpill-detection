@@ -13,6 +13,21 @@
 
 export type LngLat = [number, number];
 
+/**
+ * Which of the five authored scenes a run is.
+ *
+ * Declared here rather than in `scenarios.ts`, where it used to live, because
+ * `ScenarioMeta.id` is this type and `types.ts` sits below `scenarios.ts` in
+ * the import graph -- reaching upward for it would have been a cycle. Every
+ * consumer still imports it from `scenarios.ts`, which re-exports it.
+ */
+export type ScenarioId =
+  | "gom-moving"
+  | "gom-berthed"
+  | "gom-platform"
+  | "kutch-dark"
+  | "mumbai-null";
+
 export type SlickClass = "oos" | "slick_unknown";
 
 export type CandidateKind = "ais_vessel" | "dark_vessel" | "infrastructure";
@@ -92,6 +107,20 @@ export interface DriftRun {
   temporalState: TemporalState;
   /** Set when the field is too diffuse to discriminate (C3). */
   insufficientEvidence: { area90Km2: number; reason: string } | null;
+  /**
+   * The area the origin contour must come inside for the run to discriminate.
+   *
+   * Carried for the same reason as `gate` on `Run`: the refusal is a
+   * deliverable, and a refusal whose threshold stays inside the simulation
+   * cannot be audited from the interface. `convergence` already carries the
+   * series this is tested against -- the backward leg, at its tightest -- so
+   * with this field a pane can print the test, the measurement and the verdict
+   * rather than asserting that a refusal happened somewhere.
+   *
+   * Per scenario, not a constant: four of the five sit at 420 km2 and one at
+   * 300.
+   */
+  diffuseThresholdKm2: number;
 }
 
 export interface AisPoint {
@@ -170,7 +199,7 @@ export interface Suspect {
 }
 
 export interface ScenarioMeta {
-  id: string;
+  id: ScenarioId;
   name: string;
   region: "gulf-of-mexico" | "indian-waters";
   /**

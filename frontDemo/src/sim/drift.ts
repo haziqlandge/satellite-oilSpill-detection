@@ -169,6 +169,7 @@ export function runDrift(cfg: DriftConfig, rng: Rng): {
       ageMethod,
       temporalState,
       insufficientEvidence,
+      diffuseThresholdKm2: cfg.diffuseThresholdKm2,
     },
     grids,
   };

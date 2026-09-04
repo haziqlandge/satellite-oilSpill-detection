@@ -35,15 +35,16 @@ the dimmest colour in the palette.
 
 ---
 
-## 1. `src/sim/types.ts` — `ScenarioMeta.id` is `string`
+## 1. ~~`src/sim/types.ts` — `ScenarioMeta.id` is `string`~~ — resolved
 
-`scenarioListing()` takes a `ScenarioId`, but `run.meta.id` is typed `string`, so
-anything holding a run and wanting its listing has to cast.
+`scenarioListing()` takes a `ScenarioId`, but `run.meta.id` was typed `string`,
+so anything holding a run and wanting its listing had to cast.
 
-**Wanted:** `ScenarioMeta.id: ScenarioId`.
-
-**Workaround:** one cast in `LogStream.tsx`. Harmless, and the fix belongs in the
-sim layer rather than here.
+**Done.** `ScenarioId` now lives in `sim/types.ts`. It could not be imported the
+other way -- `scenarios.ts` already imports `types.ts`, so pulling the type
+upward would have been a cycle -- and `scenarios.ts` re-exports it, which is
+why no import site changed. Both casts are gone: the one here, and a redundant
+one in `site/SpillSelect.tsx` on a value that was already `ScenarioId`.
 
 ---
 

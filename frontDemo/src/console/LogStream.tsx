@@ -23,7 +23,7 @@ import { clock, formatHour } from "../lib/format";
 import { CONTACT_RADIUS_KM, PHASE_LABEL, type Moment } from "../lib/playback";
 import { useReducedMotion } from "../lib/motion";
 import { WEIGHTS_VERSION } from "../sim/scoring";
-import { scenarioListing, type ScenarioId } from "../sim/scenarios";
+import { scenarioListing } from "../sim/scenarios";
 import { PROVENANCE } from "../content";
 import type { Run } from "../sim/types";
 import { SCROLL, TONE, type Tone } from "./components";
@@ -52,7 +52,7 @@ function entry(at: number, hour: number, tag: string, text: string, tone: Tone =
 function seedLines(run: Run): LogEntry[] {
   const at = run.meta.acquiredAt;
   const d = run.drift;
-  const listing = scenarioListing(run.meta.id as ScenarioId);
+  const listing = scenarioListing(run.meta.id);
   const out: LogEntry[] = [
     entry(at, 0, "sys", "session open · analysis node 04", "ok"),
     entry(at, 0, "sys", `scenario ${listing.name.toLowerCase()} · ${run.meta.id}`),

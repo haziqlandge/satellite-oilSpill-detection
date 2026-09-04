@@ -23,7 +23,7 @@ import {
   formatHour,
   stamp,
 } from "../lib/format";
-import { CONTACT_RADIUS_KM } from "../lib/playback";
+import { CONTACT_RADIUS_KM, eventSpan } from "../lib/playback";
 import {
   COMPARISON,
   LIMITS,
@@ -247,6 +247,32 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
   // it converts once, here, and keeps the UTC stamps beside them.
   const ow0 = (card.originWindow[0] - run.meta.acquiredAt) / 3600_000;
   const ow1 = (card.originWindow[1] - run.meta.acquiredAt) / 3600_000;
+  // Where the jump control below lands: the part of *this candidate's* origin
+  // window that the clock can actually reach, which is the window's close
+  // pulled into the timeline's span.
+  //
+  // Deliberately neither of the two shorter spellings. A literal `0` duplicates
+  // knowledge that lives in `playback.ts`. `eventSpan(run)[0]` is worse than the
+  // literal: it reads as the safe derivation, but it is a derivation of the
+  // wrong quantity -- if the span ever regained a lead-in it would jump to the
+  // *start* of the backward horizon, and this control's whole claim is that it
+  // goes to the pass. Clamping the window's own close is the one form that
+  // stays true to the sentence in the title under either end moving.
+  //
+  // All three agree today, on every fixture: `scoring.ts` closes every origin
+  // window on `acquiredAt` (all three scorers write the same
+  // `[acquiredAt - backwardHours, acquiredAt]` pair) and `playback.ts` opens
+  // every span on that same instant. The backward horizon and the forward one
+  // are hinged on one timestamp, so the two intervals meet at exactly one hour.
+  // That is structure rather than coincidence, but it is still worth deriving,
+  // because the agreement is what makes the sentence in the title true and the
+  // reader cannot see it from here.
+  const [spanH0, spanH1] = eventSpan(run);
+  const windowEnd = Math.max(spanH0, Math.min(spanH1, ow1));
+  // The 0.01 h tolerance is Timeline.tsx's own epsilon for "the clock is at
+  // this mark". Playback accumulates fractional hours, so an equality test
+  // would flicker off during a run for no reason a reader could see.
+  const atWindowEnd = Math.abs(hour - windowEnd) < 0.01;
   const rank = ablated ? selected.rankWithoutDrift : selected.rank;
   const total = ablated ? selected.totalWithoutDrift : selected.total;
 
@@ -286,17 +312,35 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
                 </Btn>
               ))}
             {/*
-              The origin window is in negative hours and the timeline no longer
-              covers them, so there is nowhere for this to jump to. It goes to
-              the pass instead -- the earliest hour the clock has -- and says so
-              rather than silently landing somewhere else. The window itself is
-              still printed above, which is where that evidence lives now.
+              The origin window runs backward from the acquisition and the
+              timeline runs forward from it, so the two meet at exactly one
+              hour -- the pass itself -- and that hour is the window's close,
+              not somewhere outside it. The previous note here had this wrong in
+              a way worth recording: it said the window was entirely in negative
+              hours and that there was "nowhere for this to jump to", and the
+              tooltip said the window lay "before the timeline's range" in the
+              same sentence that printed it ending at T0. The behaviour was
+              right and the justification was false. What the control actually
+              does is open the one hour of the window the ruler still covers.
+              The rest of it is printed in the `origin win` field above, which
+              is where that evidence lives now that the negative hours are off
+              the scale.
+
+              It lights when the clock is already there, the same idiom the rank
+              buttons beside it use for the open card and the speed buttons use
+              for the running speed. That matters more than it looks: T0 is the
+              hour a fresh console opens on, so unlit this control's first press
+              would be a visible no-op on a surface whose whole idiom is that
+              every control reports. Lit, it is not a dead button -- it is the
+              card saying the clock is standing inside this candidate's window,
+              and it goes dark the moment a scrub leaves it.
             */}
             <Btn
-              onClick={() => setHour(0)}
-              title={`This candidate's origin window is ${formatHour(Math.round(ow0))} to ${formatHour(Math.round(ow1))}, before the timeline's range. Jumps to the satellite pass.`}
+              onClick={() => setHour(windowEnd)}
+              active={atWindowEnd}
+              title={`This candidate's origin window is ${formatHour(Math.round(ow0))} to ${formatHour(Math.round(ow1))}. It opens before the timeline and closes at the satellite pass, so ${formatHour(windowEnd)} is the one hour of it this clock can reach. Jumps there.`}
             >
-              goto t0
+              {`goto ${formatHour(windowEnd)}`}
             </Btn>
           </div>
         </Block>

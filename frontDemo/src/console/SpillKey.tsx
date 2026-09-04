@@ -44,13 +44,13 @@ export function SpillKey({
         }}
       >
         <span
-          className="text-[8.5px] tracking-[0.2em] opacity-70"
+          className="text-[9px] tracking-[0.2em] opacity-70"
           aria-hidden
         >
           spill
         </span>
         {current.name}
-        <span className="text-[8px] leading-none" aria-hidden>
+        <span className="text-[9px] leading-none" aria-hidden>
           {pop.open ? "▲" : "▼"}
         </span>
       </button>

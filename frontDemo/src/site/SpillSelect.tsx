@@ -22,7 +22,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { SCENARIOS, type ScenarioId } from "../sim/scenarios";
+import { SCENARIOS } from "../sim/scenarios";
 import type { SpillState } from "../lib/spill";
 
 export function SpillSelect({
@@ -140,7 +140,7 @@ export function SpillSelect({
                   role="option"
                   aria-selected={on}
                   onClick={() => {
-                    spill.setScenario(s.id as ScenarioId);
+                    spill.setScenario(s.id);
                     setOpen(false);
                   }}
                   className="w-full cursor-pointer px-3 py-2 text-left transition-colors"

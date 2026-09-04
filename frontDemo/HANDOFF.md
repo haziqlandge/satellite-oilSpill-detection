@@ -53,8 +53,17 @@ their numbers rather than asserting the same thing twice.
 
 ### Verified in the browser
 
-- Slick recolour repaints the console map live; `--accent` recolours page,
-  figures and console chrome together
+- Slick recolour repaints the console map live. **The `--accent` half of this
+  line was an overclaim and is corrected here:** what was checked that session
+  was the map's `slick`, which is `MapPaint` through `setPaintProperty` — the
+  *other* mechanism, not a token. `ISSUES.md` §4.7 recorded it as unverified,
+  and when it was finally driven end to end (2026-09-05) it turned out to be
+  **false in two places**: both console header menus, being portalled outside
+  the surface root, could not be recoloured at all and were rendering in the
+  site's orange; and both `SarTile` canvases baked the accent into pixels and
+  never re-baked. Both are fixed. Measured after: 148 of 148 `--accent`
+  consumers on the console follow an override with none stuck, and the tiles go
+  1036 magenta / 0 green under an override to 0 / 1091 on revert-all
 - Left dock: drag past minimum shuts it; click reopens at 214; drag-to-330
   reopens at 330 with `--panel-scale` 1.244
 - Close all nine panels, reopen one → 430px, `--panel-scale: 1` (the old bug)

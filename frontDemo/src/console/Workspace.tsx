@@ -281,14 +281,20 @@ function BootTranscript({ run, onDone }: { run: Run; onDone: () => void }) {
         {lines.slice(0, shown).map((l, i) => (
           <p
             key={i}
-            className="text-[11px] leading-[1.65] sm:text-[12px]"
+            /* 11px flat -- the prose rung, the same size as every `Note` on
+               this surface. It carried a responsive bump to twelve pixels at
+               the small breakpoint -- the last off-ladder size in the console,
+               and the only type size on the surface that moved with a viewport:
+               a transcript that changed size with the viewport while nothing
+               around it did. */
+            className="text-[11px] leading-[1.65]"
             style={{ color: TONE_VAR[l.tone] }}
           >
             <span style={{ color: "var(--ink-faint)" }}>{"> "}</span>
             {l.text}
           </p>
         ))}
-        <p className="mt-1 text-[11px] sm:text-[12px]">
+        <p className="mt-1 text-[11px]">
           <Caret />
         </p>
       </div>
@@ -393,10 +399,36 @@ export function Workspace({
    * One line, sixteen seconds, linear. Slow enough to read as an instrument
    * refreshing rather than as a loading animation, and it is the only motion on
    * the map surface. `useAnimeScope` skips it entirely under reduced motion.
+   *
+   * **The animated element is a full-height carrier, not the bar itself**, and
+   * that is the whole reason this works. A CSS transform percentage resolves
+   * against the transformed element's own border box -- never its container --
+   * so moving the 64px gradient by `102%` moved it sixty-five pixels and
+   * looped, which on a 669px map was a faint band shuffling about in the top
+   * tenth of the screen. Measured: it travelled 66px of 669.
+   *
+   * Carrying the bar on a full-height element makes the same percentages mean
+   * the map's height instead. The bar hangs at `top-full`, one bar-height below
+   * the carrier's bottom edge, so `-100%` puts it flush at the top of the map
+   * and `0%` puts it just past the bottom: one clean pass, edge to edge, with
+   * no measurement and nothing to recompute when the workspace is resized.
+   *
+   * No `backstop` here, and none wanted. That option exists for a setup that
+   * primes its targets to `opacity: 0` and needs them restored if the timeline
+   * never runs; this one only translates, the bar sits at opacity 1 throughout,
+   * and `settle()` skips anything above 0.05 in any case. Passing one would be
+   * a no-op that implied a hazard this animation does not have.
+   *
+   * Under reduced motion the hook does not run, the carrier keeps no transform,
+   * and the bar therefore rests below the map's bottom edge -- the sweep is not
+   * drawn at all. That is the intended resting state and not an oversight. This
+   * band carries no information; it is the map reporting that it is live. A
+   * scan line parked in the middle of a chart states the opposite of what it is
+   * for, so where the scanning goes, so does the line.
    */
   const scope = useAnimeScope(() => {
     animate(".tm-sweep", {
-      translateY: ["-2%", "102%"],
+      translateY: ["-100%", "0%"],
       duration: 16000,
       loop: true,
       ease: "linear",
@@ -464,14 +496,18 @@ export function Workspace({
 
         {/* --- instrument overlay ---------------------------------- */}
         <div className="pointer-events-none absolute inset-0 z-10">
-          {/* Sweep. */}
-          <div
-            className="tm-sweep absolute inset-x-0 top-0 h-[64px]"
-            style={{
-              background:
-                "linear-gradient(to bottom, transparent, color-mix(in oklab, var(--accent) 9%, transparent), transparent)",
-            }}
-          />
+          {/* Sweep. The carrier spans the map; the bar hangs off its bottom
+              edge. See the `useAnimeScope` docblock above for why it is built
+              this way round. The map container clips it at both ends. */}
+          <div className="tm-sweep absolute inset-0">
+            <div
+              className="absolute inset-x-0 top-full h-[64px]"
+              style={{
+                background:
+                  "linear-gradient(to bottom, transparent, color-mix(in oklab, var(--accent) 9%, transparent), transparent)",
+              }}
+            />
+          </div>
 
           {/* Crosshair. Hidden until the pointer is inside the workspace, so a
               stale reticle does not sit on the map after the operator has moved

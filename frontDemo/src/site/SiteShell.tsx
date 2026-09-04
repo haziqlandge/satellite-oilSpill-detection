@@ -19,7 +19,7 @@
 
 import { useEffect, useState } from "react";
 import { useSpill } from "../lib/spill";
-import { revealOnScroll } from "../lib/motion";
+import { revealOnScroll, useReducedMotion } from "../lib/motion";
 import { PROVENANCE } from "../content";
 import { REPO_URL } from "../theme";
 import { Nav, type NavSection } from "./Nav";
@@ -59,7 +59,19 @@ export default function SiteShell() {
   // the observer never reaches. Priming an element to `opacity: 0` is a bet
   // that something will set it back, and that bet losing must not produce a
   // blank page.
-  useEffect(() => revealOnScroll("[data-reveal]"), []);
+  //
+  // Guarded on reduced motion, which it was not. Every other animated thing on
+  // this page runs through `useAnimeScope` / `useAnimeScopeInView`, and both
+  // return before their setup when the preference is set -- nothing is primed,
+  // so nothing needs revealing. `revealOnScroll` is a plain function with no
+  // such check inside it, so the check has to be here: it primed its target to
+  // `opacity: 0` and slid it 26px regardless of the preference, which is the
+  // one motion on this page that a reader asking for none still got.
+  const reduced = useReducedMotion();
+  useEffect(
+    () => (reduced ? undefined : revealOnScroll("[data-reveal]")),
+    [reduced],
+  );
 
   // The one floating window on the home page. It is a tool for looking at the
   // document rather than a part of it, so it starts closed and leaves no trace

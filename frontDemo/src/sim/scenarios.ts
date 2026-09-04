@@ -29,14 +29,17 @@ import {
 } from "./ais";
 import { score, type DriftVariant } from "./scoring";
 import { buildSlick, characterise, seedPoints, windGate } from "./slick";
-import type { Environment, LngLat, Run, ScenarioMeta, Vessel } from "./types";
+import type {
+  Environment,
+  LngLat,
+  Run,
+  ScenarioId,
+  ScenarioMeta,
+  Vessel,
+} from "./types";
 
-export type ScenarioId =
-  | "gom-moving"
-  | "gom-berthed"
-  | "gom-platform"
-  | "kutch-dark"
-  | "mumbai-null";
+/** Re-exported so the dozen existing `from "../sim/scenarios"` imports stand. */
+export type { ScenarioId };
 
 export interface ScenarioListing {
   id: ScenarioId;

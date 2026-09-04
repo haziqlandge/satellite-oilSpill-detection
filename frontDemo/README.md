@@ -77,7 +77,7 @@ src/
   theme.ts        the two surfaces: map paint, fonts, accents
   site/           the home page
     SiteShell  Nav  SpillSelect  Loading  ShipTrail
-    components.tsx  figures.tsx   (from Signal)
+    components.tsx                (from Signal)
     scenery.tsx                   the tanker and the stage chain
     plates.tsx                    (from Dossier)
     instruments.tsx               (from Orbit)
@@ -154,8 +154,13 @@ text, and they survived the recombination:
 - **Tailwind v4** via `@tailwindcss/vite`. Tokens are CSS custom properties in
   `src/index.css`, re-pointed under `[data-surface="..."]`
 - **anime.js v4.5** — named exports (`animate`, `createTimeline`, `stagger`,
-  `svg.createDrawable`, `text.split`, `onScroll`, `createScope`, `utils`). Any v3
-  snippet found online will not work here
+  `svg.createDrawable`, `text.split`, `onScroll`, `createScope`, `utils`,
+  `steps`). Any v3 snippet found online will not work here, and neither will
+  every v4 one: **easing functions are imports now, not strings**. `ease:
+  "steps(2)"` was removed from the core and a rejected easing does not throw —
+  it falls back to the default, which is a fade. `Caret` was doing exactly that,
+  blinking-as-fading, with only a console warning to say so. It is `ease:
+  steps(2)` with `steps` imported
 - **MapLibre GL JS**, no API key. Esri basemaps, no token
 - Fonts self-hosted through `@fontsource`, never a `<link>` to Google Fonts
 
@@ -202,6 +207,21 @@ few-pixel sliver. Raising `z-index` fixes nothing — no z-index escapes an
 overflow clip, and a `z-50` inside a header is only `z-50` *within the header*.
 Both menus now render into `document.body` through a portal (`console/Popover`).
 
+**...and a portal escapes the surface root along with the clip.** The half of
+that trap nobody saw for two sessions. `#root` lives inside `<body>`, so a panel
+portalled to `document.body` is a *sibling* of the surface root, not a
+descendant — and the token ladder is re-pointed under `[data-surface]` on that
+root. Both console menus therefore read the `:root` fallback, where `--accent`
+is the **home page's orange**, and where `--warn`, `--alarm`, `--group` and
+`--group-ink` are not declared at all, so `background: var(--group)` was invalid
+at computed-value time and resolved to nothing. They also could not see the
+colour panel's overrides, which are inline custom properties on that same root:
+moving `--accent` recoloured the whole console *except* its two menus. And they
+inherited Tailwind preflight's system sans while every character around them was
+IBM Plex Mono. `Popover` now restates `data-surface`, spreads `tokenStyle()` and
+sets `fontFamily` — it is a second surface root, deliberately, and it has to be
+kept in step with `App.tsx`'s.
+
 **Drawing the oil and the hindcast at the same weight.** They are the same kind
 of mark and they mean opposite things. The backward ensemble is at its widest at
 the far end of the backward horizon — reversal spreads, it does not focus —
@@ -225,6 +245,33 @@ panel in a dock and the rail unmounts; reopen one and it mounts a fresh element
 whose deps have not changed, so the effect never re-runs, `width: var(--dock-w)`
 resolves to `auto`, and the panel takes the whole viewport. The resting width is
 rendered now; only the drag writes to the DOM.
+
+**Calling a setter from inside a `useState` updater.** It looks like a way to
+read fresh state and act on it in one go, and it works often enough to pass a
+casual test. React has *two* sites at which it may invoke a functional updater:
+eagerly, inside the event handler, when the fiber has no pending lanes — and
+during the **render phase** when it does. On the eager path a nested setter is
+an ordinary batched update and everything is fine. On the render-phase path a
+setter belonging to an *ancestor* cannot join that pass, so React defers it to a
+second render and warns. The timeline's play-at-horizon restart lived in such an
+updater and failed roughly two times in three, worst immediately after the
+playback loop's own auto-stop — because that auto-stop is what leaves a lane on
+the fiber. Keep updaters pure (`p => !p`) and put the decision where the value
+is actually consumed. The tell is `Cannot update a component (X) while rendering
+a different component (Y)`, which is **deduped by component name and printed
+once per session** — easy to scroll past.
+
+**A `<canvas>` cannot read a token, so it bakes one.** `ctx.strokeStyle` takes a
+resolved colour string and silently ignores `var()`, so `SarTile` resolves
+`var(--accent)` through `getComputedStyle` inside its draw effect. That makes
+the drawing only as current as the last time the effect ran — and none of its
+dependencies changes when a token moves, because the `maskColour` prop is the
+*literal string* `"var(--accent)"`. Both SAR tiles kept the outgoing accent
+indefinitely while every SVG figure beside them had already changed. Depend on
+the override's **value**, not on the prop that names it. Note the second half:
+redrawing on every token change means redrawing on every step of a slider drag,
+and the speckle loop is 27–56 ms, so the generated acquisition is cached in a
+ref and only the outline is redrawn.
 
 ---
 

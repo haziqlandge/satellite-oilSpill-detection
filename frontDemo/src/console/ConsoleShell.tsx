@@ -277,7 +277,10 @@ export default function ConsoleShell() {
       >
         <a
           href="#/"
-          className="shrink-0 text-[12px] tracking-[0.16em] whitespace-nowrap uppercase transition-colors"
+          /* 11.5px: the Panel title rung. This is the title of the whole
+             surface, and it was the only 12px in the console -- half a pixel
+             clear of a rung it is already indistinguishable from. */
+          className="shrink-0 text-[11.5px] tracking-[0.16em] whitespace-nowrap uppercase transition-colors"
           style={{ color: "var(--ink)" }}
           title="SlickTrace — back to the home page"
         >

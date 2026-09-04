@@ -212,7 +212,24 @@ export function checkpointsFor(run: Run): number[] {
   return [0, ...steps];
 }
 
-/** Growth curve for the whole event, for the designs that chart it. */
+/**
+ * The release, hour by hour: surface extent and the fraction discharged.
+ *
+ * One live caller, `site/env.tsx`'s growth chart. It stays in `lib/` anyway,
+ * and the reasoning is worth stating because a one-caller export in a shared
+ * folder usually is a smell. `playback.ts` is not a bag of shared helpers -- it
+ * is the event's time axis, and every other export here (`momentAt`,
+ * `eventSpan`, `checkpointsFor`) is the same kind of thing: a projection of the
+ * run onto hours. This belongs beside them whether one view charts it or three.
+ *
+ * The other reason not to move it into its caller: `console/Timeline.tsx`
+ * names this function in the note explaining what its trace used to be and why
+ * it no longer is. A console file pointing at a function inside a home-page
+ * component would be a worse arrangement than the one being tidied.
+ *
+ * (The old docstring said "for the designs that chart it" -- plural, from the
+ * four-design study. There are two surfaces now and only one of them draws it.)
+ */
 export function growthCurve(run: Run): { hour: number; areaKm2: number; released: number }[] {
   return run.release.map((f) => ({
     hour: f.hour,

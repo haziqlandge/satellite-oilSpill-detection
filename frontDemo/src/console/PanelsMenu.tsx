@@ -50,7 +50,7 @@ export function PanelsMenu({ dock }: { dock: Dock }) {
         <span className="text-[9px] opacity-70">
           {openCount}/{PANELS.length}
         </span>
-        <span className="text-[8px] leading-none" aria-hidden>
+        <span className="text-[9px] leading-none" aria-hidden>
           {pop.open ? "▲" : "▼"}
         </span>
       </button>
@@ -112,7 +112,7 @@ export function PanelsMenu({ dock }: { dock: Dock }) {
                           ? `Send ${p.title} back to its dock`
                           : `Undock ${p.title} into a window`
                       }
-                      className="my-[3px] mr-2 shrink-0 cursor-pointer border px-1.5 text-[8.5px] tracking-[0.14em] uppercase transition-colors"
+                      className="my-[3px] mr-2 shrink-0 cursor-pointer border px-1.5 text-[9px] tracking-[0.14em] uppercase transition-colors"
                       style={{
                         borderColor: "var(--line)",
                         color: "var(--ink-dim)",

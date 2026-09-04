@@ -201,7 +201,13 @@ export function Cause({ spill }: { spill: SpillState }) {
                   <Tag tone="accent">Figure 4</Tag> Traffic over the origin
                   field at the moment of acquisition.{" "}
                   {run.gate.considered.toLocaleString()} tracks considered,{" "}
-                  {run.gate.admitted} admitted by the gate.
+                  {run.gate.admitted} admitted by the gate.{" "}
+                  {/* `gate.reason` is the rule itself, and it was carried on
+                      every run and printed on neither surface. The two counts
+                      without it say a filter ran; with it they say what the
+                      filter was, which is the difference between a number and
+                      an auditable one. */}
+                  {run.gate.reason}
                 </figcaption>
               </figure>
             </Wide>
@@ -267,7 +273,20 @@ export function Cause({ spill }: { spill: SpillState }) {
                     that always produces a suspect is not a pipeline anyone
                     should trust.
                   </p>
-                  <p className="text-faint mt-3 font-mono text-[10px] tracking-[0.2em] uppercase">
+                  {/*
+                    The outcome, in the refusal's own ink.
+
+                    This line is what the block actually concludes -- the
+                    pipeline reached the end and named nobody -- and it was set
+                    in `--ink-faint`, the quietest token on the page, under two
+                    paragraphs of brighter body text. A conclusion printed more
+                    softly than its own explanation reads as a footnote to the
+                    refusal rather than as the refusal's result.
+                  */}
+                  <p
+                    className="mt-3 font-mono text-[10px] tracking-[0.2em] uppercase"
+                    style={{ color: "var(--alarm)" }}
+                  >
                     Candidates named: none
                   </p>
                 </div>
@@ -325,6 +344,41 @@ export function Cause({ spill }: { spill: SpillState }) {
                     );
                   })}
                 </ol>
+              )}
+
+              {/*
+                How far clear the top candidate actually is.
+
+                Both scores are printed above, so the margin is *derivable* by
+                subtraction -- but the threshold is not, and the threshold is
+                the part that matters: below 0.015 `scoring.ts` stops
+                distinguishing the top two at all. A ranked list that never says
+                how close the race was invites the reader to treat first place
+                as a finding, which is the one reading this whole section is
+                written to prevent.
+
+                `run.separability` is read here rather than recomputed. The
+                console derives its own because it has to answer for the ablated
+                ranking as well; this page has no ablation toggle, so the value
+                the scorer produced is the value to print.
+              */}
+              {run && !halt && ranked.length > 0 && (
+                <p className="text-faint mt-5 font-mono text-[11px] leading-[1.6]">
+                  {run.separability === null ? (
+                    <>
+                      Only one candidate survived the gate, so there is no
+                      margin to report. That is a result, not a gap.
+                    </>
+                  ) : (
+                    <>
+                      Separability {run.separability.toFixed(3)} — the margin
+                      between the first and second candidate.{" "}
+                      {run.separability < 0.015
+                        ? "That is inside the noise of the weighting, so neither is distinguished from the other."
+                        : "Reported per case, never targeted."}
+                    </>
+                  )}
+                </p>
               )}
             </div>
           </div>

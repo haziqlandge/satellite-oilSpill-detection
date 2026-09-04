@@ -102,7 +102,10 @@ export function Timeline({
 
   // The transport reads the live hour without re-arming its own loop, which is
   // what keeps a 12x playback from tearing down and rebuilding a
-  // requestAnimationFrame chain four times a second.
+  // requestAnimationFrame chain four times a second. The playback effect reads
+  // it exactly once, when it arms, and an effect runs after the commit whose
+  // render wrote it -- so at that instant the ref is the hour the operator can
+  // actually see.
   const hourRef = useRef(hour);
   hourRef.current = hour;
 
@@ -148,14 +151,46 @@ export function Timeline({
 
   const rewind = useCallback(() => setHour(h0), [setHour, h0]);
 
-  const toggle = useCallback(() => {
-    setPlaying((p) => {
-      if (p) return false;
-      // Pressing play at the end restarts the event rather than doing nothing.
-      if (hourRef.current >= h1 - 0.01) setHour(h0);
-      return true;
-    });
-  }, [h0, h1, setHour]);
+  /**
+   * Play and pause. Nothing else, and the "nothing else" is the whole point.
+   *
+   * This updater used to restart the event as a side effect -- `if
+   * (hourRef.current >= h1 - 0.01) setHour(h0)` before returning `true` -- and
+   * that one line made pressing play at the horizon work about half the time.
+   * The mechanism is worth writing out, because the shape is an easy one to
+   * reach for again and it does not look wrong.
+   *
+   * React does not specify *where* a functional updater runs, and
+   * `dispatchSetState` has two sites for it. When the fiber has no pending lanes
+   * it evaluates the updater eagerly, inside the click, to find out whether the
+   * result even differs from the current state. On that path the nested
+   * `setHour` was an ordinary event-handler update, batched with `setPlaying`
+   * into one render, and the restart worked. When the fiber *does* carry a
+   * pending lane the eager path is skipped and the updater runs during the
+   * render phase instead. `setHour` then belongs to a parent that has already
+   * rendered in this pass, so React cannot fold it into it: it warns ("Cannot
+   * update a component (`ConsoleShell`) while rendering a different component
+   * (`Timeline`)") and defers the hour to a second render.
+   *
+   * The second render is one commit too late. The commit in between carries
+   * `playing: true` with the hour still at the horizon; React flushes passive
+   * effects synchronously at the end of a sync-lane commit, so the playback
+   * effect below armed with `acc` at 48, and its first frame satisfied `acc >=
+   * h1` and immediately did `setHour(h1); setPlaying(false)`. Hour and label
+   * flickered out and back inside a frame or two, which is exactly why sampling
+   * every 300 ms read it as "the toggle did nothing".
+   *
+   * Which of the two sites runs is decided by `fiber.lanes` -- an internal
+   * scheduling detail, and one that is *reliably* dirty in the case that
+   * matters, because the loop's own auto-stop dispatches `setPlaying(false)` on
+   * this fiber and leaves a lane on its alternate until something re-renders
+   * this component. Hence: intermittent, and worst right after an auto-stop.
+   *
+   * So no setters inside updaters. `p => !p` is pure, which is also what
+   * StrictMode expects -- it invokes updaters twice on every path, eager or not,
+   * so a side effect in here fired twice even when the restart worked.
+   */
+  const toggle = useCallback(() => setPlaying((p) => !p), []);
 
   // A new run resets the hour in `useRun`; letting playback survive that would
   // leave the transport running against a case the operator did not start.
@@ -163,9 +198,35 @@ export function Timeline({
 
   useEffect(() => {
     if (!playing) return;
+
+    /*
+      Where this run of the loop starts -- decided here rather than in the
+      transport, and that relocation is the fix rather than a tidy-up.
+
+      Arming at (or past) the horizon means "play it again": there is nothing
+      left to run forward, so the loop rewinds to the start of the span instead
+      of stopping on its own first frame. The question "are we at the end?" and
+      the answer "then begin at h0" are now one read of one value at one moment,
+      inside the same effect body that seeds `acc` from it. They cannot land in
+      different commits, because there is only one. That is what the old shape
+      could not promise: it asked the question in a state updater whose
+      execution site React chooses, and answered it with a setter on a component
+      that had already rendered.
+
+      Publishing `from` is deliberate. `emitted` starts at `Math.round(from)`,
+      so the loop would not call `setHour` again until `acc` crossed the next
+      half hour and the playhead would sit at the horizon for an emit period
+      before jumping. One `setHour` from an effect body -- the ordinary,
+      supported place for one -- moves it immediately. It re-renders this
+      component but does not re-arm this effect: `hour` is not a dependency, by
+      design, and every other dependency is stable.
+    */
+    const from = hourRef.current >= h1 - 0.01 ? h0 : hourRef.current;
+    if (from !== hourRef.current) setHour(from);
+
     let raf = 0;
     let last = performance.now();
-    let acc = hourRef.current;
+    let acc = from;
     let emitted = Math.round(acc);
 
     const tick = (t: number) => {
@@ -194,7 +255,7 @@ export function Timeline({
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [playing, speed, h1, setHour]);
+  }, [playing, speed, h0, h1, setHour]);
 
   /* --- keyboard ---------------------------------------------------- */
 
