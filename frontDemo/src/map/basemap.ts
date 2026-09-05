@@ -16,6 +16,7 @@
 import type {
   ExpressionSpecification,
   LayerSpecification,
+  SourceSpecification,
   StyleSpecification,
 } from "maplibre-gl";
 import type { MapPaint } from "../theme";
@@ -79,18 +80,67 @@ export const SOURCE = {
   markers: "markers",
 } as const;
 
-export function buildStyle(paint: MapPaint): StyleSpecification {
-  const sources: StyleSpecification["sources"] = {};
-  const layers: LayerSpecification[] = [
-    {
-      id: "water",
-      type: "background",
-      paint: { "background-color": paint.water },
-    },
-  ];
+/* ------------------------------------------------------------------ *
+ * The world under the data
+ * ------------------------------------------------------------------ */
+
+/**
+ * The raster basemap, the wash over it, and the place names above everything.
+ *
+ * This is split out of `buildStyle` because these are the only parts of the
+ * style that `paint.basemap` and `paint.showLabels` can change, and those two
+ * fields became editable from the colour panel. Neither is a paint property:
+ * `basemap` decides which tile service the raster source points at, and
+ * `showLabels` decides whether a second source exists at all. Changing either
+ * therefore means adding and removing sources and layers rather than calling
+ * `setPaintProperty`, and `MapCanvas` does exactly that on a live map.
+ *
+ * The reason to hold the specifications here rather than writing them out
+ * again beside that swap is drift. A second copy of the raster layer -- with
+ * its own five paint expressions and its own tile template -- would start
+ * identical and end up subtly different from the one the map is first built
+ * with, and the difference would only ever show up after somebody changed the
+ * basemap at runtime, which is the least-travelled path in the component.
+ */
+export interface WorldSpec {
+  /** Keyed by source id. Only ever `basemap` and `labels`. */
+  sources: Record<string, SourceSpecification>;
+  /**
+   * Below the data, directly above the locally drawn ground.
+   *
+   * In draw order: the raster, then the wash that has to sit over it.
+   */
+  under: LayerSpecification[];
+  /**
+   * Above everything, the data layers included.
+   *
+   * Place names are the one thing on this map that is allowed to cover a
+   * result: a coastline name hidden under a credible-region band is not
+   * telling anyone anything, and the bands are translucent line work drawn to
+   * be read through.
+   */
+  over: LayerSpecification[];
+}
+
+/**
+ * Every layer id `worldSpec` can produce, in the order they must be removed.
+ *
+ * Top-down: MapLibre refuses to remove a source while a layer still references
+ * it, and refuses to remove a layer that does not exist, so a teardown that
+ * wants to be safe has to walk the whole list and check each one.
+ */
+export const WORLD_LAYER_IDS = ["labels", "basemap-tint", "basemap"] as const;
+
+/** Every source id `worldSpec` can produce. Removed after the layers. */
+export const WORLD_SOURCE_IDS = ["labels", "basemap"] as const;
+
+export function worldSpec(paint: MapPaint): WorldSpec {
+  const sources: Record<string, SourceSpecification> = {};
+  const under: LayerSpecification[] = [];
+  const over: LayerSpecification[] = [];
 
   if (paint.basemap !== "none") {
-    const cfg = BASEMAPS[paint.basemap as Exclude<MapPaint["basemap"], "none">];
+    const cfg = BASEMAPS[paint.basemap];
     sources.basemap = {
       type: "raster",
       tiles: [...cfg.tiles],
@@ -98,7 +148,7 @@ export function buildStyle(paint: MapPaint): StyleSpecification {
       maxzoom: cfg.maxzoom,
       attribution: cfg.attribution,
     };
-    layers.push({
+    under.push({
       id: "basemap",
       type: "raster",
       source: "basemap",
@@ -111,21 +161,37 @@ export function buildStyle(paint: MapPaint): StyleSpecification {
       },
     });
 
-    // Between the world and the data. A direction that wants the coastline in
-    // its own ink cannot get there through `raster-saturation`: the source is
-    // neutral grey and there is no chroma in it to saturate. Washing it from
-    // above is the one move that works, and it has to sit under the data
-    // layers, which are added on `load` and therefore land above this.
-    if (paint.basemapTint && (paint.basemapTintOpacity ?? 0) > 0) {
-      layers.push({
-        id: "basemap-tint",
-        type: "background",
-        paint: {
-          "background-color": paint.basemapTint,
-          "background-opacity": paint.basemapTintOpacity ?? 0,
-        },
-      });
-    }
+    /*
+      Between the world and the data. A direction that wants the coastline in
+      its own ink cannot get there through `raster-saturation`: the source is
+      neutral grey and there is no chroma in it to saturate. Washing it from
+      above is the one move that works, and it has to sit under the data
+      layers, which are added on `load` and therefore land above this.
+
+      Built whenever there is a world to wash, even at zero opacity, rather
+      than only when the shipped tint is already visible.
+
+      The old gate -- a tint colour set *and* an opacity above zero -- made the
+      layer's existence depend on the value of the control that drives it, and
+      `MapCanvas` can only re-apply an opacity to a layer that is there. So a
+      surface shipping `basemapTintOpacity: 0` had a wash slider that moved a
+      number and changed nothing, for ever, with no way back; and once
+      `basemap` became editable the same trap opened for the two that do ship a
+      tint, because dialling the wash to nothing and then changing world would
+      rebuild without it. A fully transparent background layer costs one draw
+      call of nothing, which is a great deal less than a control that lies.
+    */
+    under.push({
+      id: "basemap-tint",
+      type: "background",
+      paint: {
+        // `water` as the fallback colour, matching the live re-paint in
+        // `MapCanvas`: with no tint named, the honest wash is the ground's own
+        // colour at whatever opacity is asked for.
+        "background-color": paint.basemapTint ?? paint.water,
+        "background-opacity": paint.basemapTintOpacity ?? 0,
+      },
+    });
 
     if (paint.showLabels) {
       sources.labels = {
@@ -134,21 +200,56 @@ export function buildStyle(paint: MapPaint): StyleSpecification {
         tileSize: 256,
         maxzoom: cfg.maxzoom,
       };
+      over.push({
+        id: "labels",
+        type: "raster",
+        source: "labels",
+        paint: { "raster-opacity": 0.55 },
+      });
     }
   }
 
+  return { sources, under, over };
+}
+
+export function buildStyle(paint: MapPaint): StyleSpecification {
+  const world = worldSpec(paint);
   return {
     version: 8,
     // No glyph or sprite server. Nothing in this style needs a font, so the map
     // never blocks on an external asset it cannot reach.
-    sources,
-    layers,
+    sources: world.sources,
+    layers: [
+      {
+        id: "water",
+        type: "background",
+        paint: { "background-color": paint.water },
+      },
+      ...world.under,
+    ],
+    // `world.over` is deliberately not here. The labels raster belongs above
+    // the data layers, and those are added on `load` rather than declared in
+    // the style, so the only place it can be put in the right order is after
+    // them. The source it needs *is* declared above, so the layer has
+    // something to attach to the moment `MapCanvas` adds it.
   };
 }
 
-/** Whether the active direction has a labels source to draw. */
+/**
+ * Whether the active paint can carry place names at all.
+ *
+ * `showLabels` is a separate field from `basemap`, but the labels raster is a
+ * companion to a specific basemap service -- there is no set of names to draw
+ * over a map that is not there. The colour panel uses this to say so rather
+ * than offering a switch that silently does nothing.
+ */
+export function canShowLabels(paint: MapPaint): boolean {
+  return paint.basemap !== "none";
+}
+
+/** Whether the active paint has a labels source and layer to draw. */
 export function hasLabels(paint: MapPaint): boolean {
-  return paint.basemap !== "none" && paint.showLabels;
+  return canShowLabels(paint) && paint.showLabels;
 }
 
 /** A degree graticule, generated locally so the map is never empty. */

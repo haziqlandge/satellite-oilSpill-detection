@@ -125,12 +125,6 @@
     background: var(--base);
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    html {
-      scroll-behavior: auto;
-    }
-  }
-
   body {
     background: var(--base);
     color: var(--ink);
@@ -167,6 +161,151 @@
   summary::-webkit-details-marker {
     display: none;
   }
+
+  /*
+    REDUCED MOTION -- all of it, in one block.
+
+    There used to be two: an `html { scroll-behavior: auto }` beside the smooth
+    scroll above, and a universal duration clamp further down the file, outside
+    every layer. Nobody could enumerate what the pair actually covered, and
+    neither had ever run. The only lever available in this environment is a
+    `window.matchMedia` stub, which drives every JavaScript path and cannot make
+    a media query match, so the CSS half of this has been inert in every session
+    since it was written. What follows is the sweep that settled it, kept here
+    because the next person has the same problem: they cannot see this run
+    either.
+
+    WHAT IS ANIMATED, ON BOTH SURFACES
+
+      Forty-four Tailwind utilities, one per line, and nothing else -- no
+      `@keyframes` of our own, no SMIL, no inline `style={{ transition }}`, and
+      nothing in `@layer components`. Forty-three transitions and one keyframe
+      animation:
+
+        33  transition-colors    hover, focus and selected-state feedback on
+                                 buttons, tabs, menu rows and links
+         5  transition-opacity   the two dock grips' ridge dashes; the
+                                 workspace crosshair's two rules and its readout
+         2  transition-[filter]  the `panels` and `spill` header keys, which
+                                 brighten while their popover is open
+         1  transition-all       `Rocker`'s knob (site/instruments.tsx)
+         1  transition-transform `ConsoleKey`'s arrow
+         1  transition-[transform,box-shadow,filter]   `ConsoleKey` itself
+         1  animate-pulse        the ellipsis on `Loading`
+
+      Exactly three of those move something: the rocker knob slides 13px, the
+      console key scales to 1.02 on hover and focus, and its arrow translates
+      2px. The other forty-one are colour, opacity or brightness -- no motion at
+      all. Every substantial motion on either surface is anime.js, not CSS: the
+      plates, the scenery, the ship trail, the sweep carrier, the log tail and
+      the caret, and each is gated in JavaScript by `useReducedMotion` before it
+      is built. The map camera checks the query directly and jumps instead of
+      easing. None of that is reachable from here, and this block is not what
+      makes it safe.
+
+      One thing to know before grepping the *compiled* CSS for
+      `prefers-reduced-motion`: three blocks come back, and only one of them is
+      this. MapLibre ships its own, for a user-location dot this map never
+      draws. The third is
+      `@media (prefers-reduced-motion: no-preference)` carrying three
+      `motion-safe:` utilities that match no element on either surface --
+      Tailwind's source detection reaches `.backup/`, which is not gitignored,
+      and `DesignSwitcher.tsx` in there still carries the classes. Dead CSS from
+      a component that was removed.
+
+    WHY THE CLAMP STAYS BLUNT
+
+      A universal duration clamp flattens all forty-four, not just the three
+      that move, and the standard objection is that a cross-fade is not a
+      vestibular risk -- clamping it strips a control of its only feedback for
+      no benefit. That objection does not apply here, and the reason is
+      checkable rather than asserted: every one of these transitions runs
+      between two states that are each fully legible on their own, and not one
+      of them carries information in the ramp. Clamping removes the ramp and
+      never the state. The hover colour still changes, the crosshair still
+      appears, the knob is still at the other end of the track.
+
+      The condition under which that stops being true is the thing to check
+      before adding a transition to this project: a transition on a value that
+      updates *repeatedly from data* -- a needle, a bar tracking a live number,
+      a figure redrawn per timestep -- is smoothing a sequence of jumps, and
+      clamping it produces more perceived motion, not less. There is no such
+      transition on either surface: all forty-three run between discrete hover,
+      focus or toggle states. The forty-fourth is the only loop, and the
+      iteration clamp is what lands it on its resting opacity.
+
+      `ConsoleKey`'s `hover:scale-[1.02]` is the one that looks arguable, and it
+      is clamped on purpose. A two per cent scale is small, but it is motion
+      directly under the pointer, and the remedy for motion-from-interaction is
+      to remove the animation rather than to shrink it. Clamped, the key is
+      still two per cent larger while hovered -- the affordance survives, the
+      travel does not. Sparing it would also read worse than clamping it: its
+      transition list is `transform, box-shadow, filter`, so keeping the ramp
+      for the glow while the size jumps gives one control two different
+      cadences at once.
+
+      Rejected, clamping only the three that move: CSS cannot express it.
+      `transition-duration` is a positional list matched against
+      `transition-property`, so "clamp the transform but keep the box-shadow" on
+      `ConsoleKey` means restating that one element's entire transition in a
+      selector that then has to track its class list. Rejected, an allowlist of
+      selectors to clamp: it fails in the direction nobody notices -- a motion
+      added next month is simply not covered and nothing reports it -- whereas a
+      universal clamp fails the other way, turning a fade someone wanted into a
+      snap that someone sees. This file has already outlived `site/figures.tsx`,
+      which is what a selector list here is worth.
+
+    WHY IT IS IN `@layer base` AND NOT OUTSIDE EVERY LAYER
+
+      Unlayered is the wrong home for an `!important` backstop. For important
+      declarations the cascade reverses the layer order, and unlayered
+      `!important` is the *weakest* important author position: anything
+      important inside a layer beats it. Tailwind's important modifier compiles
+      into `@layer utilities` -- `duration-200!` emits
+      `transition-duration: 200ms !important` there -- so one trailing `!` in a
+      className was enough to punch a silent hole straight through the clamp.
+      `base` is declared before `components` and `utilities`, so under the
+      reversed order it outranks both.
+
+    WHAT THIS BLOCK CANNOT REACH
+
+      `scroll-behavior` governs a scroll only while the scroll itself asks for
+      `auto`. An explicit `behavior: "smooth"` handed to `scrollTo` or
+      `scrollIntoView` overrides the computed property outright, so the
+      `window.scrollTo({ behavior: "smooth" })` calls in `site/Nav.tsx` are not
+      addressable from CSS at all and need their own guard.
+
+      `::backdrop` is deliberately absent from the selector list. A selector
+      list containing one selector an engine cannot parse is invalid *in its
+      entirety*, so adding it would make the project's only reduced-motion
+      backstop conditional on that pseudo-element parsing. Nothing here uses
+      `<dialog>` or the popover API -- the console's popovers are portalled
+      divs -- so it would cover nothing and risk everything. Add it the day a
+      modal arrives.
+
+    `0.01ms` and not `0s`: a zero-duration transition never fires
+    `transitionend`, and anything waiting on one waits forever. Nothing listens
+    for one today; the point is that nothing should have to check first.
+  */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-delay: 0s !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-delay: 0s !important;
+      transition-duration: 0.01ms !important;
+
+      /* Not inherited, so it has to be set on every scroller rather than on
+         `html` alone -- the dock's panel stack, every pane body, the log and
+         the popovers all scroll in their own right. None of them asks for
+         smooth today; the universal form is what stops the next one having to
+         remember. Important because a `scroll-smooth` utility sits in
+         `@layer utilities` and would otherwise outrank a base-layer rule. */
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer utilities {
@@ -186,17 +325,6 @@
   .num {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
-  }
-}
-
-/* Every animation in this project degrades to its resting state. */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
   }
 }
 

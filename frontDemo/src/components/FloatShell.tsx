@@ -62,6 +62,46 @@ export function FloatShell({
 }: FloatShellProps) {
   const box = useRef<HTMLDivElement>(null);
 
+  /* --- focus -------------------------------------------------------- */
+
+  /**
+   * Touching the window puts focus in it.
+   *
+   * The window's owner is allowed to scope a keyboard rule to "the window you
+   * are in" -- the console scopes `Escape` that way, so that pressing it with
+   * three windows open sends one home rather than all three. That test can
+   * only be written against `document.activeElement`, and until this handler
+   * existed there was no gesture that ever put `activeElement` inside a
+   * window:
+   *
+   *  - the `<section>` was not focusable, so a click on the title bar or on
+   *    any of the panel's own prose left focus on `<body>`;
+   *  - both pointer handlers below call `preventDefault()`, which suppresses
+   *    the compatibility `mousedown` and with it the focus that a click
+   *    normally performs -- so even the resize corner, which *is* a `button`,
+   *    did not take focus when it was grabbed;
+   *  - a panel floated by double-clicking its dock tab is worse than neutral:
+   *    the tab that had focus is unmounted by the very click that floats the
+   *    panel, so `activeElement` falls back to `<body>`.
+   *
+   * The result was a documented shortcut that could be reached only by tabbing
+   * into the window from the keyboard. `tabIndex={-1}` makes the window a
+   * focus target without putting it in the tab order, and this runs in the
+   * **capture** phase so that the resize corner's `stopPropagation()` cannot
+   * skip it.
+   *
+   * The guard matters: focus is only taken when it is not already inside the
+   * window, so clicking from one control in the panel to another does not pull
+   * focus off the thing being clicked.
+   */
+  const onShellPointerDown = useCallback(() => {
+    onPointerDownCapture?.();
+    const el = box.current;
+    if (el && !el.contains(document.activeElement)) {
+      el.focus({ preventScroll: true });
+    }
+  }, [onPointerDownCapture]);
+
   /* --- move --------------------------------------------------------- */
 
   const onTitlePointerDown = useCallback(
@@ -167,7 +207,12 @@ export function FloatShell({
       ref={box}
       role="dialog"
       aria-label={`${title} window`}
-      onPointerDown={() => onPointerDownCapture?.()}
+      /* Focusable by script, never by Tab -- see `onShellPointerDown`. The
+         JSX prop is React's capture phase; the identically named *callback*
+         in `FloatShellProps` is the owner's "this window was touched" hook,
+         which is what `raise` hangs off. */
+      tabIndex={-1}
+      onPointerDownCapture={onShellPointerDown}
       className="fixed flex flex-col border"
       style={{
         left: x,
@@ -177,6 +222,11 @@ export function FloatShell({
         zIndex: z,
         borderColor: "var(--accent)",
         background: "var(--base-2)",
+        // No focus ring on the window itself. It is only ever focused by the
+        // pointer handler above and is not in the tab order, so there is no
+        // keyboard state for a ring to report; the controls inside it keep
+        // their own.
+        outline: "none",
         // A window is lifted off the surface by one hairline of its own accent
         // and a flat wash, not by a blur.
         boxShadow: "0 0 0 3px color-mix(in oklab, var(--base) 74%, transparent)",

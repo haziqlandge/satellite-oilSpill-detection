@@ -7,6 +7,13 @@ why; this file is only what is *left*.
 `npx tsc --noEmit` is clean and `npm run build` succeeds as of writing. Nothing
 here is blocking.
 
+> **Read [`NEXT-SESSION.md`](NEXT-SESSION.md) first — it is the current state
+> and the actionable list.** This file is the history; that one is what to do.
+> A fifth pass on 2026-09-05 closed §10.5.2 (reduced-motion JS), §10.5.8
+> (scenario copy audit), §10.4.2 (the dock refactor, verified) and §10.5.4
+> (palette export), plus the never-audited drift particles from §10.7. What is
+> left is B2/B3/C2/C3 and four decisions for the director, all set out there.
+
 > **Read §9 first — it is the current state.** A third pass on 2026-09-05 closed
 > §4.5 (the play-at-horizon defect), §4.6 (`goto t0`) and §4.7 (token recolour),
 > which is all three of the items §8.3 lists as "what is actually left", plus the
@@ -757,3 +764,256 @@ Both are about the instruments rather than the code, and both cost real time.
   `false`. The raw `style` attribute was authoritative and showed the real
   `var(--accent)` → `var(--line)` swap. Read the attribute, not the computed
   value, when the question is what React wrote.
+
+---
+
+## 10. Session handoff — 2026-09-05, fourth pass
+
+**Read this section first. Where it disagrees with §9, this wins.**
+
+`npx tsc --noEmit` is clean and `npm run build` succeeds. Everything below is
+**uncommitted in the working tree**. The dev server was on `localhost:5180`.
+
+### 10.0 How this session ran, and why it changed shape
+
+It began as three parallel agents under a one-task-at-a-time evaluation gate,
+the same pattern §9 used. It did not stay that way: **the agents reached for
+browser tools**, which the coordinator owns here, and the director stopped them
+and instructed that their work be taken over in the main session rather than
+re-run. So agents A, B and C each completed roughly one task and were killed
+mid-flight; the coordinator finished, corrected and verified their output.
+
+Two things worth knowing before dispatching agents again:
+
+- the prohibition in the briefs named `mcp__Claude_Browser__*` **by name**, and
+  the agents used the other family, `mcp__claude-in-chrome__*`. Ban the
+  category, not a tool list;
+- **this build has no `SendMessage` for subagents.** A running agent cannot be
+  corrected in place. `TaskStop` is the only lever and it leaves the tree
+  half-edited — `reports.tsx` came back with two `TS2741`s. Always typecheck
+  after a stop, and read what landed before deciding to keep or revert. In this
+  case the stopped work was good and two lines from compiling.
+
+### 10.1 Closed and verified this session
+
+| Item | State | Strength of the check |
+|---|---|---|
+| §9.4.3 panes 04/05 halt contradiction | **Narrowed, by decision** | Browser: both panes read back, see 10.2 |
+| Masked-MMSI collision (new, found by agent B) | **Fixed** | `·A`/`·B` proved to load different vessels |
+| AIS corridors running over land (new, raised by the director) | **Fixed** | Quantitative tile sampling, all 16 corridors |
+| `gom-platform` traffic 0.76 km from its own release (new) | **Fixed** | Geodesic distance, 3-sigma envelope |
+| Vadinar SPM buoy sitting on dry land (new) | **Fixed** | Tile sample before and after |
+
+### 10.2 §9.4.3 — what actually happened, because it reversed
+
+Agent B built the identity-label approach in full: under halt, pane 05's buttons
+printed each candidate's identity instead of a rank, so the console would stop
+asserting an order pane 04 refuses to give. It was good work and it found a real
+defect underneath — **two of `mumbai-null`'s forty-nine admitted vessels mask to
+the same string**, `MMSI 248•••••6`, and under halt every other cell of theirs is
+identical too, so they were two buttons and two table rows nobody could tell
+apart, one of which silently swapped the card for a different vessel. Verified:
+`·A` loads "Offshore supply, 88 m", `·B` loads "Offshore supply, 59 m".
+
+**The director then rejected the identity labels on the buttons and asked for the
+two-digit numbers back.** Measured cost that justified it: identity labels are
+66-84px against a rank's 33.2px, so at the right dock's 300px floor the block
+went from 7 buttons on 8 rows to 3 on **17 rows**, 455px tall, and pushed
+`goto T0` off the last row. So:
+
+- **the buttons are two digits again**, at 33.2px, 10 per row, 6 rows at the
+  430px default — the original density, confirmed in the browser;
+- **the honesty moved into the `title`**, which costs no width: under halt each
+  button says it is not a rank and, if it shares a masked identity, which one it
+  is;
+- **pane 04's table keeps the `·A`/`·B` marks**, because two indistinguishable
+  rows is a defect independent of the ranking question.
+
+So **§9.4.3 is narrowed, not closed.** Pane 05 still shows an ordering pane 04
+withholds. That is now a recorded decision rather than an oversight, and the
+reasoning is in the comment above the button row in `reports.tsx`.
+
+### 10.3 The corridor work — new, and the largest thing found
+
+The director reported ship tracks ending on land, worst on `kutch-dark`. It is
+real and it was worse than reported.
+
+**Method, which is the reusable part.** The project carries no coastline
+geometry — the basemap is a raster, and §5 records that vector tiles need a key
+this map deliberately does not have. So there is nothing to test a coordinate
+against at runtime. What works: fetch `Ocean/World_Ocean_Base` at z=10, read the
+pixel, classify on `blue - red`. Water is blue-dominant (+36 to +54 measured);
+land is a near-white cream (-3 to -7). Any threshold near +12 separates them.
+Calibrate on two known points first. This also renders an ASCII land/water map
+of a region, which is how the replacements were authored rather than guessed.
+
+**What was wrong.** Sampling 25 points along each centreline at four lateral
+offsets:
+
+| corridor | land before | land after |
+|---|---|---|
+| `kutch-dark` c1 | **52%**, endpoint inland near Jamjodhpur | 0% |
+| `kutch-dark` c2 | **20%** | 0% |
+| `kutch-dark` c3 | **54%**, *both* endpoints on dry ground | 0% |
+| `gom-platform` c2 | 9%, centreline ashore over its last tenth | 0% |
+| `gom-berthed` c1, `gom-moving` c3, `gom-platform` c1 | 1-3% at the edges | 0% |
+| `mumbai-null` all three | 0% | unchanged |
+
+**Every corridor now has zero centreline land contact**, and all but two are
+clean out to three sigma of the lateral scatter. The two residuals are
+`kutch-dark` c1 (3 samples of 287) and c3 (2 of 287), both single shoreline
+pixels at the extreme tail. Not chased further; recorded so nobody re-measures
+them and thinks something regressed.
+
+**The serious one, which was not about land.** `gom-platform`'s corridor 1 ran
+its centreline **0.76 km from `GOM_CASE_1`, the release itself** — roughly a
+third of 230 vessels driven almost over the source. That scenario asserts the
+opposite in three places: `short` is "Fixed installation, no vessel within
+5 km", `provenance` cites Zhao et al. 2025 Case 1 "where no vessel track lay
+within 5 km", and `summary` promises "the nearest vessel track well outside the
+origin window". The console printed all three beside a map that contradicted
+them, and the scenario's test — infrastructure outranking vessels with no
+special case — only means anything if the vessels are genuinely absent. The lane
+now clears the release by 13.3 km, which is 5 km plus three sigma, so the claim
+holds for the tail and not just the centreline. **This is the same class as §6c
+and §4.6 and it is the third one found; it is worth assuming there are more.**
+
+`kutch-dark`'s c3 was deliberately *not* moved to the 0.7 km variant the search
+also found clean, because `meta.summary` says the bright target has "no AIS
+report anywhere near". It passes at 2.3 km, against the old set's closest 2.8 km,
+so the scene's difficulty is roughly preserved.
+
+### 10.4 On disk from the stopped agents — REVIEW BEFORE TRUSTING
+
+Two files carry work the coordinator has **not** finished verifying. Both
+typecheck and both look strong on reading, but neither has been exercised:
+
+1. **`src/index.css` — agent A's reduced-motion rewrite (§9.4.1's CSS half).**
+   It collapses the two old blocks into one in `@layer base`, and its central
+   argument is checkable and, as far as it was checked, correct: unlayered
+   `!important` is the *weakest* important author position, so Tailwind's `!`
+   modifier compiling into `@layer utilities` (`duration-200!`) would punch
+   straight through a clamp sitting outside every layer. Its census was verified
+   exactly by grep — 33 `transition-colors`, 5 `transition-opacity`, 2
+   `transition-[filter]`, 1 each of `transition-transform`, `transition-all`,
+   `transition-[transform,box-shadow,filter]`, and 1 `animate-pulse`, so 44
+   utilities, 43 transitions and one keyframe animation.
+   **What has NOT been done: the media block has still never run.** The whole
+   point of §9.4.1 was to exercise it via an injected stylesheet, and the agent
+   was killed while building those snippets. They do not exist. **Next session
+   starts here.**
+   Its claim about a third compiled `prefers-reduced-motion` block leaking from
+   `.backup/` was partially checked: `.backup/` is confirmed **not** gitignored
+   (the root `.gitignore` covers `frontDemo/.tmp/` only) and
+   `.backup/2026-08-31-animation/src/components/DesignSwitcher.tsx` does carry
+   `motion-safe:duration-500`, `motion-safe:ease-` and `motion-safe:transition-`.
+   The compiled CSS itself was **not** grepped to confirm three blocks come back.
+2. **`src/console/dock/useDock.ts` — agent C's canonical-order refactor
+   (the foundation for §6d).** It replaced the stored `order` field with a
+   derived `RANK`, so a scrambled tab row becomes unrepresentable rather than
+   merely avoided; `Placement`'s docblocks explain it and `closed.from` was
+   narrowed to `{ side }`. It typechecks. **It has not been exercised at all** —
+   not one of float/Escape/dock-button/panels-menu/reopen was clicked, and the
+   `localStorage` migration path was not tested. Note this machine's stored
+   layout already carried `method: {order: 99}`, i.e. the scramble had really
+   happened here; that value is saved at
+   `scratchpad/stale-dock-layout.json` and is the migration fixture.
+
+### 10.5 Still open
+
+1. **Exercise the reduced-motion CSS** (§9.4.1). Extract the rules from the
+   media block, re-apply them unconditionally through an injected stylesheet,
+   and read back `transitionDuration` on a named element per surface plus
+   `scrollBehavior` on the root. Nothing in this environment can make the query
+   match; this is the only lever.
+2. **§9.4.1's JS half — untouched.** `site/Nav.tsx` still calls
+   `window.scrollTo({ behavior: "smooth" })` in two places (lines 179 and 292)
+   with no reduced-motion guard. CSS cannot reach an explicit `behavior`, so the
+   new block correctly documents this as out of its scope. **Nothing guards it.**
+3. **Verify agent C's dock refactor**, then §6d itself. The interview is done and
+   the specification is settled — see 10.6.
+4. **§9.4.4 palette export.** Untouched. The decision taken: make `basemap` and
+   `showLabels` **editable** in the colour panel, which removes the export gap at
+   its source. Note the runtime cost nobody has costed yet — changing `basemap`
+   needs a MapLibre style rebuild, not a `setPaintProperty`. The higher-value
+   half is still the converse audit: diff `palette.tsx`'s token ladder against
+   what `index.css` actually declares under `[data-surface]`.
+5. **§9.4.2 rank-row brief.** Untouched, but now measured, and §9.4.2's own
+   premise is wrong: it asks for the arithmetic "at 214 default, 430 reopened",
+   and **214 is the *left* dock's width**. The evidence pane lives right, whose
+   envelope is 300/430/760. Measured with two-digit ranks: 7/row on 8 rows at
+   300, 10/row on 6 rows at 430, 19/row on 3 rows at 760; `goto T0` (71.2px)
+   shares the last rank row at every width. The pane body is `overflow-y-auto`,
+   so a tall block scrolls rather than clips.
+6. **§9.4.5.** Pane 04 has now been opened and read (10.2), so that half is done.
+   The **panel reader has still not been re-swept** since sessions 2, 3 or 4.
+7. **§6.1's type scale, and a new defect: `--panel-scale` is inert.** Every leaf
+   text node in the right dock computes to an identical font size at 300, 430 and
+   760px — the same histogram (87x10px, 15x9.5px, 14x11px, 12x9px, 9x11.5px,
+   9x10.5px, 4x13px, 1x7px) at all three. The dock body's own font-size *does*
+   move, 14.4/15.904/21.52px, exactly `16 x scale`, so the property is set and
+   nothing inherits it: every console size is an absolute `text-[10px]` bracket,
+   and the padding utilities are px too (buttons are 33.2px wide at every width).
+   **Two docblocks assert the opposite** — `useDock.ts`'s `scaleFor` and
+   `DockRail.tsx`'s `body` comment, "widening a dock genuinely enlarges its
+   contents rather than just giving them more room to be small in".
+   `FloatShell.tsx:239` inherits the same non-effect. Before "fixing" it: §5
+   records that the sweeping px-to-em refactor **was already rejected**, which is
+   why the panel reader uses CSS `zoom`. So the likely correct resolution is to
+   make the claims true-to-fact or delete the inert mechanism.
+8. **Audit the remaining scenario copy against the data.** Three separate
+   sessions have now each found a place where the console states something its
+   own numbers contradict (§6c's convergence note, §4.6's evidence pane, and
+   this session's `gom-platform` 5 km claim). Treat every `summary`, `short`,
+   `provenance` and `tests` string in `scenarios.ts` as an unverified assertion
+   and check each against what the simulator actually produces.
+
+### 10.6 §6d — the interview is done. Do not re-ask.
+
+Settled with the director this session:
+
+- **drop target: the tab bar strip only.** Not the panel body, not the collapsed
+  edge handle; a collapsed dock is not a target
+- **no drop indicator.** While the pointer is down over a tab bar the window
+  *actually docks, live*, and the rail re-renders with it in place
+- **live un-dock:** move back off the strip with the pointer still down and it
+  pops back out to a float that keeps following the pointer. Reversible until
+  release
+- **landing slot is canonical, never positional.** 03 always lands between 02
+  and 04, closing over absent panels
+- **the dropped panel becomes the fronted tab**
+- **cross-dock drops are allowed but append at the end**
+- **tear-off:** dragging a docked tab more than a few px tears it into a float
+  that follows the pointer immediately. Double-click keeps working
+- **canonical order applies to every path home** — `dock` button, Escape,
+  double-click, panels menu, reopen — not only to the drag. This is what agent
+  C's `useDock.ts` refactor implements, and it needs verifying first
+
+### 10.7 Not verified, or checked weakly — read before trusting 10.1
+
+- **The corridor fix was verified quantitatively, not visually end to end.** The
+  tile sampling is strong evidence and it is what the coastline is drawn from,
+  but the only screenshot taken afterwards was `kutch-dark` at its default
+  camera, which frames a fraction of a 125 km corridor. The other three
+  scenarios' maps were **not** looked at after the change.
+- **Track geometry was never read back from MapLibre.** The argument that
+  vessels stay on water is: corridors sampled clean to three sigma, plus
+  `buildTraffic`'s `along` capping at exactly `legKm` so there is no overshoot
+  past an endpoint (read at `ais.ts:93-97`). The rendered features themselves
+  were not queried.
+- **Drift particles were not audited at all.** They run 48 h forward and nothing
+  stops them beaching. The director's complaint was about ship routes and only
+  ship routes were fixed.
+- **`identityOf`'s `DARK-` arm has never executed** and cannot from the current
+  fixtures: the identity form renders only under halt, `mumbai-null` is the only
+  halting scenario, and its 51 candidates are 49 AIS vessels plus two platforms.
+  `scenarios.ts` pushes to `darkTargets` at one site with a hard-coded
+  `id: "dark-01"`, so `DARK-02` cannot occur either. The agent's docblock claimed
+  otherwise; corrected.
+- **Only `mumbai-null` was exercised under halt**, because it is the only
+  scenario that halts. Non-halt regression was checked on `kutch-dark` only
+  (ranks `01`…`32`, correct).
+- **Pane 04's table was not read row by row** — the header, the first seven rows
+  and both `·`-marked rows were read, and the total counted at 52.
+- **`index.css` and `useDock.ts` were not exercised at all.** See 10.4.
+- **The build's chunk-size warning is pre-existing** and was not investigated.

@@ -2,9 +2,17 @@
  * The map. MapLibre GL JS, driven from the simulation.
  *
  * One component owns the map instance and pushes GeoJSON into named sources as
- * the scenario, the hour or the selection changes. Layers are declared once in
- * `basemap.ts`; nothing in here adds or removes a layer at runtime, because
- * restyling a live map is where MapLibre integrations usually start flickering.
+ * the scenario, the hour or the selection changes. Every layer is specified in
+ * `basemap.ts` and every *data* layer is added once and then only ever
+ * repainted, because restyling a live map is where MapLibre integrations
+ * usually start flickering.
+ *
+ * The one exception is the world underneath: `paint.basemap` and
+ * `paint.showLabels` choose which tile services the map holds, so changing
+ * either genuinely has to add and remove sources and layers. That is done in
+ * the smallest possible way -- the three layers of `worldSpec` and nothing
+ * else -- rather than through `setStyle`, which would take the whole scene
+ * down with it. See the effect that does it for the argument in full.
  *
  * The time slider drives this and the AIS playback from the same `hour` prop,
  * which is the synchronisation PHASE-07 lists as an acceptance criterion. There
@@ -18,11 +26,14 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 import {
   EMPTY,
   SOURCE,
+  WORLD_LAYER_IDS,
+  WORLD_SOURCE_IDS,
   buildStyle,
   dataLayers,
   graticule,
   hasLabels,
   slickInk,
+  worldSpec,
   type LayerToggles,
 } from "./basemap";
 import { ParticleOverlay } from "./ParticleOverlay";
@@ -155,6 +166,26 @@ export function MapCanvas({
   const mapRef = useRef<MapLibreMap | null>(null);
   const overlayRef = useRef<ParticleOverlay | null>(null);
   const resizeRef = useRef<ResizeObserver | null>(null);
+  /**
+   * Which world the live style currently holds.
+   *
+   * `paint.basemap` and `paint.showLabels` are the two `MapPaint` fields that
+   * are not paint properties. `basemap` chooses which tile service the raster
+   * source points at; `showLabels` decides whether a second source is fetched
+   * at all. Neither can be pushed through `setPaintProperty`, so a change to
+   * either has to add and remove sources and layers -- and this records what
+   * was last applied so that the effect doing so can tell a real change from
+   * an unrelated re-render, and can leave the map alone on the first pass,
+   * when the style was built from these values already.
+   *
+   * `labels` here is `hasLabels`, not `showLabels`: with no basemap there is
+   * no labels service either, so toggling `showLabels` under `basemap: "none"`
+   * is not a change to anything and must not rebuild the world.
+   */
+  const worldRef = useRef<{
+    basemap: MapPaint["basemap"];
+    labels: boolean;
+  } | null>(null);
   const [ready, setReady] = useState(false);
   const [basemapFailed, setBasemapFailed] = useState(false);
 
@@ -259,14 +290,11 @@ export function MapCanvas({
           map.addSource(id, { type: "geojson", data: EMPTY });
         }
         for (const layer of dataLayers(paint)) map.addLayer(layer);
-        if (hasLabels(paint)) {
-          map.addLayer({
-            id: "labels",
-            type: "raster",
-            source: "labels",
-            paint: { "raster-opacity": 0.55 },
-          });
-        }
+        // Above the data, which is why it is not in `buildStyle`.
+        for (const layer of worldSpec(paint).over) map.addLayer(layer);
+        // What the style was actually built from, recorded so the effect below
+        // can tell a real `basemap` or `showLabels` change from the first run.
+        worldRef.current = { basemap: paint.basemap, labels: hasLabels(paint) };
 
         overlayRef.current = new ParticleOverlay(map, holder.current!);
         setReady(true);
@@ -286,6 +314,10 @@ export function MapCanvas({
         pendingTeardown.current = null;
         resizeRef.current?.disconnect();
         resizeRef.current = null;
+        // The world belongs to the instance being destroyed. Carried into the
+        // next one it would claim a basemap the new style has not been built
+        // with, and the swap effect would decline to make it true.
+        worldRef.current = null;
         overlayRef.current?.dispose();
         overlayRef.current = null;
         const map = mapRef.current;
@@ -394,10 +426,153 @@ export function MapCanvas({
       ],
       ["markers", "circle-stroke-color", paint.water],
     ];
+
+    /*
+      The two fields of `MapPaint` that are not colours at all.
+
+      `strokeScale` and `contourFill` were both editable in the colour panel
+      and both in the export, and neither of them did anything to a running
+      map. Every entry in the list above is a colour, and the widths those two
+      drive -- `1.4 * k` on the slick outline, `fill ? 0.2 : 0.07` on the 90%
+      band -- are evaluated once, inside `dataLayers`, when the layer is first
+      added. Moving either control changed a number in an overlay that nothing
+      downstream ever read again. That is a worse failure than the missing
+      export the rest of this change is about: an absent field is at least
+      absent, whereas these two answered.
+
+      The values are pulled back out of `dataLayers(paint)` rather than
+      restated here. Writing `1.4 * k` in two files is how the map ends up
+      drawn at one weight and re-drawn at another, and the whole reason this
+      list is long and explicit is that a previous version of it was short and
+      quietly incomplete.
+    */
+    const built = new Map(
+      dataLayers(paint).map((layer) => [
+        layer.id,
+        ("paint" in layer ? layer.paint : undefined) as
+          | Record<string, unknown>
+          | undefined,
+      ]),
+    );
+    const scaled: [string, string][] = [
+      ["slick-line", "line-width"],
+      ["release-line", "line-width"],
+      ["contour90-line", "line-width"],
+      ["contour50-line", "line-width"],
+      ["traffic", "line-width"],
+      ["candidates", "line-width"],
+      ["suspect-track", "line-width"],
+      ["contour90-fill", "fill-opacity"],
+      ["contour50-fill", "fill-opacity"],
+    ];
+    for (const [layer, prop] of scaled) {
+      const value = built.get(layer)?.[prop];
+      if (value !== undefined) repaint.push([layer, prop, value]);
+    }
+
     for (const [layer, prop, value] of repaint) {
       if (map.getLayer(layer)) map.setPaintProperty(layer, prop, value);
     }
   }, [paint, ready]);
+
+  /* --- the world --------------------------------------------------- */
+
+  /**
+   * A live change of basemap, done by swapping three layers rather than the
+   * style.
+   *
+   * `map.setStyle(buildStyle(paint))` is the obvious move and it is the wrong
+   * one. Every GeoJSON source on this map -- the slick, the contours, the
+   * release, the traffic, the candidates, the suspect, the matched segment,
+   * the targets, the infrastructure, the markers, the graticule -- and every
+   * layer drawn from them is added imperatively in the `load` handler above,
+   * so none of it appears in the style `buildStyle` returns. MapLibre's style
+   * diff would therefore read the new style as an instruction to remove all
+   * thirteen sources and roughly twenty layers, and the map would go back to
+   * an empty rectangle until the load handler, the scenario effect, the time
+   * effect, the selection effect and the toggle effect had all been made to
+   * run again. That is a teardown and a visible rebuild of the entire scene to
+   * change the picture underneath it.
+   *
+   * What actually differs between two basemaps is one raster source, one
+   * raster layer, the background wash over it and the labels raster -- the
+   * whole of `worldSpec`. Removing and re-adding exactly those leaves every
+   * data layer, every source's data and the particle canvas untouched. The
+   * cost that remains is honest and unavoidable: the new service's tiles have
+   * to be fetched, so the coastline is missing for as long as that takes and
+   * the data floats over the ground colour in the meantime. Nothing else
+   * flickers, and nothing has to be re-pushed.
+   *
+   * It runs on `paint` rather than on the two fields alone so that the
+   * rebuilt layers carry the *current* opacity, saturation and tint; the guard
+   * on `worldRef` is what keeps it from doing anything when only those moved,
+   * because those the theme effect above applies live.
+   */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+
+    const want = { basemap: paint.basemap, labels: hasLabels(paint) };
+    const applied = worldRef.current;
+    if (
+      applied &&
+      applied.basemap === want.basemap &&
+      applied.labels === want.labels
+    ) {
+      return;
+    }
+    worldRef.current = want;
+
+    // Layers first, then their sources: MapLibre refuses to drop a source that
+    // a layer still references.
+    for (const id of WORLD_LAYER_IDS) {
+      if (map.getLayer(id)) map.removeLayer(id);
+    }
+    for (const id of WORLD_SOURCE_IDS) {
+      if (map.getSource(id)) map.removeSource(id);
+    }
+
+    // A different service gets a fresh verdict. The failure notice is about
+    // whether *this* world's tiles are reachable, and leaving it up after a
+    // switch to a basemap that loads -- or to no basemap at all, which cannot
+    // fail -- would be the map reporting a problem it no longer has.
+    setBasemapFailed(false);
+
+    const world = worldSpec(paint);
+    for (const [id, source] of Object.entries(world.sources)) {
+      map.addSource(id, source);
+    }
+
+    /*
+      Inserted against the ground rather than against a hard-coded data layer.
+
+      Whatever now follows `water` is the first thing the world has to sit
+      below, and after `load` that is the first layer `dataLayers` added.
+      Naming it here instead would mean this effect silently started drawing
+      the basemap over the graticule the day somebody reordered that list.
+
+      Each layer of `under` goes before that same id, so inserting the raster
+      and then the wash leaves them in the order `worldSpec` lists them.
+    */
+    const ids = map.getStyle().layers.map((l) => l.id);
+    const firstAboveGround = ids[ids.indexOf("water") + 1];
+    for (const layer of world.under) map.addLayer(layer, firstAboveGround);
+    // Appended, which puts it above the data -- the same place the load
+    // handler puts it.
+    for (const layer of world.over) map.addLayer(layer);
+
+    // A layer added here arrives visible, and the effect that owns visibility
+    // has no reason to re-run: its dependencies did not change. Without this,
+    // turning place labels back on in the colour panel would override a layer
+    // switch the operator had deliberately set to off.
+    if (map.getLayer("labels")) {
+      map.setLayoutProperty(
+        "labels",
+        "visibility",
+        toggles.labels ? "visible" : "none",
+      );
+    }
+  }, [paint, ready, toggles.labels]);
 
   /* --- scenario ---------------------------------------------------- */
 

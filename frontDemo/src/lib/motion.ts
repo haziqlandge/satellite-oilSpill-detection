@@ -2,19 +2,51 @@ import { useEffect, useRef, useState } from "react";
 import { animate, createScope, utils } from "animejs";
 import type { Scope } from "animejs";
 
+const REDUCE_QUERY = "(prefers-reduced-motion: reduce)";
+
+/**
+ * The preference, read once, at the moment of asking.
+ *
+ * The hook below is the right instrument for anything *built* from the
+ * preference -- a timeline that must not be constructed, an element that must
+ * render in its resting state -- because those are decided at render time and
+ * have to be torn down again when the preference changes mid-session.
+ *
+ * An imperative path has neither problem. A click handler wants the value at
+ * the instant of the click and nothing else: there is no subscription to keep
+ * current, nothing to re-render, and no way for the answer to be stale, because
+ * it is read after the event that needs it. Subscribing for it would mean
+ * holding React state in a component that needs none and re-rendering it on an
+ * OS toggle that changes nothing it draws.
+ *
+ * So both exist, and the query string lives here once rather than at each site
+ * that wants to ask. `MapCanvas` already inlines this exact query to choose
+ * between `jumpTo` and `easeTo`; that is the second caller this is for.
+ *
+ * Defensive about `matchMedia` and not only about `window`. The lazy initial
+ * read below used to guard `typeof window` alone, which is the SSR case; an
+ * environment that has a `window` but no `matchMedia` -- an older JSDOM, a
+ * partial stub -- got a TypeError out of a preference check, which is a bad way
+ * to lose a page. Absent the API, no preference is expressed, so: false.
+ */
+export function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia(REDUCE_QUERY).matches
+  );
+}
+
 /**
  * Reduced-motion, tracked live rather than read once, so a user toggling the
  * OS setting mid-session gets the static page without a reload.
  */
 export function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-  );
+  const [reduced, setReduced] = useState(prefersReducedMotion);
 
   useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia(REDUCE_QUERY);
     const onChange = () => setReduced(mq.matches);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);

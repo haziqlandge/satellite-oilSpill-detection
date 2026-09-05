@@ -16,11 +16,53 @@
  * something with a mechanism behind it.
  */
 
+import { prefersReducedMotion } from "../lib/motion";
 import { REPO_URL } from "../theme";
 
 export interface NavSection {
   id: string;
   label: string;
+}
+
+/**
+ * Home, for the two `href="#/"` links on this bar.
+ *
+ * THE SCROLL IS CONDITIONED HERE BECAUSE CSS CANNOT REACH IT. `index.css`
+ * carries a universal `scroll-behavior: auto !important` under
+ * `prefers-reduced-motion: reduce`, and the obvious reading of that rule is
+ * that it already covers every scroll on the project. It does not cover this
+ * one, and the next person to look will assume it does and delete this.
+ *
+ * `scroll-behavior` is consulted only when the scroll itself asks for `auto`.
+ * An explicit `behavior` in the options object *is* the used behaviour and
+ * never consults the computed property at all. So a hard-coded `"smooth"` here
+ * outruns that rule at `!important`, in any layer, at any specificity: the only
+ * thing on the platform that can stop this glide is not asking for it, which is
+ * what the branch below does.
+ *
+ * `"instant"` rather than `"auto"` for the reduced branch, for the same
+ * mechanism pointed the other way. `"auto"` would defer to the computed
+ * property -- which is `smooth`, from `html { scroll-behavior: smooth }`, and
+ * becomes `auto` only because that media block overrides it. That would make
+ * this guard correct today and silently wrong the day the CSS block is
+ * narrowed, moved or out-specified, with the failure showing up here rather
+ * than where it was caused. `"instant"` depends on nothing outside this
+ * function. `App.tsx` already passes it on surface changes, and the project's
+ * browser floor is set by Tailwind v4 (Safari 16.4, Chrome 111, Firefox 128),
+ * comfortably past the 2022 releases that added the keyword -- which matters
+ * because an unrecognised enum member in a dictionary is a TypeError, not a
+ * graceful fallback.
+ *
+ * Conditioned, not dropped: a reader who asked for no motion still asked to go
+ * home. There is no default scroll to fall back on either, because `#/` matches
+ * no element's id and is not the empty fragment, so the browser's own
+ * "scroll to the fragment" step does nothing for it.
+ */
+function scrollToTop() {
+  window.scrollTo({
+    top: 0,
+    behavior: prefersReducedMotion() ? "instant" : "smooth",
+  });
 }
 
 export function Nav({
@@ -176,7 +218,7 @@ export function Nav({
         <div className="flex h-[60px] items-center gap-4">
           <a
             href="#/"
-            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            onClick={scrollToTop}
             className="text-ink shrink-0 text-[19px] sm:text-[23px]"
             style={{
               fontFamily: "var(--font-display)",
@@ -289,7 +331,7 @@ export function Nav({
                 actually carrying meaning. */}
             <a
               href="#/"
-              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              onClick={scrollToTop}
               className="text-faint hover:text-ink hidden font-mono text-[10.5px] tracking-[0.2em] uppercase transition-colors sm:inline lg:hidden xl:inline"
             >
               Home

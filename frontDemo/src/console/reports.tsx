@@ -64,6 +64,162 @@ const KIND_TONE: Record<string, "ok" | "warn" | "alarm" | "dim"> = {
   infrastructure: "warn",
 };
 
+/* ------------------------------------------------------------------ *
+ * Naming a candidate the console has refused to rank
+ * ------------------------------------------------------------------ */
+
+/**
+ * What a candidate is called when there is no rank to call it by.
+ *
+ * Under a C3 halt, 04 prints `—` in every rank cell and heads the block
+ * *Hypotheses considered*. 05's card carried the same refusal in its `unranked`
+ * meta and then printed `01`…`51` on the buttons underneath it -- the console
+ * showing the ordering it had just declined to give, in the pane whose whole
+ * job is to show working. The buttons could not simply be blanked: they are
+ * 05's only selector, because 04 and 05 share the right dock and only one of
+ * them is on screen at a time.
+ *
+ * So under halt the button carries the candidate's own identity instead. What
+ * that identity *is* differs by kind, and the difference is the point:
+ *
+ *  - **AIS vessel** -- the masked MMSI. `Suspect.id` is the raw one and must
+ *    never reach the screen (`Vessel.label`: "Real identities are never
+ *    rendered by this demo"; 04's own Language note: "AIS identities are masked
+ *    throughout"), so the text comes off `label`, with the `MMSI` prefix
+ *    dropped. That word is the *type*, and the block says it once rather than
+ *    fifty-one times
+ *  - **Infrastructure** -- the installation's designation, off the authored id:
+ *    `infra-mh-north` → `MH-NORTH`, which is what "Mumbai High North complex"
+ *    is called on a chart. Nothing about infrastructure is masked; 04 prints
+ *    these labels in full
+ *  - **Unlit contact** -- the radar designation, `DARK-01`, and nothing else.
+ *    A dark vessel is the one candidate that genuinely has no identity, which
+ *    is the case this whole project exists for, so the tag names the *contact*
+ *    rather than a vessel
+ *
+ * ### This branch has never executed, and cannot from the current fixtures
+ *
+ * Two facts, both worth stating so nobody re-derives them:
+ *
+ *  - the identity form is only reached under halt, and `mumbai-null` is the
+ *    only scenario that halts. Its fifty-one admitted candidates are
+ *    forty-nine AIS vessels and the two Mumbai High platforms -- **no dark
+ *    contact**. So the `DARK-` arm above is written, typed and dead
+ *  - `scenarios.ts` pushes to `darkTargets` at exactly one site (line 770) with
+ *    a hard-coded `id: "dark-01"`, and only when `spec.source.type === "dark"`.
+ *    There is no construction in this simulator that yields a second one, so a
+ *    `DARK-02` cannot occur and the plural case needs no disambiguation
+ *
+ * If a halting scenario ever admits a dark contact, this is the arm to check
+ * first, and `disambiguate` will already handle a repeat if one becomes
+ * possible.
+ *
+ * ### The collision, which is real and not hypothetical
+ *
+ * `maskMmsi` keeps three digits and the last one, so two admitted vessels can
+ * mask to the same string -- and two of `mumbai-null`'s forty-nine do:
+ * `248104476` and `248230366` both print `MMSI 248•••••6`. Under halt every
+ * other cell of theirs is identical as well (rank `—`, score `0.000`, no-drift
+ * `0.000`), so before this they were two rows and two buttons no reader could
+ * tell apart, one of which silently swapped the card for a different vessel.
+ *
+ * They are marked `·A` / `·B`, dimmed so the mark reads as console furniture
+ * rather than as a digit of the identity. Lettering is assigned by `id` and not
+ * by list position, because `rows` reorders when the ablation is toggled and a
+ * disambiguator that swaps which contact is `A` half way through a reading is
+ * worse than the ambiguity it replaced.
+ *
+ * `text` is a parameter rather than fixed, because the two panes print
+ * different strings: 04's table prints the full `label`, 05's button prints the
+ * identity alone. Each disambiguates exactly what it puts on screen -- which
+ * also covers the case the identity form would miss, two `Unlit contact` rows
+ * in 04 whose designations differ.
+ */
+export interface CandidateTag {
+  /** The string this surface prints for the candidate. */
+  text: string;
+  /** `A`, `B`, … only when another candidate prints the same string. */
+  mark: string | null;
+  /** How many candidates share it. 1 whenever `mark` is null. */
+  shared: number;
+}
+
+const MARKS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+/** The identity a candidate carries, for a surface that cannot use its rank. */
+function identityOf(s: Suspect): string {
+  if (s.kind === "ais_vessel") return s.label.replace(/^MMSI\s+/, "");
+  return s.id.replace(/^infra-/, "").toUpperCase();
+}
+
+function disambiguate(
+  rows: Suspect[],
+  text: (s: Suspect) => string,
+): Map<string, CandidateTag> {
+  const groups = new Map<string, Suspect[]>();
+  for (const s of rows) {
+    const key = text(s);
+    const seen = groups.get(key);
+    if (seen) seen.push(s);
+    else groups.set(key, [s]);
+  }
+
+  const out = new Map<string, CandidateTag>();
+  for (const [key, group] of groups) {
+    if (group.length === 1) {
+      out.set(group[0].id, { text: key, mark: null, shared: 1 });
+      continue;
+    }
+    [...group]
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+      .forEach((s, i) =>
+        out.set(s.id, {
+          text: key,
+          mark: MARKS[i] ?? String(i + 1),
+          shared: group.length,
+        }),
+      );
+  }
+  return out;
+}
+
+/**
+ * A tag and, when it needs one, its disambiguating mark.
+ *
+ * The mark carries no title of its own on purpose: both call sites already put
+ * one on the row or the button around it, and a nested `title` would replace
+ * that tooltip with a fragment of itself exactly where a reader hovers to ask
+ * what the mark means.
+ */
+function Tagged({
+  tag,
+  fallback,
+}: {
+  tag: CandidateTag | undefined;
+  /** Printed if the lookup misses, so a miss degrades to the plain string
+      rather than to an empty cell. */
+  fallback: string;
+}) {
+  if (!tag) return <>{fallback}</>;
+  return (
+    <>
+      {tag.text}
+      {tag.mark && (
+        <span style={{ color: "var(--ink-faint)" }}>{`·${tag.mark}`}</span>
+      )}
+    </>
+  );
+}
+
+/** How a shared identity is explained, in a tooltip. Empty when unshared. */
+function sharedNote(tag: CandidateTag | undefined): string {
+  if (!tag?.mark) return "";
+  // Leading space, because every call site appends this to a sentence that has
+  // already been terminated. Returning "" for the unshared case is what stops
+  // that space becoming a trailing one on the other fifty tooltips.
+  return ` Marked ${tag.mark}: ${tag.shared} admitted contacts mask to this same identity, and the mark is this console's way of telling them apart — it is not part of the identity.`;
+}
+
 /* ================================================================== *
  * 04 ATTRIBUTE
  * ================================================================== */
@@ -72,6 +228,8 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
   const { ablated, setAblated, selectedId, setSelectedId } = state;
   const rows = useMemo(() => orderedSuspects(run, ablated), [run, ablated]);
   const halt = run.drift.insufficientEvidence;
+  // This table prints `label`, so that is what it disambiguates.
+  const tags = useMemo(() => disambiguate(rows, (s) => s.label), [rows]);
 
   // The margin between the top two. A different statement from insufficient
   // evidence: a narrow margin means two candidates are hard to separate, a
@@ -82,6 +240,38 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
       : null;
 
   const moved = rows.filter((s) => s.rank !== s.rankWithoutDrift).length;
+
+  /*
+    The diffuse test, recomputed here so the alarm can say whether it is the
+    reason.
+
+    `insufficientEvidence` carries one number and a sentence, and the number
+    means a different thing depending on which of the scorer's four branches
+    set it -- the *first* convergence sample for the wind-gate and no-candidate
+    causes, the tightest for the separability cause, drift's own figure for the
+    diffuse one. Printing it unqualified as "90% origin contour N km²" at the
+    head of the refusal read as the cause, and on `mumbai-null` it read as a
+    contradictory one: 130 km² announced above a rule that only refuses above
+    300. That is the same defect §6c fixed one pane over, and the same fix
+    applies -- state the test rather than a number that resembles it.
+
+    This is not the drift pane's readout repeated. Pane 02 prints the test and
+    says in its own note that it cannot see the other three causes; what is
+    added here is the one thing that pane cannot say, which is whether the test
+    is what withheld *this* run.
+  */
+  const originMin = run.drift.convergence.reduce(
+    (m, c) => Math.min(m, c.area90Km2),
+    Infinity,
+  );
+  const haveOrigin = Number.isFinite(originMin);
+  const threshold = run.drift.diffuseThresholdKm2;
+  const tooDiffuse = haveOrigin && originMin > threshold;
+
+  // The gate scales both sides of the ablation, so at zero the comparison has
+  // nothing left to compare. See the note inside the block.
+  const gate = run.characterisation.windGateMultiplier;
+  const gateInert = gate <= 0;
 
   return (
     <Pane
@@ -102,9 +292,14 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
         {halt && (
           <div className="mb-3">
             <Alarm code="E-C3" title="attribution withheld">
-              <p>
-                90% origin contour {halt.area90Km2.toFixed(0)} km². {halt.reason}
-              </p>
+              <p>{halt.reason}</p>
+              {haveOrigin && (
+                <p className="mt-2" style={{ color: "var(--ink-dim)" }}>
+                  {tooDiffuse
+                    ? `The backward 90% origin contour never closed tighter than ${originMin.toFixed(0)} km², against this scenario's ${threshold.toFixed(0)} km² limit. That test is the reason.`
+                    : `The origin field is not the reason: its backward 90% contour closes to ${originMin.toFixed(0)} km² against a ${threshold.toFixed(0)} km² limit, so the diffuse test passes. A run can still be withheld for causes that test cannot see, and this is one.`}
+                </p>
+              )}
               <p className="mt-2" style={{ color: "var(--ink-dim)" }}>
                 No candidate is ranked from this field. The hypotheses the gate
                 admitted are listed below unranked, because suppressing them
@@ -144,11 +339,17 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
             rows={rows.map((s) => {
               const rank = ablated ? s.rankWithoutDrift : s.rank;
               const total = ablated ? s.totalWithoutDrift : s.total;
+              const tag = tags.get(s.id);
               return [
                 <span style={{ color: halt ? "var(--ink-faint)" : "var(--accent)" }}>
                   {halt ? "—" : String(rank).padStart(2, "0")}
                 </span>,
-                <span style={{ color: "var(--ink)" }}>{s.label}</span>,
+                <span
+                  style={{ color: "var(--ink)" }}
+                  title={tag?.mark ? sharedNote(tag).trim() : undefined}
+                >
+                  <Tagged tag={tag} fallback={s.label} />
+                </span>,
                 <Flag tone={KIND_TONE[s.kind] ?? "dim"}>{KIND_SHORT[s.kind]}</Flag>,
                 <span style={{ color: "var(--ink)" }}>{total.toFixed(3)}</span>,
                 <AsciiBar value={total} width={10} tone={halt ? "faint" : "ok"} />,
@@ -161,9 +362,19 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
               ];
             })}
           />
-          {rows.length > 0 && !halt && (
+          {/*
+            The hint used to be suppressed under halt, presumably to avoid the
+            word "candidate" while the console was refusing to name one. It cost
+            more than it saved: the halt branch is exactly where a reader is
+            least likely to guess that a row is clickable, and pane 05 is where
+            the working for these hypotheses is. The sentence is re-worded
+            instead of withheld.
+          */}
+          {rows.length > 0 && (
             <p className="mt-1.5 text-[10px]" style={{ color: "var(--ink-faint)" }}>
-              select a row to open its evidence card in pane 05
+              {halt
+                ? "select a row to open its working in pane 05 — a card, not a place in a list"
+                : "select a row to open its evidence card in pane 05"}
             </p>
           )}
         </Block>
@@ -187,6 +398,27 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
               tone={separability !== null && separability < 0.015 ? "alarm" : "dim"}
             />
           </div>
+          {/*
+            Why `0 of 51` is not a finding about s_drift.
+
+            `combineWithout` scales its result by the same wind gate `combine`
+            does, so at a gate of zero both the ranked and the ablated total are
+            zero for every candidate and neither list can move. Left unsaid, the
+            two rows above read as "removing the drift term changed nothing",
+            which is the opposite of what the cards show: on `mumbai-null` the
+            top hypothesis carries an unscaled drift contribution of 0.097 out
+            of a 0.494 weighted sum. The gate is what flattened it, not the
+            term.
+          */}
+          {gateInert && (
+            <Note tone="warn" label="the ablation is inert here">
+              Nothing can move while the gate multiplier is {gate.toFixed(2)}.
+              It scales both totals in this comparison, so every candidate sits
+              at 0.000 on either side of it. That is a statement about the wind
+              and not about s_drift, whose unscaled contribution is printed on
+              each card in pane 05.
+            </Note>
+          )}
           <Note label="what the drift term is worth">
             The remaining five terms are renormalised over their own weights so
             the comparison is fair. Nothing else changes, so whatever moves in
@@ -217,6 +449,11 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
 export function Evidence({ run, state }: { run: Run; state: SpillState }) {
   const { ablated, hour, selectedId, setSelectedId, setHour } = state;
   const rows = useMemo(() => orderedSuspects(run, ablated), [run, ablated]);
+  const halt = run.drift.insufficientEvidence;
+  // The buttons print the identity alone, so that is what they disambiguate.
+  // 04 disambiguates `label`; the two sets coincide for AIS vessels and can
+  // legitimately differ for the other kinds.
+  const tags = useMemo(() => disambiguate(rows, identityOf), [rows]);
   const selected: Suspect | null =
     run.suspects.find((s) => s.id === selectedId) ?? rows[0] ?? null;
 
@@ -283,7 +520,19 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
       right={<Flag tone={KIND_TONE[selected.kind] ?? "dim"}>{KIND_SHORT[selected.kind]}</Flag>}
     >
       <PaneBody>
-        <Block label="Candidate" right={run.drift.insufficientEvidence ? "unranked" : `rank ${rank}`}>
+        {/*
+          "Hypothesis" under halt, and it is the same word 04 uses.
+
+          C3's language rule cut both ways in one console: 04 refuses to head
+          its list "Candidates" while a run is withheld, and 05 went on calling
+          the open card a candidate with `unranked` printed beside it. The two
+          panes are two halves of one constraint and have to speak with one
+          voice about it.
+        */}
+        <Block
+          label={halt ? "Hypothesis" : "Candidate"}
+          right={halt ? "unranked" : `rank ${rank}`}
+        >
           <p className="num text-[13px]" style={{ color: "var(--accent)" }}>
             {selected.label}
           </p>
@@ -291,7 +540,24 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
             {selected.detail}
           </p>
           <div data-fields className="mt-2 grid grid-cols-3 gap-1.5">
-            <Field label="score" value={total.toFixed(3)} tone="ok" />
+            {/*
+              The score keeps its value and loses its tone under halt. 04 prints
+              these numbers too, deliberately, so suppressing the value here
+              would put the two panes back out of step in the other direction --
+              but `ok` on a total the console has just declined to rank anything
+              by is the affirmative reading of a figure that supports nothing.
+              04 already draws its bar `faint` for the same reason.
+            */}
+            <Field
+              label="score"
+              value={total.toFixed(3)}
+              tone={halt ? "dim" : "ok"}
+              title={
+                halt
+                  ? `Weighted sum ${rawSum.toFixed(3)}, scaled by a wind gate multiplier of ${gate.toFixed(2)}. Pane 04 withheld the ranking for this scene, so this total orders nothing; the terms below are the working it was built from.`
+                  : undefined
+              }
+            />
             <Field label="kind" value={KIND_LABEL[selected.kind]} />
             <Field
               label="origin win"
@@ -300,17 +566,46 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
             />
           </div>
           <div className="mt-1.5 flex flex-wrap gap-1">
+            {/*
+              Two digits on the face, in every scene including a halt.
+
+              This row was briefly made to print each candidate's identity under
+              halt, so that 05 would stop showing the ordering 04 refuses to
+              give. It was built, measured and rejected by the person directing
+              this work, and the measurement is why the decision is recorded
+              rather than just reverted: a masked MMSI is 66-84px against a
+              two-digit rank's 33.2px, so at the right dock's 300px floor the
+              block went from seven buttons on eight rows to three on
+              *seventeen*, 455px tall, and pushed `goto T0` off the last row
+              onto its own. The pane scrolls, so nothing was lost -- but the
+              density is the design here, and it was traded away for a
+              distinction a reader can also get by hovering.
+
+              So the number stays, and the honesty moved into the `title`, which
+              costs no width: under halt every button says outright that it is
+              not ranked, and a candidate sharing a masked identity with another
+              says which one it is. The contradiction with pane 04 is therefore
+              narrowed rather than closed, knowingly. ISSUES.md 9.4.3 stays
+              open with this as its answer.
+            */}
             {rows.length > 1 &&
-              rows.map((s) => (
-                <Btn
-                  key={s.id}
-                  onClick={() => setSelectedId(s.id)}
-                  active={s.id === selected.id}
-                  title={s.label}
-                >
-                  {String(ablated ? s.rankWithoutDrift : s.rank).padStart(2, "0")}
-                </Btn>
-              ))}
+              rows.map((s) => {
+                const tag = tags.get(s.id);
+                return (
+                  <Btn
+                    key={s.id}
+                    onClick={() => setSelectedId(s.id)}
+                    active={s.id === selected.id}
+                    title={
+                      halt
+                        ? `${s.label} — ${KIND_LABEL[s.kind]}, ${s.detail}. Not a rank: pane 04 withheld the ordering for this scene, and this number is only its position in the list.${sharedNote(tag)}`
+                        : s.label
+                    }
+                  >
+                    {String(ablated ? s.rankWithoutDrift : s.rank).padStart(2, "0")}
+                  </Btn>
+                );
+              })}
             {/*
               The origin window runs backward from the acquisition and the
               timeline runs forward from it, so the two meet at exactly one
@@ -343,6 +638,29 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
               {`goto ${formatHour(windowEnd)}`}
             </Btn>
           </div>
+
+          {/*
+            The row needs a sentence under halt and does not need one otherwise.
+
+            `01`…`51` explains itself beside a card headed `rank 3`. A strip of
+            masked identities does not: its most likely misreading is that these
+            are the only contacts worth looking at, when they are every one the
+            gate admitted. The sentence also has to answer the case this design
+            is really for -- a candidate with no identity at all -- and it only
+            says that when there is one in the list to say it about.
+          */}
+          {halt && rows.length > 1 && (
+            <p
+              className="mt-1.5 text-[10px] leading-[1.5]"
+              style={{ color: "var(--ink-faint)" }}
+            >
+              every hypothesis the gate admitted, by the identity it carries
+              rather than by a position — pane 04 withheld the ordering for this
+              scene, so there is no number to put on these.
+              {rows.some((s) => s.kind === "dark_vessel") &&
+                " an unlit contact carries no identity at all, so it is named by its radar designation and by nothing else."}
+            </p>
+          )}
         </Block>
 
         <Block label="Track vs field" right={card.matchedSegment ? "matched" : "no match"}>
@@ -400,7 +718,13 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
               value={`x${gate.toFixed(2)}`}
               tone={gate < 0.75 ? "warn" : "dim"}
             />
-            <Row label="total" value={selected.total.toFixed(3)} tone="ok" />
+            {/* Same reasoning as the `score` field above: the number stays, the
+                affirmative tone does not, while the run is withheld. */}
+            <Row
+              label="total"
+              value={selected.total.toFixed(3)}
+              tone={halt ? "dim" : "ok"}
+            />
           </div>
           <Note label="never a bare total">
             The total is the weighted sum scaled by the wind gate, and both halves

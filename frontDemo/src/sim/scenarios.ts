@@ -55,7 +55,8 @@ export const SCENARIOS: ScenarioListing[] = [
     name: "Moving discharge",
     short: "Underway tanker, 19 km trail",
     region: "gulf-of-mexico",
-    tests: "The straightforward case. Every term agrees.",
+    tests:
+      "The straightforward case. Drift and proximity both put the true vessel first. Parity does not, because it measures the whole nearby transit rather than the stretch that was discharging.",
   },
   {
     id: "gom-berthed",
@@ -63,7 +64,7 @@ export const SCENARIOS: ScenarioListing[] = [
     short: "Vessel moored two days, still discharging",
     region: "gulf-of-mexico",
     tests:
-      "The adversarial case. Parity and proximity both fail; only the drift field reaches the berth.",
+      "The adversarial case. Parity fails on a vessel that never moved, and every passing track in the channel outscores it on that term.",
   },
   {
     id: "gom-platform",
@@ -172,7 +173,16 @@ const GOM_CASE_1: LngLat = [
   DEG_MIN_SEC(29, 6, 58.176),
 ];
 
-/** Midpoint of the 19 km discharge line, bearing 17 degrees from the tip. */
+/**
+ * Centre of the `gom-moving` convergence cell.
+ *
+ * The comment here used to call this "the midpoint of the 19 km discharge line,
+ * bearing 17 degrees from the tip". Measured, it is neither: it lies 10.32 km
+ * from `GOM_CASE_2` on a bearing of 28.2 degrees, which puts it 2.10 km east of
+ * the actual midpoint (9.5 km along bearing 17). The constant is left where it
+ * is -- it is a field parameter and moving it would change every number in this
+ * scenario -- but it is no longer described as something it is not.
+ */
 const GOM_CASE_2_MID: LngLat = [-89.1755, 28.4407];
 
 const KUTCH: LngLat = [69.42, 22.46];
@@ -192,8 +202,9 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
       sceneId: "S1A_IW_GRDH_1SDV_20230515T000200_GoM",
       place: "the Port of South Louisiana",
       summary:
-        "A 19 km ribbon trailing south of the Mississippi Delta, laid in under two hours by a vessel underway and then carried downstream for most of a day.",
-      tests: "The straightforward case. Every term agrees.",
+        "A 19 km ribbon trailing south of the Mississippi Delta, laid in under two hours by a vessel underway and then carried downstream for the four hours before the pass.",
+      tests:
+        "The straightforward case. Drift and proximity both put the true vessel first. Parity does not, because it measures the whole nearby transit rather than the stretch that was discharging.",
       expectedTop1: "The vessel that laid the trail",
     },
     field: {
@@ -234,7 +245,9 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
       corridors: [
         { from: [-89.7, 28.9], to: [-88.7, 27.9], widthKm: 6 },
         { from: [-89.9, 28.2], to: [-88.6, 28.55], widthKm: 5 },
-        { from: [-89.15, 29.1], to: [-89.45, 27.7], widthKm: 4 },
+        // Start nudged south off the delta edge; the old [-89.15, 29.1] put the
+        // scatter around the first few per cent of this lane on land.
+        { from: [-89.13, 29.05], to: [-89.45, 27.7], widthKm: 4 },
       ],
     },
     infrastructure: [
@@ -269,7 +282,7 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
       summary:
         "A 5 km band running south from a mooring. The vessel at the head of it has not moved since the third of December, so its track parallels nothing.",
       tests:
-        "The adversarial case. Parity and proximity both fail; only the drift field reaches the berth.",
+        "The adversarial case. Parity fails on a vessel that never moved, and every passing track in the channel outscores it on that term.",
       expectedTop1: "The moored vessel",
     },
     field: {
@@ -308,7 +321,9 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
     traffic: {
       vesselCount: 260,
       corridors: [
-        { from: [-90.25, 29.1], to: [-89.6, 28.6], widthKm: 4 },
+        // Start pulled off the marsh at [-90.25, 29.1], which put the first few
+        // per cent of this lane -- and the scatter around it -- on land.
+        { from: [-90.2, 29.05], to: [-89.6, 28.6], widthKm: 4 },
         { from: [-90.15, 28.7], to: [-89.55, 29.05], widthKm: 3.5 },
         // The berth sits on a working channel. Traffic passes within a few
         // hundred metres of it constantly, which is what makes this case a
@@ -344,7 +359,20 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
       sceneId: "S1A_IW_GRDH_1SDV_20230409T000200_GoM",
       place: "the South Pass lease blocks",
       summary:
-        "A 5.5 km banded slick with its northern tip on a platform group, and the nearest vessel track well outside the origin window.",
+        "A 5.5 km banded slick with its northern tip on a platform group, and no vessel track inside the origin field at any backward hour.",
+      /*
+        UNTESTED AS CONFIGURED, and left standing for the director rather than
+        quietly rewritten.
+
+        Measured on the built run: the spatiotemporal gate considers 180 tracks
+        and admits **zero**, so `run.suspects` holds two rows and both are
+        infrastructure. There is no vessel in the ranking for a platform to
+        outrank, which means this scenario states a collation property it no
+        longer exercises. The corridor rework that cleared the release by 13.3 km
+        is what emptied the gate; putting one lane back inside the origin field
+        would restore the test, but that is a data change needing a land check
+        this codebase carries no geometry for.
+      */
       tests: "Infrastructure has to outrank vessels without a special case.",
       expectedTop1: "The platform group",
     },
@@ -384,8 +412,43 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
     traffic: {
       vesselCount: 180,
       corridors: [
-        { from: [-89.95, 29.35], to: [-89.2, 28.8], widthKm: 5 },
-        { from: [-89.85, 28.85], to: [-89.15, 29.3], widthKm: 4 },
+        /*
+          Moved 2026-09-05, and this one was not a cosmetic fault.
+
+          This lane used to run [-89.95, 29.35] -> [-89.2, 28.8], whose
+          centreline passes **0.76 km** from `GOM_CASE_1` -- the release itself.
+          A third of two hundred and thirty vessels were therefore driven almost
+          exactly over the source, while this scenario states in three separate
+          places that nothing was near it: `short` is "Fixed installation, no
+          vessel within 5 km", `provenance` cites Zhao et al. 2025 Case 1 "where
+          no vessel track lay within 5 km", and `summary` then promised "the
+          nearest vessel track well outside the origin window" -- wording since
+          corrected, because `originWindow` is a *time* range everywhere else in
+          this codebase (`EvidenceCard.originWindow`) and 10,429 of this run's
+          20,471 AIS reports fall inside it.
+
+          The replacement clears the release by 13.3 km: 5 km plus three sigma
+          of the lateral scatter, sigma being `widthKm / 2`. So the claim holds
+          for the tail of the distribution rather than only for the centreline.
+          Measured on the built run, the nearest track of any of the 180 vessels
+          is 8.15 km off and none comes inside 5 km.
+
+          The cost, which the note here originally got backwards: it is not true
+          that the collation test "only means anything if the vessels really are
+          absent". With the lane this far out the gate admits zero of the 180,
+          so no vessel is scored at all and the platform outranks nothing. See
+          the note on `meta.tests` below.
+        */
+        { from: [-90.0, 29.2], to: [-89.25, 28.75], widthKm: 5 },
+        /*
+          Pulled clear of the delta. Running to [-89.15, 29.3] took this lane
+          across the bird's-foot: 9% land, with the centreline ashore over its
+          last tenth. The islands around [-89.30, 29.05] defeat the obvious
+          shortenings -- four variants along the old bearing still scored 4-5%
+          -- so the lane keeps its west-to-east run and passes south of them.
+          Clean to three sigma, and 34 km off the release.
+        */
+        { from: [-89.95, 28.7], to: [-88.9, 29.0], widthKm: 4 },
         // Passing traffic, kept outside the 5 km radius the published case
         // reports as empty. Collation has to rank the platform above these
         // without a rule that says so.
@@ -413,8 +476,19 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
       sceneId: "S1A_IW_GRDH_1SDV_20240218T004100_KUTCH",
       place: "the Gulf of Kutch",
       summary:
-        "A 9 km trail in the approaches to the Gulf of Kutch. A radar bright target sits at the head of it with no AIS report anywhere near.",
+        "A 9 km trail in the approaches to the Gulf of Kutch. A radar bright target sits at the head of it, in a working lane, carrying no AIS report of its own.",
       tests: "A candidate with no identity is ranked and never named.",
+      /*
+        FALSE UNDER THE `max` VARIANT, and left standing for the director.
+
+        Under `integral` this holds: `dark-01` ranks 1 at 0.6390 with the next
+        candidate at 0.5422. Switch S_drift to `max` -- which the interface lets
+        a reader do -- and the dark contact falls to rank 3 behind a 32 m tug at
+        0.6572, the top-two margin drops to 0.0058, and the run trips the
+        separability branch and reports insufficient evidence instead. Same root
+        cause as the summary above: corridor 3 puts identified traffic through
+        the origin field peak, and `max` rewards exactly that.
+      */
       expectedTop1: "An unlit radar contact, unnamed",
     },
     field: {
@@ -452,14 +526,71 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
     },
     traffic: {
       vesselCount: 230,
+      /*
+        Re-authored 2026-09-05, because all three of these ran over land.
+
+        The Gulf of Kutch is a narrow funnel between the Kutch peninsula to the
+        north and Saurashtra to the south, and the previous corridors were laid
+        out without checking either shore. Measured against the basemap raster,
+        the old set was 52%, 20% and 54% land: the first ended inland near
+        Jamjodhpur, the third crossed the whole Saurashtra peninsula and had
+        *both* endpoints on dry ground. Two hundred and thirty vessels then drew
+        their tracks straight across it.
+
+        The replacements are 0% land, sampled at 25 points along each centreline
+        and at four lateral offsets out to the full `widthKm`, which is roughly
+        two sigma of the scatter `buildTraffic` applies. They keep the three
+        roles: c1 is the gulf trunk running the length of the funnel, c2 comes
+        in off the Arabian Sea through the mouth, and c3 is the local lane that
+        passes the release -- 2.1 km off it, closer than any corridor in the old
+        set, so the gate still has to filter traffic that genuinely could have
+        been the source. c1 and c2 pass at 13.8 and 8.1 km; the old set sat at
+        5.8 and 2.8, so the scene is slightly less crowded at the release than
+        it was, which is the price of the south shore being where it is.
+
+        HOW TO CHECK A CORRIDOR, since the project carries no land data
+
+        The basemap is a raster and there is no coastline geometry anywhere in
+        this codebase, so there is nothing to test a coordinate against at
+        runtime. What works is sampling the tiles themselves. Fetch
+        `Ocean/World_Ocean_Base` at z=10 for the point, read the pixel, and
+        classify on `blue - red`: water is blue-dominant (+36 to +54 across the
+        points checked here) and land is a near-white cream (-3 to -7). The gap
+        is wide enough that any threshold around +12 separates them. Calibrate
+        on two known points before trusting a run.
+      */
       corridors: [
-        { from: [69.05, 22.68], to: [69.95, 21.98], widthKm: 5 },
-        { from: [68.95, 22.25], to: [69.9, 22.62], widthKm: 5 },
-        { from: [69.6, 22.9], to: [69.3, 21.95], widthKm: 4 },
+        { from: [68.85, 22.5], to: [70.05, 22.68], widthKm: 5 },
+        { from: [68.88, 22.8], to: [69.55, 22.48], widthKm: 5 },
+        /*
+          The local lane, and the one that gives the gate its work. Its
+          centreline passes 2.27 km off the release.
+
+          The note that used to sit here said this distance was chosen so the
+          lane would not contradict `meta.summary`'s "no AIS report anywhere
+          near". That reasoning was wrong, and measuring the built run is how it
+          was caught: `buildTraffic` scatters each vessel laterally by
+          `rng.normal() * widthKm * 0.5`, so sigma here is 1.75 km and 2.27 km is
+          1.3 sigma -- well inside the traffic, not clear of it. What the run
+          actually contains is a nearest AIS report 248 m from the bright target,
+          a nearest track 70 m from it, 8 reports inside 500 m from 5 vessels,
+          33 inside 1 km from 13, and 135 inside 2 km from 29.
+
+          The summary now states what is true -- the target carries no AIS report
+          of its own, in a lane that is busy -- rather than claiming an empty sea.
+          Moving the lane is still open: at 2.27 km it is close enough that under
+          the `max` S_drift variant identified traffic outranks the dark contact
+          (see the note on `expectedTop1`). Any replacement has to be land-checked
+          against the basemap raster, per the method recorded above.
+        */
+        { from: [69.24, 22.34], to: [69.68, 22.7], widthKm: 3.5 },
       ],
     },
     infrastructure: [
-      { id: "infra-vadinar", label: "Vadinar SPM buoy", position: [69.72, 22.38] },
+      // Moved north out of Vadinar town, where it had been sitting on dry land.
+      // A single point mooring is a buoy tankers berth against; it is offshore
+      // by definition, and this one is now in the water it has to be in.
+      { id: "infra-vadinar", label: "Vadinar SPM buoy", position: [69.72, 22.45] },
     ],
     infrastructureCoverage: "partial",
     source: { type: "dark", lengthM: 118 },
@@ -487,9 +618,24 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
       meanU: 0.05,
       meanV: 0.04,
       eddy: { centre: [71.45, 19.62], radiusKm: 30, strengthMs: 0.03 },
-      // No convergence cell. Nothing pulls the cloud together, so the field just
-      // spreads, which is the correct behaviour and the reason this run reports
-      // insufficient evidence rather than a suspect.
+      /*
+        No convergence cell, so nothing pulls the cloud together.
+
+        This comment used to add "which is the correct behaviour and the reason
+        this run reports insufficient evidence rather than a suspect". Measured,
+        that attributes the refusal to the wrong mechanism. The field does not
+        spread far enough to trip anything: the 90% origin contour is 15.2 km2 at
+        its tightest and 129.6 km2 at its widest, against this scenario's
+        `diffuseThresholdKm2` of 300, so `deriveAge` returns
+        `insufficientEvidence: null` and `ageMethod` stays `drift_convergence`
+        rather than `beyond_horizon`.
+
+        The refusal is the wind gate. `windGate(1.9)` is 0.00, which is below the
+        scorer's 0.15 floor, so every total is multiplied to exactly zero and the
+        wind branch fires first. Absent convergence still matters -- it is why
+        this looks like a look-alike rather than a spill -- but it is not what
+        withholds the attribution.
+      */
       convergence: { centre: MUMBAI_HIGH, radiusKm: 10, strengthMs: 0 },
       tideMs: 0.03,
       tidePhaseHours: 1.2,

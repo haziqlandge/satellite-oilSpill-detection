@@ -33,8 +33,23 @@ export function FloatWindow({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       const el = box.current;
-      // Only the window the pointer or focus is actually in. Escape with three
-      // windows open should not shut all three.
+      /*
+        Only the window focus is actually in. `Escape` with three windows open
+        should send one home, not all three, and every window has this same
+        listener on `window`, so the test has to be something only one of them
+        can pass.
+
+        This used to say "the pointer or focus". There has never been any
+        pointer tracking here -- `activeElement` is the whole test -- and the
+        difference was not academic: nothing put focus inside a window either,
+        so the rule was one no window could pass and `Escape` did nothing at
+        all. `FloatShell` now takes focus on pointer-down (see the long note
+        there), which is what makes this reachable: touch the window, then
+        press `Escape`.
+
+        `box` is `display: contents`, which changes how it lays out and not
+        what it contains, so `contains` still answers for the whole window.
+      */
       if (el && el.contains(document.activeElement)) redock(id);
     };
     window.addEventListener("keydown", onKey);

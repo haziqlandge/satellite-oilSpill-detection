@@ -22,7 +22,9 @@
 
 import { useMemo, useState } from "react";
 import {
+  MAP_CHOICE_FIELDS,
   MAP_COLOUR_FIELDS,
+  MAP_FLAG_FIELDS,
   MAP_NUMBER_FIELDS,
   SURFACE_TOKENS,
   downloadPalette,
@@ -30,7 +32,10 @@ import {
   isHex,
   rgbToHex,
   usePalette,
+  type MapChoiceField,
+  type MapFlagField,
 } from "../lib/palette";
+import { canShowLabels } from "../map/basemap";
 import { SURFACES, type MapPaint } from "../theme";
 
 type Group = "ink" | "basemap" | "tokens";
@@ -198,7 +203,25 @@ export function PalettePanel() {
 
         {/* --- the control --------------------------------------------- */}
         {group === "basemap" ? (
-          <NumberControl field={numField} />
+          <>
+            <NumberControl field={numField} />
+            {/*
+              The two fields that are not a colour and not a quantity.
+
+              They sit below the slider, permanently, rather than as entries in
+              the attribute menu above -- the menu chooses which field the
+              slider points at, and neither a menu nor a checkbox is something
+              a slider can point at. `contourFill` was already drawn this way
+              under the inks, so this is the panel's existing answer to the
+              same problem rather than a new one.
+            */}
+            {MAP_CHOICE_FIELDS.map((f) => (
+              <ChoiceControl key={f.key} field={f} />
+            ))}
+            {MAP_FLAG_FIELDS.filter((f) => f.group === "basemap").map((f) => (
+              <FlagControl key={f.key} field={f} />
+            ))}
+          </>
         ) : (
           <>
             <div className="mt-4 flex items-center gap-3">
@@ -230,7 +253,10 @@ export function PalettePanel() {
           </>
         )}
 
-        {group === "ink" && <ContourFill />}
+        {group === "ink" &&
+          MAP_FLAG_FIELDS.filter((f) => f.group === "ink").map((f) => (
+            <FlagControl key={f.key} field={f} />
+          ))}
 
         {/*
           The question this panel gets asked, answered where it is asked.
@@ -394,7 +420,9 @@ function Select({
 }: {
   value: string;
   onChange: (value: string) => void;
-  options: { value: string; label: string }[];
+  // Readonly because the enum's options come from a frozen literal in
+  // `palette.tsx`; the attribute menus above still hand it a fresh array.
+  options: readonly { value: string; label: string }[];
 }) {
   return (
     <select
@@ -533,6 +561,22 @@ function NumberControl({ field }: { field: keyof MapPaint }) {
   const raw = palette.paint[field];
   const value = typeof raw === "number" ? raw : 0;
 
+  /*
+    Six of the eight sliders act on the raster basemap, and the raster layer
+    only exists while a world map is chosen. Until `basemap` became editable
+    there was no way to reach that state from the panel, so the sliders could
+    never be inert and nothing had to say so; now the first thing anyone will
+    do with the new menu is set it to "no world map", at which point five
+    coastline sliders and a wash sit there moving numbers that reach nothing.
+
+    Left live rather than disabled, deliberately. Their values are still real
+    -- they are what the basemap will be drawn with the moment one is chosen
+    again -- so dialling them in with no world up is a legitimate thing to do.
+    The note says the setting is stored and not currently drawn, which is the
+    true statement; a greyed-out slider would say the value did not exist.
+  */
+  const stored = field.startsWith("basemap") && palette.paint.basemap === "none";
+
   return (
     <div className="mt-4">
       <div className="flex items-baseline justify-between">
@@ -554,26 +598,123 @@ function NumberControl({ field }: { field: keyof MapPaint }) {
         className="mt-2 w-full cursor-pointer"
         style={{ accentColor: "var(--accent)" }}
       />
+      {stored && (
+        <p className="mt-1.5 text-[10px]" style={{ color: "var(--warn)" }}>
+          Kept, but not drawn: there is no world map up for it to act on.
+        </p>
+      )}
     </div>
   );
 }
 
-/** The one boolean worth having beside the inks. */
-function ContourFill() {
+/**
+ * A field chosen from a fixed set of named values.
+ *
+ * The panel's own menus -- which attribute, which token -- are already a
+ * `<select>`, so an enum gets the same control rather than a fourth idiom
+ * invented for it. What it does not share with them is position: those menus
+ * choose what the swatch below points at, this one *is* the value, so it is
+ * ruled off from them and carries its own sentence.
+ *
+ * Reverting it means what it means everywhere else in this panel: drop the
+ * override and let the merged paint fall back to the surface's shipped
+ * literal. The overlay is a diff keyed by field rather than a store of values,
+ * so nothing about an enum needs its own path through it.
+ */
+function ChoiceControl({ field }: { field: MapChoiceField }) {
   const palette = usePalette();
-  const on = palette.paint.contourFill;
+  const value = String(palette.paint[field.key] ?? "");
+  const edited = palette.map[field.key] !== undefined;
+
   return (
-    <label
-      className="mt-4 flex cursor-pointer items-center gap-2 border-t pt-3 text-[10.5px]"
-      style={{ borderColor: "var(--line)", color: "var(--ink-dim)" }}
-    >
-      <input
-        type="checkbox"
-        checked={on}
-        onChange={(e) => palette.setMapField("contourFill", e.target.checked)}
-        style={{ accentColor: "var(--accent)" }}
+    <div className="mt-4 border-t pt-3" style={{ borderColor: "var(--line)" }}>
+      <div className="flex items-baseline gap-2">
+        <Label>{field.label}</Label>
+        <span className="flex-1" />
+        <Revert
+          disabled={!edited}
+          title={
+            edited
+              ? "Put this back to the world map that shipped"
+              : "This is already at its shipped value"
+          }
+          onClick={() => palette.clearMapField(field.key)}
+        />
+      </div>
+      <Select
+        value={value}
+        onChange={(v) => palette.setMapField(field.key, v)}
+        options={field.options}
       />
-      fill the credible-region bands
-    </label>
+      <p
+        className="mt-2 text-[11px] leading-[1.5]"
+        style={{ color: "var(--ink-dim)", fontFamily: "var(--font-body)" }}
+      >
+        {field.blurb}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * A field that is on or off.
+ *
+ * `contourFill` was drawn like this before anything else was, and it is the
+ * right shape for the job: a switch with the sentence that says what it
+ * switches, ruled off from the controls above it. What it lacked was a revert,
+ * which every other control in the panel has -- so a checkbox was the one
+ * thing you could move and then only put back by resetting the whole palette,
+ * or by remembering what it had been.
+ *
+ * `disabledNote` is for a switch that is currently inert. `showLabels` under
+ * `basemap: "none"` is the case: there is no world for names to sit on, so
+ * rather than offer a control that quietly does nothing, the checkbox is
+ * disabled and the sentence says why.
+ */
+function FlagControl({ field }: { field: MapFlagField }) {
+  const palette = usePalette();
+  const on = palette.paint[field.key] === true;
+  const edited = palette.map[field.key] !== undefined;
+  const inert = field.key === "showLabels" && !canShowLabels(palette.paint);
+
+  return (
+    <div className="mt-4 border-t pt-3" style={{ borderColor: "var(--line)" }}>
+      <div className="flex items-center gap-2">
+        <label
+          className="flex min-w-0 flex-1 items-center gap-2 text-[10.5px]"
+          style={{
+            color: "var(--ink-dim)",
+            cursor: inert ? "default" : "pointer",
+            opacity: inert ? 0.45 : 1,
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={on}
+            disabled={inert}
+            onChange={(e) => palette.setMapField(field.key, e.target.checked)}
+            style={{ accentColor: "var(--accent)" }}
+          />
+          {field.label}
+        </label>
+        <Revert
+          disabled={!edited}
+          title={
+            edited
+              ? "Put this one back to the setting it shipped with"
+              : "This one is already at its shipped value"
+          }
+          onClick={() => palette.clearMapField(field.key)}
+        />
+      </div>
+      <p
+        className="mt-1.5 text-[11px] leading-[1.5]"
+        style={{ color: "var(--ink-dim)", fontFamily: "var(--font-body)" }}
+      >
+        {inert
+          ? "There is no world map to draw names on. Choose one of the three above and this comes back."
+          : field.blurb}
+      </p>
+    </div>
   );
 }
