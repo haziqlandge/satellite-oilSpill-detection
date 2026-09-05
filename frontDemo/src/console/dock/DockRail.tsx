@@ -6,7 +6,14 @@
  * and no indication that any of it could be moved. Everything here is meant to
  * announce itself: the grip has a visible ridge and a `col-resize` cursor, the
  * collapse control is a labelled button rather than a hover target, and the tab
- * bar says outright that a double-click undocks.
+ * bar says outright, on every tab, that dragging it off or double-clicking it
+ * undocks the panel.
+ *
+ * The tab strip is also the console's only drop target. A floating window
+ * dragged over it docks into this rail while the pointer is still down, and
+ * moving back off pops it out again -- the gesture lives in `useDockDrag`, and
+ * all this file contributes is the mark that says "this strip is a dock's" and
+ * the press that may become a tear-off.
  *
  * The resize is the one piece of this file with a performance constraint. A
  * pointer dragging across the console fires well over a hundred events a
@@ -21,9 +28,10 @@
 import { useCallback, useRef, type ReactNode } from "react";
 import {
   DOCK_LIMITS,
+  DOCK_STRIP_ATTR,
   panelDef,
-  scaleFor,
   type Dock,
+  type DockDrag,
   type DockSide,
   type PanelId,
 } from "./useDock";
@@ -43,10 +51,13 @@ const HANDLE = 10;
 export function DockRail({
   side,
   dock,
+  drag,
   render,
 }: {
   side: DockSide;
   dock: Dock;
+  /** The console's drag controller, for the tear-off. See `useDockDrag`. */
+  drag: DockDrag;
   render: (id: PanelId) => ReactNode;
 }) {
   const ids = dock.panelsIn(side);
@@ -79,7 +90,6 @@ export function DockRail({
         frame = 0;
         el.style.width = shut ? "0px" : `${next}px`;
         el.style.opacity = shut ? "0" : "1";
-        el.style.setProperty("--panel-scale", String(scaleFor(side, next)));
       };
 
       const onMove = (ev: PointerEvent) => {
@@ -238,15 +248,42 @@ export function DockRail({
           there is no frame in which it is undefined.
         */
         width: size,
-        "--panel-scale": scaleFor(side, size),
         background: "var(--base-2)",
-        // Every type size in the console family is expressed against this, so
-        // widening a dock genuinely enlarges its contents rather than just
-        // giving them more room to be small in.
-        fontSize: "calc(1em * var(--panel-scale, 1))",
-      } as React.CSSProperties}
+        /*
+          Widening a dock gives its contents more room. It does not enlarge
+          them, and there is no longer anything here pretending otherwise.
+
+          This element used to set a `--panel-scale` custom property from a
+          `scaleFor(side, size)` and then its own
+          `fontSize: calc(1em * var(--panel-scale, 1))`, under a comment
+          claiming "every type size in the console family is expressed against
+          this". That claim was false when it was written. Every size in the
+          console is an absolute bracket -- `text-[10px]`, `text-[9.5px]` -- so
+          the body's font-size was inherited by nothing, and the property was
+          read in exactly two places, one of which was a floating window that
+          is never a descendant of this element and so always took the
+          fallback. Measured across 300 / 430 / 760 px, every leaf text node in
+          a dock computed to the same size at all three widths.
+
+          It was removed rather than re-documented because it had already
+          fooled a verification pass: a handoff recorded "214 -> 383 px gives
+          --panel-scale: 1.35, computed font-size: 21.6px" as a *passing* type
+          -scale check. Both numbers were true and neither meant what it was
+          taken to mean. A mechanism that reads as working to someone looking
+          straight at it is worse than no mechanism, and a warning comment
+          would have been one more thing to not read.
+
+          Making it real is possible and was not done here: `zoom` on this
+          element, which is what the panel reader below the workstation uses
+          for exactly this problem (`ISSUES.md` §5). It is not free -- `zoom`
+          scales this element's own box, so the rendered width would stop
+          matching `size` and the resize grip's arithmetic with it, and
+          `getBoundingClientRect` inside the rail would start returning zoomed
+          pixels. That is a design decision with a real cost, not a cleanup.
+        */
+      }}
     >
-      <TabBar side={side} dock={dock} ids={ids} active={active} />
+      <TabBar side={side} dock={dock} drag={drag} ids={ids} active={active} />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {active ? render(active) : null}
       </div>
@@ -375,19 +412,38 @@ function EdgeHandle({
 /**
  * The tabs.
  *
- * A tab carries three affordances and has to show all of them: click to front,
- * double-click to tear off into a window, and a close box. The close box is
- * always drawn rather than revealed on hover -- a control that appears only
- * when the pointer is already on it cannot be discovered by looking.
+ * A tab carries four affordances now and has to show all of them: click to
+ * front, double-click to tear off into a window, *drag* to tear off into a
+ * window that follows the pointer, and a close box. The close box is always
+ * drawn rather than revealed on hover -- a control that appears only when the
+ * pointer is already on it cannot be discovered by looking.
+ *
+ * This strip is also the drop target for the reverse gesture: a window dragged
+ * over it docks here, live, while the pointer is still down. That is declared
+ * by `DOCK_STRIP_ATTR` below rather than inferred from anything about the
+ * element, because the console has a third tab strip -- the panel reader's --
+ * that must never be a target and is otherwise indistinguishable. See
+ * `stripAt` in `useDock` for why an attribute and not geometry.
+ *
+ * Two things a shut dock gets for free from how this is written. A collapsed
+ * rail renders an `EdgeHandle` instead of any of this, so it has no strip and
+ * cannot be dropped on; and a dock with no panels left in it renders nothing
+ * at all, so it has no strip either. The second is a real hole in the gesture
+ * -- empty a dock completely and there is no way to drag anything back into it
+ * -- and it is deliberately not patched here, because the only patch is to
+ * make an empty strip appear during a drag, which is a drop indicator, which
+ * the specification rules out. The four other routes home are unaffected.
  */
 function TabBar({
   side,
   dock,
+  drag,
   ids,
   active,
 }: {
   side: DockSide;
   dock: Dock;
+  drag: DockDrag;
   ids: PanelId[];
   active: PanelId | null;
 }) {
@@ -397,6 +453,7 @@ function TabBar({
       style={{ borderColor: "var(--line)", background: "var(--base-3)" }}
       role="tablist"
       aria-label={`${side} dock`}
+      {...{ [DOCK_STRIP_ATTR]: side }}
     >
       {ids.map((id) => {
         const def = panelDef(id);
@@ -416,11 +473,24 @@ function TabBar({
               type="button"
               role="tab"
               aria-selected={on}
+              onPointerDown={(e) => drag.startTab(e, id, side)}
               onClick={() => dock.setActive(side, id)}
               onDoubleClick={() => dock.float(id)}
-              title={`${def.title} — double-click to undock into a window`}
+              title={`${def.title} — drag off to undock into a window, or double-click`}
               className="flex cursor-pointer items-baseline gap-1.5 py-[5px] pr-1 pl-2 text-[10px] tracking-[0.14em] whitespace-nowrap uppercase transition-colors"
-              style={{ color: on ? "var(--ink)" : "var(--ink-faint)" }}
+              style={{
+                color: on ? "var(--ink)" : "var(--ink-faint)",
+                /*
+                  Vertical panning still starts here, so the page under the
+                  workstation can be scrolled from a tab on a touch screen;
+                  horizontal movement comes to the tear-off instead of being
+                  eaten by a scroll that ends the pointer stream. Docks are
+                  desktop-only today, so this is insurance rather than a
+                  behaviour anyone will meet -- but it is the correct
+                  declaration for a control that is also a drag handle.
+                */
+                touchAction: "pan-y",
+              }}
             >
               <span
                 className="num text-[9px]"

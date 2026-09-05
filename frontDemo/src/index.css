@@ -1,5 +1,39 @@
 @import "tailwindcss";
 
+/*
+  Prose is not a source of class names.
+
+  Tailwind v4 auto-detects its sources by walking up from this file to the
+  repository root and scanning every non-ignored, non-binary file it finds --
+  Markdown included. This repository's Markdown is unusually dangerous for that
+  heuristic, because `ISSUES.md`, `NEXT-SESSION.md` and `HANDOFF.md` are
+  engineering logs that quote class names *as their subject matter*. A note
+  saying "this utility is dead and should be removed" is itself a live
+  reference, so the utility is emitted, and the note documenting the problem
+  becomes the reason the problem persists.
+
+  That is not hypothetical, and it is why these two lines exist. The dead
+  `@media (prefers-reduced-motion: no-preference)` block described further down
+  survived after `.backup/` was excluded, and the surviving occurrence was
+  `ISSUES.md` line 909, which spells `motion-safe:duration-500` out in full.
+  Its two neighbours in that sentence, `motion-safe:ease-` and
+  `motion-safe:transition-`, are written truncated and are therefore not valid
+  candidates -- which is exactly why those two disappeared and this one did
+  not. Measured, not reasoned: excluding Markdown takes the compiled
+  `no-preference` block from one utility to none.
+
+  `.backup/` is excluded explicitly rather than by `.gitignore`. It IS listed
+  in the root `.gitignore` now, and Tailwind's scanner honours that -- but the
+  eight files in it are already tracked, and `.gitignore` has no effect on
+  tracked files, so `git check-ignore` reports nothing for them. Relying on a
+  rule that git itself does not apply is the kind of thing that works until
+  someone untracks or retracks the directory. Stated here, it is a build fact
+  rather than an accident of index state.
+*/
+@source not "../**/*.md";
+@source not "../../**/*.md";
+@source not "../.backup";
+
 /* Imported here rather than from the component, so its cascade position is
    predictable relative to the utility layer. */
 @import "maplibre-gl/dist/maplibre-gl.css";
@@ -175,6 +209,24 @@
     because the next person has the same problem: they cannot see this run
     either.
 
+    HOW TO SEE IT RUN ANYWAY
+
+      The media query cannot be made to match, but the *rules* can be replayed
+      at the same cascade position. Append a `<style>` to `<head>` containing
+      `@layer base { *, *::before, *::after { ... } }` -- the declarations
+      below, minus the query. A layer name that already exists is re-opened
+      rather than re-created, so those rules join the `base` layer declared by
+      the main sheet and inherit its position in the layer order; a plain
+      unlayered `<style>` would land in the weakest important position instead
+      and under-report what this block actually reaches. Then read
+      `getComputedStyle(el).transitionDuration` before and after on an element
+      that demonstrably has a transition -- `a[href="#/console"]` is `0.2s`
+      unclamped, `[data-cross-part]` and the two popover keys are `0.15s` -- and
+      `getComputedStyle(document.documentElement).scrollBehavior`, which goes
+      `smooth` -> `auto`. Read the *change*, never the absolute: after the clamp
+      every element on the page reports a sub-millisecond duration whether or
+      not it ever had a transition, so a bare reading proves nothing on its own.
+
     WHAT IS ANIMATED, ON BOTH SURFACES
 
       Forty-four Tailwind utilities, one per line, and nothing else -- no
@@ -205,13 +257,54 @@
 
       One thing to know before grepping the *compiled* CSS for
       `prefers-reduced-motion`: three blocks come back, and only one of them is
-      this. MapLibre ships its own, for a user-location dot this map never
-      draws. The third is
+      this. That has now been grepped rather than assumed -- `npm run build`,
+      `dist/assets/index-*.css`, three hits. MapLibre ships one, for a
+      user-location dot this map never draws; nothing on either surface
+      constructs a `GeolocateControl`. The third is
       `@media (prefers-reduced-motion: no-preference)` carrying three
-      `motion-safe:` utilities that match no element on either surface --
-      Tailwind's source detection reaches `.backup/`, which is not gitignored,
-      and `DesignSwitcher.tsx` in there still carries the classes. Dead CSS from
-      a component that was removed.
+      `motion-safe:` utilities -- `transition-[transform,opacity]`,
+      `duration-500` and an `ease-[...]` -- that match no element on either
+      surface. Two of the three came from one className on line 89 of
+      `.backup/2026-08-31-animation/src/components/DesignSwitcher.tsx`: dead CSS
+      from a component that was removed, still in the bundle because Tailwind's
+      source detection walked `.backup/` and nothing excluded it.
+
+      RESOLVED, and the first answer was wrong in an instructive way.
+
+      The obvious exclusion is a `.gitignore` entry -- Tailwind v4's scanner is
+      the Rust `ignore` crate and it does honour `.gitignore`, including one in
+      a directory above the Vite root. That was added, and it was not enough.
+      Rebuilt, the block came back with **one** utility still in it:
+      `motion-safe:duration-500`.
+
+      Two things had been missed, and both are worth keeping.
+
+      The first is that the scanner reads Markdown, and this repository's
+      Markdown quotes class names as its subject matter. The surviving
+      occurrence was `ISSUES.md` line 909, which spells `motion-safe:duration-500`
+      out in full while writing its two neighbours truncated as
+      `motion-safe:ease-` and `motion-safe:transition-`. Truncated names are not
+      valid candidates -- which is precisely why those two died with `.backup/`
+      and this one did not. The note recording that a utility was dead was
+      keeping it alive.
+
+      The second is that `.gitignore` does not apply to tracked files, and the
+      eight files under `.backup/` are tracked. `git check-ignore` reports
+      nothing for them. Tailwind's scanner does not consult the index, so it
+      skips the directory anyway and the bundle improved -- but the rule that
+      appeared to be doing the work is one git itself does not apply, which
+      would have quietly stopped being true the moment anyone untracked or
+      retracked the directory.
+
+      So the exclusion is stated explicitly at the top of this file with
+      `@source not`, covering Markdown and `.backup/` both, rather than left to
+      an inference about ignore semantics. Measured after that change:
+      **two** compiled `prefers-reduced-motion` blocks, zero `motion-safe`
+      rules, and the CSS asset 147.96 kB -> 146.99 kB. The selector diff was
+      checked rather than assumed -- exactly four selectors left the bundle
+      (`.grayscale`, `.transition`, `.duration-200!`, `.motion-safe:duration-500`)
+      and none of the four appears in any `className` in `src/`; every
+      `transition` in this codebase is a hyphenated variant.
 
     WHY THE CLAMP STAYS BLUNT
 
@@ -230,9 +323,23 @@
       updates *repeatedly from data* -- a needle, a bar tracking a live number,
       a figure redrawn per timestep -- is smoothing a sequence of jumps, and
       clamping it produces more perceived motion, not less. There is no such
-      transition on either surface: all forty-three run between discrete hover,
-      focus or toggle states. The forty-fourth is the only loop, and the
-      iteration clamp is what lands it on its resting opacity.
+      transition on either surface. Forty-two of the forty-three run between
+      discrete hover, focus, selection or toggle states, all of them driven by
+      an event rather than by the clock.
+
+      The forty-third is worth naming because it is the only near miss, and a
+      later one will look like it. `goto T0` in `reports.tsx` is a
+      `transition-colors` `Btn` whose `active` is `atWindowEnd` -- derived from
+      `hour`, which the playback loop advances in fractional steps. What keeps
+      it discrete is the 0.01 h epsilon around the comparison: the button is
+      lit or unlit, never partway, and the ramp only ever runs on a crossing.
+      Take the epsilon out and this becomes exactly the case above. It is also
+      the one transition the clamp arguably *improves*: at 24 simulated hours a
+      second a crossing can be shorter than the 150 ms ramp, so the lit state
+      the tooltip promises never fully arrives, and clamped it does.
+
+      The forty-fourth is the only loop, and the iteration clamp is what lands
+      it on its resting opacity.
 
       `ConsoleKey`'s `hover:scale-[1.02]` is the one that looks arguable, and it
       is clamped on purpose. A two per cent scale is small, but it is motion
@@ -244,16 +351,47 @@
       for the glow while the size jumps gives one control two different
       cadences at once.
 
-      Rejected, clamping only the three that move: CSS cannot express it.
-      `transition-duration` is a positional list matched against
-      `transition-property`, so "clamp the transform but keep the box-shadow" on
-      `ConsoleKey` means restating that one element's entire transition in a
-      selector that then has to track its class list. Rejected, an allowlist of
-      selectors to clamp: it fails in the direction nobody notices -- a motion
-      added next month is simply not covered and nothing reports it -- whereas a
-      universal clamp fails the other way, turning a fade someone wanted into a
-      snap that someone sees. This file has already outlived `site/figures.tsx`,
-      which is what a selector list here is worth.
+      Rejected, clamping only the three that move. The reason this was first
+      written down was "CSS cannot express it", and that is not quite true, so
+      it is restated here rather than left as a claim the next person will
+      disprove in five minutes and then distrust the rest of this block over.
+      CSS can express it, per element, positionally:
+      `transition-duration: 0.01ms, 200ms, 200ms` against `ConsoleKey`'s
+      `transition-property: transform, box-shadow, filter` clamps the transform
+      and keeps the glow, and it works. What CSS has no form for is expressing
+      it *generically* -- there is no way to say "clamp whichever entry of this
+      element's transition-property list happens to be a motion property"
+      without already knowing the list. So the rule has to restate that one
+      element's whole transition, in a selector that then has to track its class
+      list, and it goes silently wrong the day a fourth property is added to the
+      className and the positional list is not lengthened to match. That is a
+      worse failure than the blunt clamp's, because nothing about it is visible.
+
+      Rejected too, neutralising the motion rather than the ramp -- a universal
+      `scale: 1 !important; translate: none !important` under hover, which would
+      leave every colour transition intact. Tailwind v4 emits `translate` and
+      `scale` as standalone properties, and this project centres the two dock
+      grips and the workspace readout with `-translate-x-1/2 -translate-y-1/2`.
+      A universal `translate: none` moves them. The idea is sound and the
+      property namespace is shared with layout, which is the end of it.
+
+      Rejected, an allowlist of selectors to clamp: it fails in the direction
+      nobody notices -- a motion added next month is simply not covered and
+      nothing reports it -- whereas a universal clamp fails the other way,
+      turning a fade someone wanted into a snap that someone sees. This file has
+      already outlived `site/figures.tsx`, which is what a selector list here is
+      worth.
+
+      What the blunt clamp does cost, stated so it is not discovered later:
+      `transition-property` initially computes to `all`, and this block sets a
+      duration on every element without touching that. So under reduced motion
+      every element on the page acquires a 0.01ms transition on every animatable
+      property, and every property change fires a `transitionend` that bubbles.
+      Nothing on either surface listens for one -- checked, there is no
+      `transitionend` or `onTransitionEnd` anywhere in `src/` -- and 0.01ms
+      resolves inside a single frame, so the cost today is event dispatch and
+      nothing else. The day something does listen, it will be hearing from the
+      whole document rather than from the element it attached to.
 
     WHY IT IS IN `@layer base` AND NOT OUTSIDE EVERY LAYER
 
@@ -271,17 +409,33 @@
 
       `scroll-behavior` governs a scroll only while the scroll itself asks for
       `auto`. An explicit `behavior: "smooth"` handed to `scrollTo` or
-      `scrollIntoView` overrides the computed property outright, so the
-      `window.scrollTo({ behavior: "smooth" })` calls in `site/Nav.tsx` are not
-      addressable from CSS at all and need their own guard.
+      `scrollIntoView` overrides the computed property outright, so a scripted
+      smooth scroll is not addressable from CSS at all and needs its own guard.
 
-      `::backdrop` is deliberately absent from the selector list. A selector
-      list containing one selector an engine cannot parse is invalid *in its
+      It has one. This note used to end here, reading as an open hole, and it is
+      not one: `scrollToTop()` in `site/Nav.tsx` -- the single `window.scrollTo`
+      on that surface, called from the wordmark and from the Home link -- picks
+      its `behavior` from `prefersReducedMotion()` in `src/lib/motion.ts`, and
+      passes `"instant"` rather than `"auto"` so it depends on nothing in this
+      file. `App.tsx` passes `"instant"` unconditionally on a surface change.
+      Both are deliberate and neither is redundant with the rule below; the
+      docblock on `scrollToTop` says at length why deleting it on the strength
+      of this block would be wrong. The only thing left unreachable from here is
+      a *future* scripted scroll that forgets to ask.
+
+      `::backdrop` is deliberately absent from the selector list, and the
+      reason is the second one below rather than the first. A selector list
+      containing one selector an engine cannot parse is invalid *in its
       entirety*, so adding it would make the project's only reduced-motion
-      backstop conditional on that pseudo-element parsing. Nothing here uses
-      `<dialog>` or the popover API -- the console's popovers are portalled
-      divs -- so it would cover nothing and risk everything. Add it the day a
-      modal arrives.
+      backstop conditional on that pseudo-element parsing -- true, but weaker
+      than it sounds, because the bundle already depends on exactly that:
+      Tailwind v4 opens `@layer properties` with
+      `*, ::before, ::after, ::backdrop { --tw-translate-x: 0; ... }`, so an
+      engine that cannot parse `::backdrop` has already dropped every custom
+      property the transform utilities read. The standing reason is the plain
+      one: nothing here uses `<dialog>` or the popover API -- the console's
+      popovers are portalled divs -- so it would cover nothing. Add it the day
+      a modal arrives.
 
     `0.01ms` and not `0s`: a zero-duration transition never fires
     `transitionend`, and anything waiting on one waits forever. Nothing listens

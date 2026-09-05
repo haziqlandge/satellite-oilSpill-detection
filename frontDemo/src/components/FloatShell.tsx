@@ -39,6 +39,37 @@ export interface FloatShellProps {
   onDock?: () => void;
   onTitleDoubleClick?: () => void;
   onPointerDownCapture?: () => void;
+  /**
+   * Take the title-bar drag over entirely.
+   *
+   * Given, this is called on a press of the title bar and the window's own
+   * move handling does not run at all -- no listeners, no frame, no `onMove`.
+   * It is not a notification alongside the built-in drag; it is a replacement
+   * for it, and a caller that supplies it owns the whole gesture including
+   * writing the final position back.
+   *
+   * The console needs that because its drag does something this component
+   * cannot be told about: crossing a dock's tab strip *docks the panel while
+   * the pointer is still down*, which unmounts this very component. A move
+   * handler living here would stop existing halfway through its own gesture.
+   * The home page's colour panel supplies neither this nor `onElement` and
+   * keeps the self-contained drag below, which is the whole point of the two
+   * being optional.
+   */
+  onDragTitle?: (e: React.PointerEvent) => void;
+  /**
+   * Handed the window's outermost element on mount and `null` on unmount.
+   *
+   * The escape hatch an owner needs to position the window imperatively, which
+   * is the only way to move a window holding a live map without re-rendering
+   * it on every frame -- see the note at the top of this file.
+   *
+   * **Must be stable across renders.** It is used as a callback ref, so a
+   * fresh identity each render makes React detach and re-attach the element
+   * every time, and an owner that treats those calls as mount and unmount
+   * will see a stream of them.
+   */
+  onElement?: (el: HTMLElement | null) => void;
   children: ReactNode;
 }
 
@@ -58,9 +89,26 @@ export function FloatShell({
   onDock,
   onTitleDoubleClick,
   onPointerDownCapture,
+  onDragTitle,
+  onElement,
   children,
 }: FloatShellProps) {
-  const box = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLElement | null>(null);
+
+  /**
+   * One element, two readers: this component's own pointer handlers, and
+   * whoever passed `onElement`. A callback ref rather than two refs on one
+   * node, because the owner needs to know *when* the element appears -- a
+   * console window that has just come back off a tab strip is a fresh element
+   * that has to be found again mid-gesture, and only a ref call says so.
+   */
+  const attachBox = useCallback(
+    (el: HTMLElement | null) => {
+      box.current = el;
+      onElement?.(el);
+    },
+    [onElement],
+  );
 
   /* --- focus -------------------------------------------------------- */
 
@@ -112,6 +160,12 @@ export function FloatShell({
       // Let the close and dock buttons in the bar do their own job.
       if ((e.target as HTMLElement).closest("button")) return;
 
+      // Handed over whole, not shared. See `onDragTitle`.
+      if (onDragTitle) {
+        onDragTitle(e);
+        return;
+      }
+
       e.preventDefault();
       onPointerDownCapture?.();
 
@@ -154,7 +208,7 @@ export function FloatShell({
       window.addEventListener("pointerup", up);
       document.body.style.userSelect = "none";
     },
-    [x, y, onMove, onPointerDownCapture],
+    [x, y, onMove, onPointerDownCapture, onDragTitle],
   );
 
   /* --- resize ------------------------------------------------------- */
@@ -204,7 +258,7 @@ export function FloatShell({
 
   return (
     <section
-      ref={box}
+      ref={attachBox}
       role="dialog"
       aria-label={`${title} window`}
       /* Focusable by script, never by Tab -- see `onShellPointerDown`. The
@@ -244,6 +298,15 @@ export function FloatShell({
         style={{
           borderColor: "var(--line)",
           background: "color-mix(in oklab, var(--accent) 14%, var(--base-3))",
+          /*
+            The title bar is a drag handle, so the browser must not read a
+            press on it as the start of a scroll. Without this a touch drag
+            pans the page and the pointer stream ends in `pointercancel`
+            partway through -- which the console's drag now handles, but
+            handling it is not the same as the gesture working. The page below
+            the workstation still scrolls everywhere else.
+          */
+          touchAction: "none",
         }}
       >
         {index && (
@@ -284,10 +347,24 @@ export function FloatShell({
         )}
       </header>
 
-      <div
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
-        style={{ fontSize: "calc(1em * var(--panel-scale, 1))" }}
-      >
+      {/*
+        No font-size here. This carried
+        `fontSize: "calc(1em * var(--panel-scale, 1))"`, copied from the
+        console's dock body so that a panel torn into a window would keep
+        whatever type scale its rail had.
+
+        It could not have done that, and not merely because the console's type
+        does not scale. `--panel-scale` was only ever set on a `DockRail`'s body
+        element, and a floating window is *never a descendant of one* -- the
+        console renders its windows at the root of `ConsoleShell`, and the home
+        page renders this one at the root of `SiteShell`. Custom properties
+        inherit down the DOM, not through whatever the window happens to be
+        drawn on top of, so the `var()` took its fallback of 1 in every
+        instance that has ever existed and the declaration read
+        `font-size: calc(1em * 1)` -- which is to say, `font-size: 1em`, which
+        is to say, nothing.
+      */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {children}
       </div>
 

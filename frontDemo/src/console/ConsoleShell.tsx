@@ -38,7 +38,7 @@ import { SpillKey } from "./SpillKey";
 import { PanelsMenu } from "./PanelsMenu";
 import { DockRail } from "./dock/DockRail";
 import { FloatWindow } from "./dock/FloatWindow";
-import { PANELS, useDock, type PanelId } from "./dock/useDock";
+import { PANELS, useDock, useDockDrag, type PanelId } from "./dock/useDock";
 
 /** Layer switches, in the order they stack on the map. */
 const LAYERS: { key: keyof LayerToggles; label: string; hint: string }[] = [
@@ -59,6 +59,18 @@ export default function ConsoleShell() {
   const paint = usePaint();
   const state = useSpill("gom-berthed", { eager: true, syncUrl: true });
   const dock = useDock();
+  /*
+    The drag controller belongs here and cannot belong anywhere lower.
+
+    Dropping a window on a tab strip docks it *while the pointer is still
+    down*, which unmounts the `FloatWindow` doing the dragging; tearing a tab
+    off unmounts the tab that started it. Whatever holds the pointer listeners
+    therefore has to outlive both ends of the gesture, and this component --
+    which owns `useDock` and is mounted for as long as the console is -- is the
+    lowest place in the tree that does. See `useDockDrag` for the two designs
+    that were costed against this one.
+  */
+  const drag = useDockDrag(dock);
   const { run, loading, hour, setHour, selectedId, setSelectedId } = state;
 
   const [toggles, setToggles] = useState<LayerToggles>(DEFAULT_TOGGLES);
@@ -370,7 +382,9 @@ export default function ConsoleShell() {
        * workspace row: left dock | map | right dock
        * ============================================================ */}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        {!narrow && <DockRail side="left" dock={dock} render={renderPanel} />}
+        {!narrow && (
+          <DockRail side="left" dock={dock} drag={drag} render={renderPanel} />
+        )}
 
         {/* The map, mounted once. A flex column so the workspace inside takes
             its height by `flex-1`; never height-by-content, which collapses to
@@ -402,7 +416,9 @@ export default function ConsoleShell() {
           once, for every viewport, so a narrow console now has one mechanism
           rather than a miniature of a mechanism it cannot use.
         */}
-        {!narrow && <DockRail side="right" dock={dock} render={renderPanel} />}
+        {!narrow && (
+          <DockRail side="right" dock={dock} drag={drag} render={renderPanel} />
+        )}
       </div>
 
         {/* ========================================================== *
@@ -427,7 +443,7 @@ export default function ConsoleShell() {
 
       {/* Floating windows, above everything but the scanlines. */}
       {dock.floating.map((id) => (
-        <FloatWindow key={id} id={id} dock={dock}>
+        <FloatWindow key={id} id={id} dock={dock} drag={drag}>
           {renderPanel(id)}
         </FloatWindow>
       ))}

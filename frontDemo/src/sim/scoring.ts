@@ -22,7 +22,7 @@ import {
   type FieldAgreement,
   type FieldFrame,
 } from "./drift";
-import { behaviour, trackPath, vesselPrior } from "./ais";
+import { behaviour, trackPath, unknownClassPrior, vesselPrior } from "./ais";
 
 import type {
   AnomalyFlag,
@@ -312,26 +312,36 @@ export function score(input: ScoringInput): ScoringResult {
   // must reach the interface as one.
   let insufficient: ScoringResult["insufficientEvidence"] = null;
 
+  // The number `insufficientEvidence` carries is the *tightest* the backward
+  // field ever gets, because that is the figure the halt notice is arguing
+  // about: if even the best-constrained frame spans this much, nothing inside
+  // it is separable. `drift.convergence` is sorted ascending by hour and the
+  // backward hours are negative, so index 0 is the most-backward and therefore
+  // the widest frame -- the opposite of what is wanted. `deriveAge` in
+  // drift.ts, `panes.tsx` and `reports.tsx` all take the minimum; these
+  // branches used to read [0] and printed a number several times too large
+  // (129.60 km2 against 15.25 on mumbai-null).
+  const tightestArea90Km2 = drift.convergence.length
+    ? drift.convergence.reduce((m, c) => Math.min(m, c.area90Km2), Infinity)
+    : 0;
+
   const gateMultiplier = characterisation.windGateMultiplier;
   if (gateMultiplier < 0.15) {
     insufficient = {
-      area90Km2: drift.convergence[0]?.area90Km2 ?? 0,
+      area90Km2: tightestArea90Km2,
       reason: `Wind ${characterisation.windSpeedMs.toFixed(1)} m/s at the detection centroid puts the gate multiplier at ${gateMultiplier.toFixed(2)}. At this wind the sea is dark whether or not there is oil on it, so no ranking here would mean anything.`,
     };
   } else if (drift.insufficientEvidence) {
     insufficient = drift.insufficientEvidence;
   } else if (rows.length === 0) {
     insufficient = {
-      area90Km2: drift.convergence[0]?.area90Km2 ?? 0,
+      area90Km2: tightestArea90Km2,
       reason:
         "No candidate intersected the origin field anywhere inside the backward horizon.",
     };
   } else if (separability !== null && separability < 0.015) {
     insufficient = {
-      area90Km2: drift.convergence.reduce(
-        (m, c) => Math.min(m, c.area90Km2),
-        Infinity,
-      ),
+      area90Km2: tightestArea90Km2,
       reason: `Top two candidates separated by ${separability.toFixed(3)}. That is inside the noise of the weighting, so neither is distinguished from the other.`,
     };
   }
@@ -602,11 +612,57 @@ function scoreDark(
   const { grids, acquiredAt } = input;
   const gate = input.characterisation.windGateMultiplier;
 
-  // A radar contact is a position at one instant. There is no track, so the
-  // field is sampled at acquisition only, and everything a track would have
-  // supplied is reported as unavailable rather than as zero evidence.
-  const agreement = fieldAgreement(grids, 0, dark.position);
-  const prob = agreement.value;
+  /*
+    A radar contact is a position at one instant, and until 2026-09-05 that was
+    taken to mean the field could only be sampled at acquisition:
+    `fieldAgreement(grids, 0, ...)`, one frame, hour zero.
+
+    That was the wrong frame, and it is worth naming why rather than just
+    changing it. S_drift asks whether this candidate could be where the oil
+    *came from*, which is a question about the backward field. Sampling at hour
+    zero asks whether the contact sits where the oil is *now* -- which is the
+    question `proximity` already answers, from the same geometry.
+
+    `scoreInfrastructure` is the same shape of candidate -- a fixed position,
+    no track -- and it has always swept `-backwardHours..0` and taken the best
+    hour. So the scorer held two fixed-point candidates to two different
+    standards, and the one it treated worse was the unlit contact, which is the
+    entire subject of the scenario it appears in.
+
+    ON THE SHIPPED FIXTURES THIS CHANGES NOTHING, and that is worth stating
+    plainly rather than leaving the reader to assume it fixed something.
+    `dark-01`'s drift is 0.6948 before and after, because hour zero already was
+    its best hour: `informativeness` is `sqrt(INFORMATIVE_AREA_KM2 / area90)`,
+    the backward field is at its tightest at acquisition (7.09 km2 against
+    102.76 at h-28), and the contact sits near the release, so no earlier frame
+    beats it. The sweep is here because the scorer should not hold two
+    fixed-point candidates to two standards, and because a contact placed away
+    from the release in some future scenario would need it. It is not a fix for
+    anything currently visible.
+
+    In particular it does NOT fix `kutch-dark` under the `max` variant. That
+    failure is a different asymmetry and it is still open: a fixed point has one
+    sample, so its `max` and `integral` are necessarily equal, while a vessel's
+    `max` is the densest cell its whole track ever touches. `max` therefore
+    rewards carrying AIS. It cannot be fixed by moving the traffic either --
+    twelve corridor geometries were measured, and every one whose vessels cross
+    the T0 slick (which they must, or the map stops reading as a scene) also
+    puts them in the field peak and loses the contact its first place.
+
+    This now matches `scoreInfrastructure` exactly: sweep the window, take the
+    best hour, report which hour it was.
+  */
+  let prob = 0;
+  let bestHour = 0;
+  let agreement = fieldAgreement(grids, 0, dark.position);
+  for (let h = -backwardHours; h <= 0; h++) {
+    const a = fieldAgreement(grids, h, dark.position);
+    if (a.value > prob) {
+      prob = a.value;
+      agreement = a;
+      bestHour = h;
+    }
+  }
   const km = distanceKm(head, dark.position);
   const proximity = Math.exp(-km / PROXIMITY_LAMBDA_KM);
 
@@ -616,7 +672,7 @@ function scoreDark(
     parity: 0,
     temporality: 1,
     behaviour: 0.45,
-    prior: Math.min(0.8, dark.lengthM / 260),
+    prior: unknownClassPrior(dark.lengthM),
   };
 
   const explanations: TermExplanation[] = [
@@ -624,7 +680,7 @@ function scoreDark(
       key: "drift",
       value: prob,
       weight: WEIGHTS.drift,
-      detail: `At acquisition the contact sits inside the ${agreement.credibleRegionPct.toFixed(0)}% credible region of the field. Without a track there is no earlier position to test.`,
+      detail: `At ${fmtHour(bestHour)} the origin field placed this contact inside its ${agreement.credibleRegionPct.toFixed(0)}% credible region, over ${agreement.area90Km2.toFixed(0)} km2. Without a track this is the field tested against one fixed position, the same treatment an installation gets.`,
       geometry: [dark.position],
     },
     {
@@ -658,9 +714,9 @@ function scoreDark(
     },
     {
       key: "prior",
-      value: Math.min(0.8, dark.lengthM / 260),
+      value: unknownClassPrior(dark.lengthM),
       weight: WEIGHTS.prior,
-      detail: `Radar-estimated length ${dark.lengthM} m. Vessel class unknown.`,
+      detail: `Radar-estimated length ${dark.lengthM} m. Vessel class unknown, so the class term is the mean over the classes that length admits rather than a size-only score.`,
       geometry: null,
     },
   ];

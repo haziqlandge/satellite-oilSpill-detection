@@ -55,6 +55,46 @@ export function vesselPrior(kind: string, lengthM: number): number {
   return Math.min(1, base * 0.78 + size * 0.22);
 }
 
+/**
+ * The same prior for a contact whose class nobody knows.
+ *
+ * A radar bright target has a radar-estimated length and nothing else. Until
+ * 2026-09-05 `scoreDark` scored it as `min(0.8, lengthM / 260)` -- pure size,
+ * no class term at all -- which put it on a different scale from every vessel
+ * it is ranked against, where size carries only 22% and class carries 78%. A
+ * 118 m contact came out at 0.454, *below* an identified 118 m general cargo at
+ * 0.490. The contact was being marked down for the analyst's ignorance.
+ *
+ * The fix keeps the vessel formula and supplies the one missing input honestly:
+ * class is unknown, so the class term is the mean over the classes whose length
+ * range actually admits this contact. That is inference from the one
+ * measurement radar does give, rather than either a guess or a zero.
+ *
+ * What it deliberately does NOT do is treat running dark as itself raising the
+ * prior. That would be the natural way to make an unlit contact score well, and
+ * it would be double counting: absence of AIS is already scored, explicitly and
+ * with its own caveat about regional reception, in the `behaviour` term.
+ */
+export function unknownClassPrior(lengthM: number): number {
+  const admitted = VESSEL_KINDS.filter(
+    (v) => lengthM >= v.lo && lengthM <= v.hi,
+  );
+  // Nothing in the table is this length: fall back to the classes nearest it,
+  // rather than to a constant that would be unrelated to the measurement.
+  const pool = admitted.length
+    ? admitted
+    : [
+        VESSEL_KINDS.reduce((best, v) => {
+          const d = (x: { lo: number; hi: number }) =>
+            Math.max(x.lo - lengthM, lengthM - x.hi, 0);
+          return d(v) < d(best) ? v : best;
+        }, VESSEL_KINDS[0]),
+      ];
+  const base = pool.reduce((s, v) => s + v.prior, 0) / pool.length;
+  const size = Math.min(1, lengthM / 260);
+  return Math.min(1, base * 0.78 + size * 0.22);
+}
+
 /** MMSI masked to its country prefix and check digit, the way the UI shows it. */
 export function maskMmsi(mmsi: string): string {
   return `MMSI ${mmsi.slice(0, 3)}${"•".repeat(5)}${mmsi.slice(-1)}`;
@@ -286,8 +326,34 @@ export function behaviour(
 
   let score = 0;
 
-  // Sustained speed drop against the vessel's own service speed.
-  if (mean > 2 && minRun < mean * 0.72) {
+  /*
+    Sustained speed drop against the vessel's own service speed.
+
+    The threshold was 0.72 -- a 28% reduction -- and at that value this flag
+    was dead code. Censused across all five scenarios, 1096 vessels: two flags
+    fired in the whole fixture set, both `stationary`/`course_change` on
+    gom-berthed's truth, and `speed_drop` fired on nothing at all. That
+    includes gom-moving, where `movingDischarge` plants a 1.6 kn reduction on
+    an 8.0 kn transit *specifically* so this flag has something to find. It
+    reached 0.7912 and missed.
+
+    0.85 -- a 15% sustained reduction -- is set against the noise rather than
+    against any one scenario. AIS speed noise here is 0.16 kn per report and
+    `minRun` averages eight of them, so the sampling sigma of the quantity
+    being tested is 0.16/sqrt(8) = 0.057 kn, 0.7% of an 8 kn transit. 15% is
+    roughly 21 sigma clear of that, and comfortably under the 20% the
+    generator plants. Measured margin on the shipped fixtures: it fires on
+    gom-moving's truth at 0.7912 and on nothing else, the nearest other vessel
+    anywhere being 0.9539.
+
+    `mean` is a whole-window statistic and the discharge is inside it, so a
+    long enough discharge would drag its own baseline down and hide itself.
+    Here the discharge is 3.3% of the window (mean 7.947 against a service
+    speed of 8.0) so it does not matter, but a scenario that discharged for a
+    large fraction of its window would need a transit baseline -- a high
+    percentile of the speed series -- rather than the mean.
+  */
+  if (mean > 2 && minRun < mean * 0.85) {
     const drop = 1 - minRun / mean;
     score += Math.min(0.42, drop * 0.6);
     flags.push({

@@ -613,9 +613,9 @@ export function MapCanvas({
 
     src(SOURCE.axis).setData(collection([line(run.characterisation.medialAxis)]));
 
-    src(SOURCE.infrastructure).setData(
-      collection(run.infrastructure.map((i) => point(i.position, { label: i.label }))),
-    );
+    // Infrastructure is deliberately NOT written here. It carries a `selected`
+    // flag now, so it is rebuilt by the selection effect below instead -- see
+    // the note there for why it is not simply written in both places.
 
     src(SOURCE.targets).setData(
       collection(
@@ -799,7 +799,34 @@ export function MapCanvas({
         ? collection([line(selected.evidence.matchedSegment)])
         : EMPTY,
     );
-  }, [selected, ready]);
+
+    /*
+      Infrastructure is rebuilt here rather than in the scenario effect above,
+      because its features now carry the selection flag the layer's paint reads.
+
+      Writing it in both places was the alternative and it is worse: the two
+      effects would race on a scenario change -- both fire, and whichever runs
+      last wins -- so a run whose new selection happened to be an installation
+      would render selected or unselected depending on effect order, which is
+      exactly the kind of bug that only shows up on one scenario. One writer
+      cannot disagree with itself.
+
+      It is two features. Rebuilding them on every selection change is cheaper
+      than the `feature-state` machinery that would avoid it, which would need
+      stable feature ids on a source that has none.
+
+      `run.infrastructure` is in the dependency list so a scenario change still
+      reaches this; `selected` alone would not, because a new run whose top
+      candidate is the same object identity is not a thing React can see.
+    */
+    src(SOURCE.infrastructure).setData(
+      collection(
+        run.infrastructure.map((i) =>
+          point(i.position, { label: i.label, selected: i.id === selected?.id }),
+        ),
+      ),
+    );
+  }, [selected, ready, run.infrastructure]);
 
   /* --- toggles ----------------------------------------------------- */
 

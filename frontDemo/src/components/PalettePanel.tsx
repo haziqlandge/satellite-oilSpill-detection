@@ -250,6 +250,38 @@ export function PalettePanel() {
                 onChange={(v) => setChannel("b", v)}
               />
             </div>
+
+            {/*
+              The one ink that can be inert, told the same way the sliders are.
+
+              `worldSpec` builds the `basemap-tint` layer only when a world map
+              is up, so under "no world map" this swatch drives a layer that
+              does not exist -- exactly the state the six coastline sliders and
+              the wash-strength slider already own a sentence for. Without this
+              the panel answered six of the seven basemap controls and stayed
+              silent on the seventh, which is the worst of the three options:
+              the operator learns the panel reports inertness and then trusts
+              its silence here.
+
+              Written out rather than shared with `NumberControl`'s note,
+              because there is no shared note mechanism to reach for --
+              `NumberControl` carries a `stored` flag, `FlagControl` carries an
+              `inert` flag, and each renders its own sentence inline. A fourth
+              control type wanting this should be the point at which the three
+              are pulled into one small component, not before.
+
+              The wording is `NumberControl`'s, deliberately: the value is real
+              and kept, and it is what the wash will be drawn in the moment a
+              world map is chosen again. Nothing here is disabled for the same
+              reason nothing there is -- dialling in a tint with no world up is
+              a legitimate thing to do, and a greyed-out control would say the
+              value did not exist.
+            */}
+            {inkField === "basemapTint" && palette.paint.basemap === "none" && (
+              <p className="mt-3 text-[10px]" style={{ color: "var(--warn)" }}>
+                Kept, but not drawn: there is no world map up for it to wash.
+              </p>
+            )}
           </>
         )}
 

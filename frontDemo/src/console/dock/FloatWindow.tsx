@@ -6,19 +6,33 @@
  * is about the *dock* rather than about the window: committing the new position
  * and size to the layout, sending the panel home on a double-click or `Escape`,
  * and raising it above its siblings when it is touched.
+ *
+ * The title-bar drag is now one of those dock-specific behaviours, so it is
+ * handed to `useDockDrag` rather than left to the shell. A window dragged over
+ * a rail's tab strip docks there while the pointer is still down, which
+ * unmounts this component -- so the gesture cannot be owned by anything inside
+ * it. See that hook for the argument in full.
  */
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { FloatShell } from "../../components/FloatShell";
-import { panelDef, type Dock, type PanelId } from "./useDock";
+import {
+  panelDef,
+  type Dock,
+  type DockDrag,
+  type PanelId,
+} from "./useDock";
 
 export function FloatWindow({
   id,
   dock,
+  drag,
   children,
 }: {
   id: PanelId;
   dock: Dock;
+  /** The console's drag controller. See `useDockDrag`. */
+  drag: DockDrag;
   children: ReactNode;
 }) {
   const placement = dock.layout[id];
@@ -26,6 +40,31 @@ export function FloatWindow({
   const box = useRef<HTMLDivElement>(null);
 
   const { close, dock: redock, moveFloat, sizeFloat, raise } = dock;
+  const { startWindow, attach } = drag;
+
+  /* --- the drag controller's two hooks into the window --------------- */
+
+  /**
+   * Both memoised, and for different reasons.
+   *
+   * `onElement` is a callback ref: an unstable identity would make React
+   * detach and re-attach the element on every render, and the controller reads
+   * those calls as the window appearing and disappearing -- which, mid-drag,
+   * is a meaningful event rather than noise.
+   *
+   * `onDragTitle` only needs to be stable to keep `FloatShell`'s own handler
+   * from being rebuilt every render, which is tidiness rather than
+   * correctness. It is memoised anyway so the two sit together and neither
+   * looks like the exception.
+   */
+  const onElement = useCallback(
+    (el: HTMLElement | null) => attach(id, el),
+    [attach, id],
+  );
+  const onDragTitle = useCallback(
+    (e: React.PointerEvent) => startWindow(e, id),
+    [startWindow, id],
+  );
 
   /* --- escape ------------------------------------------------------- */
 
@@ -74,6 +113,8 @@ export function FloatWindow({
         onClose={() => close(id)}
         onTitleDoubleClick={() => redock(id)}
         onPointerDownCapture={() => raise(id)}
+        onDragTitle={onDragTitle}
+        onElement={onElement}
       >
         {children}
       </FloatShell>

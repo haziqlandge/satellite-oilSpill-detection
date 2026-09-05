@@ -503,11 +503,33 @@ export function dataLayers(paint: MapPaint): LayerSpecification[] {
       id: "infrastructure",
       type: "circle",
       source: SOURCE.infrastructure,
+      /*
+        The selected installation has to be findable on the map, and until now
+        it was not.
+
+        `suspect-track` draws the selected candidate's AIS track, and an
+        installation has no track -- `scoreInfrastructure` leaves `Suspect.track`
+        null, correctly, because a fixed platform has no voyage. The
+        consequence was that selecting one changed nothing anywhere on the map:
+        on `gom-platform`, whose rank 1 is an installation and is selected by
+        default, the operator's first sight of the scene was a candidate card
+        with no corresponding mark. Clicking the other installation looked
+        equally inert.
+
+        Selection is therefore expressed here, on the only mark an installation
+        has. Same colour, three properties: a larger radius, a solid rather than
+        washed fill, and a heavier ring. Colour is deliberately not what
+        changes -- `paint.infrastructure` is one token and the palette is
+        editable, so a second token would be one more thing to keep in step, and
+        a hue shift reads as "different kind of thing" where size reads as
+        "this one". The `["case", ["get", …]]` form is the one the `targets`
+        layer above already uses for `matched`.
+      */
       paint: {
-        "circle-radius": 5,
+        "circle-radius": ["case", ["get", "selected"], 8, 5],
         "circle-color": paint.infrastructure,
-        "circle-opacity": 0.25,
-        "circle-stroke-width": 1.4,
+        "circle-opacity": ["case", ["get", "selected"], 0.55, 0.25],
+        "circle-stroke-width": ["case", ["get", "selected"], 2.6, 1.4],
         "circle-stroke-color": paint.infrastructure,
       },
     },

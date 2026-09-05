@@ -220,6 +220,21 @@ export interface ScenarioMeta {
   summary: string;
   /** What this scenario is meant to prove. */
   tests: string;
+  /**
+   * Who the run is supposed to name, in prose, for a reader.
+   *
+   * This is the most falsifiable string in the fixtures and for a long time it
+   * was the only one nothing checked -- `kutch-dark` carried a note saying its
+   * own `expectedTop1` was false under one of the two S_drift variants the
+   * interface exposes, and the build stayed green through two sessions.
+   *
+   * It is prose, so nothing can compare it to a run directly. The claim
+   * underneath it is checked instead, per scenario and per variant, by
+   * `checkExpectation` in `scenarios.ts`: `truth === null` must coincide with a
+   * refusal, and otherwise exactly one candidate carries `isTruth`, it ranks 1,
+   * and the run does not refuse. Dev builds only. If you edit this string so
+   * that it no longer describes that outcome, nothing will tell you.
+   */
   expectedTop1: string;
 }
 

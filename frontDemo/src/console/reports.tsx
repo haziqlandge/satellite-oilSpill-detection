@@ -565,8 +565,27 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
               title={`${stamp(card.originWindow[0])} to ${stamp(card.originWindow[1])}`}
             />
           </div>
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {/*
+          {/*
+            The rank strip and `goto T0` are two rows now, not one.
+
+            They shared a `flex-wrap` row until 2026-09-05. The cost of that was
+            positional: `goto T0` was whatever control the wrap happened to
+            leave it -- the 38th, 26th, 10th, 33rd and 52nd across the five
+            fixtures -- so it landed at a different offset on the last row in
+            each, and an operator who had learned where it was on one scenario
+            had learned nothing about the next. On its own row it is in the same
+            place at every width and in every scene.
+
+            What that costs is one row of height, about 27px, unconditionally --
+            including on `kutch-dark`, where nine rank buttons never wrapped and
+            the row was never a problem. Taken deliberately: the control is
+            worth finding by muscle memory, and the strip below is worth reading
+            as one block rather than as a strip with something else on the end
+            of it.
+          */}
+          {rows.length > 1 && (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {/*
               Two digits on the face, in every scene including a halt.
 
               This row was briefly made to print each candidate's identity under
@@ -576,8 +595,10 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
               rather than just reverted: a masked MMSI is 66-84px against a
               two-digit rank's 33.2px, so at the right dock's 300px floor the
               block went from seven buttons on eight rows to three on
-              *seventeen*, 455px tall, and pushed `goto T0` off the last row
-              onto its own. The pane scrolls, so nothing was lost -- but the
+              *seventeen*, 455px tall. (It also pushed `goto T0` off the last
+              row; that is no longer one of the costs, because `goto T0` now has
+              a row of its own by design -- see the note above.) The pane
+              scrolls, so nothing was lost -- but the
               density is the design here, and it was traded away for a
               distinction a reader can also get by hovering.
 
@@ -588,8 +609,7 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
               narrowed rather than closed, knowingly. ISSUES.md 9.4.3 stays
               open with this as its answer.
             */}
-            {rows.length > 1 &&
-              rows.map((s) => {
+              {rows.map((s) => {
                 const tag = tags.get(s.id);
                 return (
                   <Btn
@@ -606,6 +626,9 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
                   </Btn>
                 );
               })}
+            </div>
+          )}
+          <div className="mt-1 flex">
             {/*
               The origin window runs backward from the acquisition and the
               timeline runs forward from it, so the two meet at exactly one
@@ -622,8 +645,11 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
               the scale.
 
               It lights when the clock is already there, the same idiom the rank
-              buttons beside it use for the open card and the speed buttons use
-              for the running speed. That matters more than it looks: T0 is the
+              strip above uses for the open card and the speed buttons use for
+              the running speed. ("Beside it" until this control was moved onto
+              its own row; the idiom is still shared, it is just no longer
+              demonstrated by adjacency, which is part of what that move cost.)
+              That matters more than it looks: T0 is the
               hour a fresh console opens on, so unlit this control's first press
               would be a visible no-op on a surface whose whole idiom is that
               every control reports. Lit, it is not a dead button -- it is the

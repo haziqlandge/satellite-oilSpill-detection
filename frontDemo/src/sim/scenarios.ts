@@ -69,7 +69,7 @@ export const SCENARIOS: ScenarioListing[] = [
   {
     id: "gom-platform",
     name: "Platform leak",
-    short: "Fixed installation, no vessel within 5 km",
+    short: "Fixed installation, traffic straight over the slick",
     region: "gulf-of-mexico",
     tests: "Infrastructure has to outrank vessels without a special case.",
   },
@@ -352,26 +352,72 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
       name: "Platform leak",
       region: "gulf-of-mexico",
       provenance:
-        "Acquisition time, slick length and suspected-source coordinate from Zhao et al. 2025 Case 1, where no vessel track lay within 5 km. Drift field, AIS traffic and all scores are simulated.",
+        "Acquisition time, slick length and suspected-source coordinate from Zhao et al. 2025 Case 1. Drift field, AIS traffic and all scores are simulated, and the traffic here deliberately departs from the published case: that case reported no vessel track within 5 km, and this one runs a lane straight over the slick so that the platform has to win against vessels rather than by default.",
       acquiredAtIso: "2023-04-09T00:02:00Z",
       centre: [-89.62, 29.06],
       zoom: 10.4,
       sceneId: "S1A_IW_GRDH_1SDV_20230409T000200_GoM",
       place: "the South Pass lease blocks",
       summary:
-        "A 5.5 km banded slick with its northern tip on a platform group, and no vessel track inside the origin field at any backward hour.",
+        "A 5.5 km banded slick with its northern tip on a platform group, lying directly under a transit lane. Seventeen vessel tracks are admitted alongside the two installations, every one of them passing within 200 m of the slick and ten reporting a position inside the detection polygon itself.",
       /*
-        UNTESTED AS CONFIGURED, and left standing for the director rather than
-        quietly rewritten.
+        WHAT THIS SCENARIO NOW ACTUALLY TESTS, and how that was measured.
 
-        Measured on the built run: the spatiotemporal gate considers 180 tracks
-        and admits **zero**, so `run.suspects` holds two rows and both are
-        infrastructure. There is no vessel in the ranking for a platform to
-        outrank, which means this scenario states a collation property it no
-        longer exercises. The corridor rework that cleared the release by 13.3 km
-        is what emptied the gate; putting one lane back inside the origin field
-        would restore the test, but that is a data change needing a land check
-        this codebase carries no geometry for.
+        For three sessions this scenario stated a collation property it did not
+        exercise. The traffic had been pushed 13.3 km clear of the release to
+        protect a "no vessel within 5 km" claim, and the side effect was that
+        the spatiotemporal gate admitted **zero** of 180 tracks: `run.suspects`
+        held two rows, both infrastructure, and there was no vessel in the
+        ranking for a platform to outrank. The scenario proved nothing.
+
+        The director resolved it in the opposite direction to the one the
+        previous note assumed. Rather than restoring a lane just inside the
+        origin field -- which would have admitted vessels while keeping them
+        politely distant -- the lane now runs **over the slick**, and the
+        published case's empty 5 km is described as a fact about the paper
+        rather than claimed for this scene. `provenance` says so explicitly.
+        That makes the test harder, not softer: the vessels the platform has to
+        beat are the ones with the best possible proximity evidence.
+
+        Measured on the built run, both drift variants, after the change:
+
+          gate                17 admitted of 178 considered. 178 rather than
+                              the 180 of `vesselCount` because `buildTraffic`
+                              drops any vessel whose transit leaves fewer than
+                              four fixes inside the window
+          suspects            19 rows -- 17 vessels, 2 installations
+          tracks crossing T0  ALL 17 candidates pass within 163 m of the
+                              slick's medial axis; the median is 25 m. Ten of
+                              them report a fix inside the detection polygon
+          the other seven     are an AIS sampling artefact, not a miss. Fix
+                              spacing on these tracks is 474-936 m (median 643)
+                              against a ribbon 170 m wide at the head and 520 m
+                              at the tail, so a vessel can and does step over
+                              the polygon between two reports. `crossing` is
+                              therefore a floor, and the honest statement of
+                              closeness is the 163 m above
+          nearest AIS fix     0.04 km from the release; 40 of the 178 vessels
+                              pass within 5 km of it
+          rank 1              infra-sp-52, under BOTH `integral` and `max`
+          rank 2              a vessel, at 0.4735 (integral) / 0.5588 (max)
+                              against the platform's 0.6787
+          separability        0.2052 (integral) / 0.1199 (max), against the
+                              0.015 floor below which the run refuses
+
+        The margin is what makes this worth keeping: the platform wins on
+        `S_drift` and dwell inside the origin field, which a vessel crossing the
+        slick once cannot match however close it passes. That is the "without a
+        special case" part of `tests`, and it is now a claim with a number
+        behind it rather than an assertion about an empty ranking.
+
+        Robustness, checked rather than assumed: the corridor array's ORDER
+        changes the result, because `buildTraffic` assigns vessels round-robin
+        (`corridors[i % n]`) off one shared RNG stream, so moving a lane
+        re-rolls every vessel in the scene. All four positions for the new lane
+        were run. All four keep the platform at rank 1 under both variants; the
+        one shipped here (index 1) has the widest `max`-variant separability of
+        the four, 0.1199 against 0.0523-0.0952 for the others. A configuration
+        that only passed in one slot would have been a coincidence, not a test.
       */
       tests: "Infrastructure has to outrank vessels without a special case.",
       expectedTop1: "The platform group",
@@ -413,33 +459,51 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
       vesselCount: 180,
       corridors: [
         /*
-          Moved 2026-09-05, and this one was not a cosmetic fault.
+          The offshore lane, 13.3 km south-west of the release and unchanged.
 
-          This lane used to run [-89.95, 29.35] -> [-89.2, 28.8], whose
-          centreline passes **0.76 km** from `GOM_CASE_1` -- the release itself.
-          A third of two hundred and thirty vessels were therefore driven almost
-          exactly over the source, while this scenario states in three separate
-          places that nothing was near it: `short` is "Fixed installation, no
-          vessel within 5 km", `provenance` cites Zhao et al. 2025 Case 1 "where
-          no vessel track lay within 5 km", and `summary` then promised "the
-          nearest vessel track well outside the origin window" -- wording since
-          corrected, because `originWindow` is a *time* range everywhere else in
-          this codebase (`EvidenceCard.originWindow`) and 10,429 of this run's
-          20,471 AIS reports fall inside it.
+          It used to run [-89.95, 29.35] -> [-89.2, 28.8], a centreline 0.76 km
+          from `GOM_CASE_1`, and was moved out here in an earlier pass to
+          protect a "no vessel within 5 km" claim that this scenario no longer
+          makes. It stays where it is anyway, for a reason that survives the
+          claim: it is the scene's *background* traffic. The gate has to have
+          something to reject, and a scenario where every vessel on screen ends
+          up admitted tests filtering no better than one where none does.
 
-          The replacement clears the release by 13.3 km: 5 km plus three sigma
-          of the lateral scatter, sigma being `widthKm / 2`. So the claim holds
-          for the tail of the distribution rather than only for the centreline.
-          Measured on the built run, the nearest track of any of the 180 vessels
-          is 8.15 km off and none comes inside 5 km.
-
-          The cost, which the note here originally got backwards: it is not true
-          that the collation test "only means anything if the vessels really are
-          absent". With the lane this far out the gate admits zero of the 180,
-          so no vessel is scored at all and the platform outranks nothing. See
-          the note on `meta.tests` below.
+          Measured: none of this lane's vessels is admitted. That is the point
+          of it.
         */
         { from: [-90.0, 29.2], to: [-89.25, 28.75], widthKm: 5 },
+        /*
+          THE TRANSIT LANE, and the reason this scenario has a ranking at all.
+
+          Added 2026-09-05 on the director's instruction: the evidence pane was
+          showing two rows, both installations, and clicking either drew nothing
+          on the map because infrastructure carries no track. The cause was
+          upstream of the map -- the gate was admitting zero vessels -- so the
+          fix is here, in the data.
+
+          The centreline passes **25 m** from the slick centroid: it runs the
+          length of the detection polygon rather than near it. 2.62 km from the
+          head, 2.71 km from the tail, 48 km end to end on a bearing of 60
+          degrees, which crosses the slick's 163-degree axis at close to a right
+          angle so the two are legible as separate things on the map.
+
+          Both endpoints were chosen against the coastline, not by eye. The
+          western end sits in open Gulf; the eastern end stops at
+          [-89.4704, 29.1640] because continuing on that bearing runs into the
+          Mississippi delta -- every earlier candidate lane that reached past
+          about longitude -89.46 at this latitude scored 0.5-8.7% land. Checked
+          the way PART 5 of the session notes describes: Esri `World_Ocean_Base`
+          at z=10, classified on `blue - red` with a +12 threshold, calibrated
+          against open Gulf (+64) and New Orleans (-20). **909 samples over the
+          full three-sigma envelope: 0% land.**
+
+          Width 3 km, so sigma is 1.5 km and the lane's vessels are spread
+          +/-4.5 km at three sigma -- wide enough that they do not arrive as a
+          single file over the slick, narrow enough that most of them pass close
+          enough to be admitted.
+        */
+        { from: [-89.8979, 28.9479], to: [-89.4704, 29.1640], widthKm: 3 },
         /*
           Pulled clear of the delta. Running to [-89.15, 29.3] took this lane
           across the bird's-foot: 9% land, with the centreline ashore over its
@@ -449,9 +513,9 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
           Clean to three sigma, and 34 km off the release.
         */
         { from: [-89.95, 28.7], to: [-88.9, 29.0], widthKm: 4 },
-        // Passing traffic, kept outside the 5 km radius the published case
-        // reports as empty. Collation has to rank the platform above these
-        // without a rule that says so.
+        // Passing traffic to the west, 11.2 km off the release. Collation has
+        // to rank the platform above these without a rule that says so -- and
+        // now also above the transit lane above, which is the harder half.
         { from: [-89.80, 29.30], to: [-89.66, 28.88], widthKm: 2.0 },
       ],
     },
@@ -479,15 +543,52 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
         "A 9 km trail in the approaches to the Gulf of Kutch. A radar bright target sits at the head of it, in a working lane, carrying no AIS report of its own.",
       tests: "A candidate with no identity is ranked and never named.",
       /*
-        FALSE UNDER THE `max` VARIANT, and left standing for the director.
+        STILL FALSE UNDER THE `max` VARIANT. Left standing deliberately, and the
+        diagnosis is now much sharper than it was.
 
         Under `integral` this holds: `dark-01` ranks 1 at 0.6390 with the next
         candidate at 0.5422. Switch S_drift to `max` -- which the interface lets
-        a reader do -- and the dark contact falls to rank 3 behind a 32 m tug at
+        a reader do -- and the contact falls to rank 3 behind a 32 m tug at
         0.6572, the top-two margin drops to 0.0058, and the run trips the
-        separability branch and reports insufficient evidence instead. Same root
-        cause as the summary above: corridor 3 puts identified traffic through
-        the origin field peak, and `max` rewards exactly that.
+        separability branch and reports insufficient evidence instead.
+
+        This was treated as a corridor-placement problem for two sessions. It is
+        not one. Twelve geometries were measured on 2026-09-05, including one
+        that fixes `max` outright in all three corridor slots: the requirement
+        that fails is not "traffic is too close to the release" but "a fixed
+        point cannot win under a rule that scores tracks by their best cell".
+        `dark-01` has one sample, so its max and its integral are the same
+        number; a vessel's max is the densest cell anywhere along it. Any lane
+        whose vessels cross the slick -- and they must, or the map stops showing
+        an attribution problem -- puts them in the field peak. The corridor note
+        above carries the measurements.
+
+        THE PRIOR LEVER WAS PULLED ON 2026-09-05 AND IS NOT ENOUGH. `scoreDark`
+        used to score `prior` as `min(0.8, lengthM/260)` -- pure size, where a
+        vessel's prior is 78% class and 22% size -- giving a 118 m contact
+        0.4538, below an identified 118 m general cargo at 0.4898. That was a
+        real defect and it is fixed: `unknownClassPrior` now applies the vessel
+        formula with the class term averaged over the classes the measured
+        length admits. For this contact that is General cargo alone, so it lands
+        on exactly 0.4898, the same prior the one class it could be would get.
+
+        The effect is real but small. `dark-01` goes 0.6390 -> 0.6419 and the
+        `integral` margin widens 0.0968 -> 0.0997. Under `max` it stays rank 3,
+        because the gap to close is 0.0153 on a term weighted 0.08: **the prior
+        would have to be 0.6811** to take first place. There is no honest route
+        to that number. The obvious argument for one -- that running dark is
+        itself suspicious -- is already spent, explicitly, in the `behaviour`
+        term, and spending it twice is double counting.
+
+        So one lever remains, and it is the one that re-scores everything:
+        `max` reduces a track by its single densest cell and a point by its only
+        cell. Changing that is a director decision about the scoring model, not
+        a tidy-up.
+
+        Nothing compares this string to anything -- it is prose. What sits under
+        it IS now checked: `checkExpectation` below fires on this scenario under
+        `max`, by design, so the failure is visible in any dev console instead
+        of only in this comment. See the note on the field in `types.ts`.
       */
       expectedTop1: "An unlit radar contact, unnamed",
     },
@@ -542,11 +643,13 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
         two sigma of the scatter `buildTraffic` applies. They keep the three
         roles: c1 is the gulf trunk running the length of the funnel, c2 comes
         in off the Arabian Sea through the mouth, and c3 is the local lane that
-        passes the release -- 2.1 km off it, closer than any corridor in the old
-        set, so the gate still has to filter traffic that genuinely could have
-        been the source. c1 and c2 pass at 13.8 and 8.1 km; the old set sat at
-        5.8 and 2.8, so the scene is slightly less crowded at the release than
-        it was, which is the price of the south shore being where it is.
+        passes the release, so the gate still has to filter traffic that
+        genuinely could have been the source. c1 and c2 pass at 13.8 and 8.1 km;
+        the old set sat at 5.8 and 2.8, so the scene is slightly less crowded at
+        the release than it was, which is the price of the south shore being
+        where it is. Moving c3 further out was attempted on 2026-09-05 and
+        reverted; the note on it records what that cost and why the trade is not
+        available.
 
         HOW TO CHECK A CORRIDOR, since the project carries no land data
 
@@ -563,25 +666,54 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
         { from: [68.85, 22.5], to: [70.05, 22.68], widthKm: 5 },
         { from: [68.88, 22.8], to: [69.55, 22.48], widthKm: 5 },
         /*
-          The local lane, and the one that gives the gate its work. Its
-          centreline passes 2.27 km off the release.
+          THE LOCAL LANE, and the one that gives the gate its work. Its
+          centreline passes 2.27 km off the release, and 27 of its 36 admitted
+          tracks cross the T0 detection polygon -- which is the point of it, and
+          the constraint that decided the attempt described below.
 
-          The note that used to sit here said this distance was chosen so the
-          lane would not contradict `meta.summary`'s "no AIS report anywhere
-          near". That reasoning was wrong, and measuring the built run is how it
-          was caught: `buildTraffic` scatters each vessel laterally by
-          `rng.normal() * widthKm * 0.5`, so sigma here is 1.75 km and 2.27 km is
-          1.3 sigma -- well inside the traffic, not clear of it. What the run
-          actually contains is a nearest AIS report 248 m from the bright target,
-          a nearest track 70 m from it, 8 reports inside 500 m from 5 vessels,
+          `buildTraffic` scatters each vessel laterally by
+          `rng.normal() * widthKm * 0.5`, so sigma here is 1.75 km and 2.27 km
+          is 1.3 sigma -- well inside the traffic, not clear of it. What the run
+          contains is a nearest AIS report 248 m from the bright target, a
+          nearest track 70 m from it, 8 reports inside 500 m from 5 vessels,
           33 inside 1 km from 13, and 135 inside 2 km from 29.
 
-          The summary now states what is true -- the target carries no AIS report
-          of its own, in a lane that is busy -- rather than claiming an empty sea.
-          Moving the lane is still open: at 2.27 km it is close enough that under
-          the `max` S_drift variant identified traffic outranks the dark contact
-          (see the note on `expectedTop1`). Any replacement has to be land-checked
-          against the basemap raster, per the method recorded above.
+          MOVING THIS LANE WAS TRIED ON 2026-09-05 AND REVERTED. Recorded in
+          full, because the next person to look at `expectedTop1` will have the
+          same idea.
+
+          The brief was to move the lane clear of the origin field so the
+          scenario would stop failing its own `expectedTop1` under the `max`
+          S_drift variant. That is achievable: a lane at
+          `[69.38, 22.35] -> [69.62, 22.70]`, widthKm 2.6, is 0% land over
+          17806 samples and keeps `dark-01` first under both variants in all
+          three corridor slots, with margins of 0.287 to 0.351 against the 0.015
+          halt floor. It was built, measured, and thrown away, because it also
+          moved every AIS line off the oil: nearest report 248 m -> 863 m,
+          nothing at all inside 500 m, and no track crossing the slick. The
+          director rejected it on sight, and was right to -- the lines running
+          over the slick is what makes this a scene rather than a scatter plot.
+
+          Twelve geometries were measured in total. THE TWO REQUIREMENTS ARE
+          MUTUALLY EXCLUSIVE AT THE DATA LEVEL, and the reason is in the scorer,
+          not here: the slick sits inside the origin field, so a lane whose
+          vessels cross the slick necessarily puts them in the field peak, and
+          under `max` a vessel is scored by the densest cell its track ever
+          touches while `dark-01` is one fixed point whose max and integral are
+          equal. Every crossing candidate measured -- 13 to 28 crossing tracks
+          -- loses the contact its first place under `max`. Every candidate that
+          holds first place crosses nothing.
+
+          So the lane stays where it is, and the `max` failure is left standing
+          as a scorer question. See the note on `expectedTop1`, and the long
+          note in `scoreDark` in `scoring.ts`.
+
+          Any replacement still has to be land-checked against the basemap
+          raster, per the method recorded above -- and sampled at or below the
+          z=10 pixel size. Two candidates in this round measured 0% land on a
+          900-sample envelope grid and 0.08-0.09% at 150 m spacing: the coarse
+          grid had stepped over a single 400 m islet at [69.404, 22.528], and it
+          sat at 1.3-1.6 sigma, not out in the tail where it could be waved off.
         */
         { from: [69.24, 22.34], to: [69.68, 22.7], widthKm: 3.5 },
       ],
@@ -759,7 +891,68 @@ export function buildRun(id: ScenarioId, variant: DriftVariant = "integral"): Ru
 
   const run = assemble(id, variant);
   cache.set(key, run);
+  // Cast rather than pulling in `vite/client`: those ambient types also declare
+  // every asset import in the project, and widening global type resolution to
+  // switch on one boolean is a poor trade.
+  if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) {
+    checkExpectation(id, variant, run);
+  }
   return run;
+}
+
+/*
+ * The falsifiable half of `meta.expectedTop1`.
+ *
+ * `expectedTop1` is prose -- "The platform group", "Nobody. Insufficient
+ * evidence." -- so nothing can compare it to a run. It had no consumer at all,
+ * which is how `kutch-dark` was able to carry a note saying its own expectation
+ * was false under one of the two variants the interface exposes, for two
+ * sessions, with a clean build the whole time. The most falsifiable string in
+ * the file was the one thing nothing checked.
+ *
+ * What IS machine-checkable is the claim underneath the prose, and it needs no
+ * new field because `truth` and `isTruth` already carry it:
+ *
+ *   truth === null  =>  the run must refuse, and name nobody
+ *   truth !== null  =>  exactly one candidate is the truth, it ranks 1, and the
+ *                       run does not refuse
+ *
+ * This runs per scenario AND per variant, because a variant switch is a reader
+ * action and the failure it caught was variant-only. Dev builds only: it is a
+ * tripwire for whoever is editing the fixtures, not a runtime guard, and a
+ * scenario that trips it is still rendered so the failure can be looked at.
+ */
+function checkExpectation(id: ScenarioId, variant: DriftVariant, run: Run) {
+  const halted = run.drift.insufficientEvidence !== null;
+  const truthRows = run.suspects.filter((s) => s.isTruth);
+  const say = (msg: string) =>
+    console.warn(
+      `[scenario] ${id}/${variant} contradicts meta.expectedTop1 ` +
+        `(${JSON.stringify(SPECS[id].meta.expectedTop1)}): ${msg}`,
+    );
+
+  if (run.truth === null) {
+    if (!halted) say("ground truth is nobody, but the run did not refuse");
+    if (truthRows.length) say(`${truthRows.length} candidates are flagged isTruth`);
+    return;
+  }
+  if (truthRows.length !== 1) {
+    say(`expected exactly one isTruth candidate, found ${truthRows.length}`);
+    return;
+  }
+  if (halted) {
+    say(
+      `the run refused (${run.drift.insufficientEvidence!.reason}) although ` +
+        `there is a ground truth to name`,
+    );
+  }
+  if (truthRows[0].rank !== 1) {
+    say(
+      `truth ${truthRows[0].label} ranks ${truthRows[0].rank}, behind ` +
+        `${run.suspects[0].label}; separability ` +
+        `${run.separability === null ? "n/a" : run.separability.toFixed(4)}`,
+    );
+  }
 }
 
 function assemble(id: ScenarioId, variant: DriftVariant): Run {

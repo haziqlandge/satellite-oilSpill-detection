@@ -4,8 +4,28 @@
     {
       "name": "frontDemo",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "frontDemo"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "frontDemo"
+      ],
       "port": 5180,
+      "autoPort": true
+    },
+    {
+      "name": "frontDemo-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "preview",
+        "--prefix",
+        "frontDemo",
+        "--",
+        "--port",
+        "5190"
+      ],
+      "port": 5190,
       "autoPort": true
     }
   ]

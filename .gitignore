@@ -50,3 +50,9 @@ outputs/
 
 # --- frontend scratch ---
 frontDemo/.tmp/
+
+# Superseded component snapshots. Not gitignoring this is not only a
+# housekeeping matter: Tailwind v4 scans it, so a removed component in here
+# still emits utilities into the shipped CSS. See the reduced-motion note in
+# frontDemo/src/index.css.
+frontDemo/.backup/
