@@ -51,7 +51,7 @@ not do.
 | Regions | **Dual** — Gulf of Mexico (real AIS, published ground truth) + Indian waters (synthetic AIS demo) |
 | Stack | FastAPI + PostGIS backend; React + MapLibre + deck.gl frontend |
 | Database hosting | **Supabase** (`oilSpill-Detect`), decided 2026-08-28. Trade-offs in `scripts/SETUP_DATABASE.md` |
-| Training machine | RTX 4060 Ti, 16 GB. See PHASE-02 for batch sizing |
+| Training machine | **RTX 5070 Ti laptop, 12 GB** (sm_120) + Core Ultra 9 275HX. See PHASE-02 for batch sizing |
 
 ## Documents
 
@@ -103,6 +103,30 @@ implementation does.
 `frontDemo/` is a five-direction landing-page layout study (Vite + React + anime.js). It is
 design exploration feeding **PHASE-07**, not PHASE-07 itself, and it is owned by a separate
 session. See `frontDemo/README.md`. Do not edit it from the backend track.
+
+## Machine limits and the interactive runner (updated 2026-09-01)
+
+Set by the user. Full detail in `CONSTRAINTS.md` and the top of `HANDOFF.md`.
+
+- **CPU 80% max** — enforced by `cap_cpu()` in-process, pinned to the **E-cores**.
+  Percentage alone is not enough: the core *type* is what drives temperature.
+- **RAM 24 GB hard, machine-wide** — an absolute figure, not a fraction. `workers=2`.
+- **GPU about 80%, training process only** — 80% CUDA-memory fraction plus an ~80%
+  in-process duty cycle.
+- **Pause at 90 C**, resume at 80 C. The GPU guard is automatic; CPU is checked in
+  Armoury Crate after every completed epoch because the shell sensor is unavailable.
+- **Re-optimisation is done.** `cache="disk"` cut cell time 57%; pre-resizing the oversized
+  cache entries then cut per-image load 13.66 ms -> 1.43 ms and freed 12.4 GB. Measured
+  operating point: `workers=2, batch=8`; completed cells currently measure a median
+  1.66 min/epoch.
+- **The interactive runner exists** — `run.bat` + `scripts/progress.py`.
+- **The overfitting question is answered: 60 epochs UNDER-trains.** Do not shorten the
+  screening depth; see PHASE-02.
+
+> **Stopped 2026-09-02:** the grid is 3/12 complete and `L3-ciou` has a verified resumable
+> checkpoint at 43/60. The latest session stopped at the requested Codex usage reserve. During epoch 8 the CPU
+> reached 91 C; only the training tree was paused and it resumed after Armoury Crate showed
+> 65 C. Do not resume automatically. See the state header at the top of `HANDOFF.md`.
 
 ## Reading rule
 

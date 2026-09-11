@@ -104,6 +104,19 @@ def find_gpt(explicit: Path | str | None = None) -> Path:
     )
 
 
+def partial_target(target: Path) -> Path:
+    """Where gpt actually writes, before a completed run claims the final name.
+
+    The suffix is preserved (`scene_s0db.partial.tif`, not `scene_s0db.tif.partial`)
+    because SNAP's GeoTIFF writer **appends** the format extension when the given
+    filename does not already end in one -- so a `.partial` suffix produced
+    `scene_s0db.tif.partial.tif` on disk and `run_graph` then failed to find its
+    own output. Observed 2026-08-30.
+    """
+
+    return target.with_name(f"{target.stem}.partial{target.suffix}")
+
+
 def build_command(
     gpt: Path,
     source: Path,
@@ -122,7 +135,11 @@ def build_command(
         str(gpt),
         str(graph),
         f"-Psource={source}",
-        f"-Ptarget={target}",
+        # gpt writes to a `.partial` sibling; `run_graph` renames to `target` only
+        # after the CRS and data checks pass. An external kill (which bypasses
+        # every handler here) then leaves a `.partial`, never something that the
+        # "already processed, skip it" path would accept as finished.
+        f"-Ptarget={partial_target(target)}",
         f"-J-Xmx{max_heap_gb}G",
         # Deliberately NOT setting `snap.userdir`. It is SNAP's home directory,
         # not a cache override: pointing it at the output directory scatters
@@ -287,6 +304,9 @@ def run_graph(
 
     executable = find_gpt(gpt)
     target.parent.mkdir(parents=True, exist_ok=True)
+    working = partial_target(target)
+    # A leftover from a previous killed run must never be appended to or reused.
+    _discard_partial(working)
     command = build_command(
         executable, source, target, graph=graph, max_heap_gb=max_heap_gb
     )
@@ -304,7 +324,7 @@ def run_graph(
         # A killed gpt leaves a partial product behind. Callers skip targets that
         # already exist, so leaving it would let a truncated raster be mistaken
         # for a finished one on the next run.
-        _discard_partial(target)
+        _discard_partial(working)
         raise SnapProcessingError(
             f"SNAP graph timed out after {timeout_s}s on {source.name}. "
             "A full IW scene through Refined Lee takes hours; raise timeout_s "
@@ -312,7 +332,7 @@ def run_graph(
         ) from error
 
     if completed.returncode != 0:
-        _discard_partial(target)
+        _discard_partial(working)
         output = f"{completed.stdout or ''}\n{completed.stderr or ''}"
         detail = summarise_snap_failure(output)
         hint = ""
@@ -325,14 +345,14 @@ def run_graph(
             f"SNAP graph failed (exit {completed.returncode}) on {source.name}:\n{detail}{hint}"
         )
 
-    if not target.exists():
+    if not working.exists():
         raise SnapProcessingError(
-            f"SNAP reported success but wrote no output for {source.name} at {target}"
+            f"SNAP reported success but wrote no output for {source.name} at {working}"
         )
 
     epsg: int | None = None
     if verify_crs:
-        ok, description = check_geographic_wgs84(target)
+        ok, description = check_geographic_wgs84(working)
         if not ok:
             # Silent reprojection to a UTM zone is the documented trap: it
             # looks fine and corrupts every pixel<->geo mapping downstream.
@@ -341,9 +361,9 @@ def run_graph(
                 f"EPSG:{EXPECTED_EPSG}. Check the Terrain-Correction mapProjection "
                 "parameter in the graph -- it must be WGS84(DD), not an EPSG string."
             )
-        epsg = read_epsg(target)
+        epsg = read_epsg(working)
 
-        has_data, data_description = check_has_data(target)
+        has_data, data_description = check_has_data(working)
         if not has_data:
             raise SnapProcessingError(
                 f"SNAP wrote {target.name} with valid geometry but no data "
@@ -352,4 +372,6 @@ def run_graph(
                 "because SRTM has no data over water. It must be false here."
             )
 
+    # Every check has passed: claim the final name atomically.
+    working.replace(target)
     return PreprocessResult(source=source, target=target, epsg=epsg)

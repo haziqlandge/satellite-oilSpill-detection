@@ -94,4 +94,5 @@ markers = [
     "gpu: requires a usable CUDA device",
     "network: requires network access",
     "fixture_data: requires downloaded fixture scenes",
+    "slow: builds or runs a real model; minutes not seconds",
 ]

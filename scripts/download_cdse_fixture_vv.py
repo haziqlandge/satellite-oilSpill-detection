@@ -33,7 +33,12 @@ def get_token() -> str:
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
     with urlopen(request, timeout=30) as response:
-        return json.load(response)["access_token"]
+        token = json.load(response)["access_token"]
+    # json.load is typed Any; the annotation says str, so assert it rather than
+    # letting `warn_return_any` be silenced by a cast that checks nothing.
+    if not isinstance(token, str):
+        raise TypeError(f"CDSE returned a non-string access_token: {type(token).__name__}")
+    return token
 
 
 PRODUCTS = (

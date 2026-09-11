@@ -12,7 +12,17 @@
   <node id="Calibration">
     <operator>Calibration</operator>
     <sources><sourceProduct refid="Apply-Orbit-File"/></sources>
-    <parameters><outputSigmaBand>true</outputSigmaBand><outputImageScaleInDb>true</outputImageScaleInDb></parameters>
+    <!-- Calibrate to LINEAR sigma0. The dB conversion happens in LinearToFromdB
+         at the very end of the chain instead; see the comment on that node.
+
+         `outputImageScaleInDb` was previously `true` here and it made no
+         difference whatsoever: measured 2026-08-30 on the Case 1 fixture, a
+         subset calibrated with `true` and one with `false` are byte-identical
+         (min 0.00007, max 0.26983, mean 0.00209 in both). SNAP silently
+         ignored the flag and emitted linear sigma0 either way. It is set
+         explicitly to `false` so the graph states what actually happens rather
+         than asking for something that does not occur. -->
+    <parameters><outputSigmaBand>true</outputSigmaBand><outputImageScaleInDb>false</outputImageScaleInDb></parameters>
   </node>
   <node id="Speckle-Filter">
     <operator>Speckle-Filter</operator>
@@ -45,9 +55,35 @@
          the signal, not the background. -->
     <parameters><mapProjection>WGS84(DD)</mapProjection><pixelSpacingInMeter>10.0</pixelSpacingInMeter><nodataValueAtSea>false</nodataValueAtSea></parameters>
   </node>
+  <node id="LinearToFromdB">
+    <operator>LinearToFromdB</operator>
+    <sources><sourceProduct refid="Terrain-Correction"/></sources>
+    <!-- sigma0 -> dB, LAST in the chain. Decided with the user 2026-08-30;
+         recorded in PLAN/CONSTRAINTS.md.
+
+         The training corpus (Zenodo Parts I-III) is sigma0 in dB, so the model
+         must infer on dB or it trains on a different quantity than it sees at
+         inference. The conversion is placed last, after speckle filtering and
+         terrain correction, for two physical reasons:
+
+         1. Speckle is MULTIPLICATIVE in the linear domain, which is exactly
+            what Refined Lee's local-statistics (coefficient-of-variation)
+            model assumes. A log transform makes the noise additive and
+            invalidates that model, so filtering in dB is statistically wrong.
+         2. Terrain-Correction RESAMPLES. Averaging radar power linearly is the
+            physically correct arithmetic mean; averaging in dB is a geometric
+            mean of power, which biases every interpolated pixel low.
+
+         This deviates from the literal order in P004 section 2.3
+         (calibrate-to-dB, then Refined Lee). In practice that order was never
+         running: SNAP ignored `outputImageScaleInDb`, so the filter has always
+         received linear input. What was actually missing was any dB conversion
+         at all. -->
+    <parameters/>
+  </node>
   <node id="Write">
     <operator>Write</operator>
-    <sources><sourceProduct refid="Terrain-Correction"/></sources>
+    <sources><sourceProduct refid="LinearToFromdB"/></sources>
     <parameters><file>${target}</file><formatName>GeoTIFF-BigTIFF</formatName></parameters>
   </node>
 </graph>

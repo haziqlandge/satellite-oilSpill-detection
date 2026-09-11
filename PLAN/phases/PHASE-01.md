@@ -86,17 +86,24 @@ matching P004 §2.4 (200/2048 train, 25/231 val, 25/231 test).
 
 ## Acceptance criteria
 - [x] All three fixture scenes **fetched** (classic `.SAFE`, `data/raw/sar/safe/`)
-- [ ] All three fixture scenes pre-processed end-to-end — **none complete.** Case 1 ran
-      correctly but exceeded the then-1-hour timeout and was killed; its partial output was
-      deleted. Timeout is now 4 h. Budget hours per scene
-- [ ] Geocoding round-trip < 1 px, asserted in CI
+- [x] All three fixture scenes pre-processed end-to-end — **complete 2026-08-31.** Case 1
+      3.34 GB, Case 2 3.32 GB (54.7 min), Case 3 3.33 GB (59.1 min), all EPSG:4326, all
+      written through the `.partial` name so each passed the CRS and non-zero-data checks
+      before being renamed. ~1 hour per scene on the 5070 Ti at `--max-heap-gb 8`
+- [x] Geocoding round-trip < 1 px, asserted in CI — **met on all three real scenes**:
+      1.30e-10, 1.30e-10 and 1.16e-10 px, ten orders of magnitude inside the requirement.
+      `test_roundtrip_holds_on_a_real_terrain_corrected_scene` is no longer skipped
 - [ ] Coastline overlay aligns visually on all three scenes
-- [ ] Zenodo Parts I/II/III + Refined SOS downloaded and verified — **blocked on disk:
-      91 GB of archives against 59.9 GB free (2026-08-29)**. Downloader and checksum
-      verification are written and tested (`backend/ingest/datasets/zenodo.py`); only the
-      space is missing. Sizes and a suggested order are in `HANDOFF.md`
+- [x] Zenodo Parts I/III + Refined SOS downloaded and verified (2026-08-31). **Part II is
+      deliberately skipped** — decided with the user, because the negative pool it exists to
+      fill is already at target from Part III (see the criterion below). All three fetched
+      records are MD5-verified and extracted (`scripts/extract_zenodo.py`) with counts
+      confirmed: Part I 1,200 img + 1,200 masks, Part III 450 + 450, Refined SOS 8,070 pairs
 - [x] marinecadastre AIS downloaded for the three fixture dates (10 days, `data/raw/ais/`)
-- [ ] Look-alike negative pool assembled at ~10% per split
+- [x] Look-alike negative pool assembled at ~10% per split — **met 2026-08-31 without
+      Part II.** Part III ships 150 `Lookalike` + 150 `No oil` images whose masks are
+      genuinely empty (0 foreground across 80 sampled). Assembled split carries
+      **10.2% / 11.7% / 11.8%** empty labels for train / val / test
 - [ ] Relabelling pass complete on the training positives
 - [ ] SAR Fixed Infrastructure Dataset obtained for the GoM AOI
 

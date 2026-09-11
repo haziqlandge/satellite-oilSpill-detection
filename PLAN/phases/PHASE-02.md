@@ -120,6 +120,62 @@ refuses weights whose class scheme does not match).
   position (guards tile-offset bugs).
 - Inference on a look-alike-only batch returns few or no detections.
 
+## Before running the rest of the grid — ANSWERED 2026-09-01
+
+The 2026-08-31 questions were investigated from the curves already on disk. **Do not re-run
+this investigation.**
+
+### 1. Does 60 epochs overfit? No — it UNDER-trains
+
+| Signal | `L1-ciou` | `baseline-screen` |
+|---|---|---|
+| best mask mAP50-95 at epoch | **59 of 60** | **59 of 60** |
+| val box / seg / cls loss at epoch 60 | all still **falling** | all still **falling** |
+| gain over epochs 50→60 | **+0.0098** | **+0.0119** |
+
+No overfitting signature anywhere: every curve is still improving when training stops.
+
+> **The framing correction matters and is the user's:** the ~1,020 epochs is **15 independent
+> models**, not one model trained for 1,020 epochs. Overfitting is a per-run property, so the
+> only question is whether *one* 60-epoch run on 4,606 images overfits. It does not.
+
+> **Consequence: the screening depth CANNOT be shortened.** Cutting to ~30 epochs was the
+> proposed way to halve the remaining cost. At epoch 30 the models are still climbing steeply
+> (+0.024 over epochs 30→40), so a 30-epoch ranking would rank noise on an unconverged curve.
+> If cost must come down, the lever is the input pipeline (done) or cells — never depth.
+
+### 2. Are the variants separable? L2 is; none and L1 are not
+
+Detrended epoch-to-epoch standard deviation of mask mAP50-95 over the last 10 epochs:
+**±0.0012** (`L1-ciou`) and **±0.0009** (`baseline-screen`).
+
+The `none` vs `L1` difference is **0.00036** — about **a third of one run's own
+epoch-to-epoch jitter**. It is not a difference.
+
+`L2-ciou` completed at mask mAP50-95 **0.19048**, which is **0.00769 below `none-ciou`**
+and **0.00806 below `L1-ciou`**. Both gaps exceed the ~0.004 within-run threshold, so L2
+is materially worse under CIoU in this single-seed screen. This does not substitute for
+multi-seed significance testing, but it is large enough to affect the screening ranking.
+
+**Do not declare a winner from cells differing by less than ~0.004.** If the remaining cells
+land inside ±0.002 of each other, **that is the finding** — report it. `SYNTHESIS.md` §9 Q1
+says explicitly that a negative result is legitimate.
+
+### 3. If cells must be cut
+
+Unchanged from 2026-08-31: L2 and L5 are the positions P004 found best, L4 is the one it
+found *degrades* under MPDIoU, and `none-mpdiou` is the loss-axis control. Cut from the
+middle, and record what was cut and why in `ml/ablation/results.md`.
+
+### 4. Cost, measured rather than assumed
+
+Across the completed timing records at the 2026-09-01 operating point (E-core pinned,
+pre-resized cache), the current median is **1.66 min/epoch**. With 3/12 cells complete and
+`L3-ciou` checkpointed at 43/60, **497 of 720 screening epochs remain, estimated at
+~13.8 active hours**. The
+`--list` estimator now reads `results.csv` instead of the stale 2.5 min/epoch constant, which
+overstated the grid by 40%.
+
 ## Acceptance criteria
 - [ ] Full 12-run ablation complete, table committed to `ml/ablation/results.md`
 - [ ] Shipped variant >= baseline YOLO-seg on multi-class mAP50-95

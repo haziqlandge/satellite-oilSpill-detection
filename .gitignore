@@ -14,6 +14,11 @@ weights/
 *.pth
 *.onnx
 
+# Committed baseline model artifacts used by the reproducible demo/training setup.
+!weights/
+!weights/yolo26n.pt
+!yolo11n-seg.pt
+
 # --- secrets ---
 .env
 .netrc

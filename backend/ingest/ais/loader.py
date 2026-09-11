@@ -11,8 +11,9 @@ from __future__ import annotations
 import csv
 import io
 import zipfile
+from collections import Counter
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TextIO
@@ -114,12 +115,65 @@ def parse_ais_row(row: dict[str, str]) -> AisRecord:
     )
 
 
-def _records_from_text(stream: TextIO) -> Iterator[AisRecord]:
-    for row in csv.DictReader(stream):
-        yield parse_ais_row(row)
+class AisRowError(ValueError):
+    """One provider row could not be parsed, with the row number and value."""
 
 
-def iter_ais_records(path: Path) -> Iterator[AisRecord]:
+@dataclass
+class LoadStats:
+    """Counts for one file read. Skipped rows are reported, never silent.
+
+    A silent drop is the dangerous option: a provider format change would show up
+    as "slightly less traffic in the AOI" rather than as an error, and traffic
+    volume is an input to the attribution scoring.
+    """
+
+    total: int = 0
+    parsed: int = 0
+    skipped: int = 0
+    reasons: Counter[str] = field(default_factory=Counter)
+
+
+def _records_from_text(
+    stream: TextIO,
+    *,
+    strict: bool = False,
+    stats: LoadStats | None = None,
+) -> Iterator[AisRecord]:
+    """Parse rows, optionally tolerating individual malformed ones.
+
+    A real marinecadastre day (AIS_2023_04_09) carries exactly **one** row in
+    8,235,199 whose MMSI is `G338926440` -- the Coast Guard cutter CGC OLIVER
+    HENRY, off Guam. Parsing it strictly aborted the entire national day. One
+    unparseable identifier must not cost 8.2 million good rows, so by default the
+    row is skipped and counted; `strict=True` restores the hard failure for
+    fixtures and regression data, where quiet degradation would be worse.
+    """
+
+    for number, row in enumerate(csv.DictReader(stream), start=1):
+        if stats is not None:
+            stats.total += 1
+        try:
+            record = parse_ais_row(row)
+        except (ValueError, KeyError) as error:
+            problem = AisRowError(f"row {number}: {error} (MMSI={row.get('MMSI')!r})")
+            if strict:
+                raise problem from error
+            if stats is not None:
+                stats.skipped += 1
+                stats.reasons[type(error).__name__] += 1
+            continue
+        if stats is not None:
+            stats.parsed += 1
+        yield record
+
+
+def iter_ais_records(
+    path: Path,
+    *,
+    strict: bool = False,
+    stats: LoadStats | None = None,
+) -> Iterator[AisRecord]:
     """Yield messages from a ``.zip``, ``.zst`` or plain CSV extract.
 
     ZIP archives must contain exactly one CSV payload.  This catches accidental
@@ -133,7 +187,7 @@ def iter_ais_records(path: Path) -> Iterator[AisRecord]:
             if len(members) != 1:
                 raise ValueError(f"expected one CSV in {path.name}, found {len(members)}")
             with archive.open(members[0]) as binary, io.TextIOWrapper(binary, encoding="utf-8-sig") as text:
-                yield from _records_from_text(text)
+                yield from _records_from_text(text, strict=strict, stats=stats)
         return
 
     if suffix == ".zst":
@@ -142,12 +196,12 @@ def iter_ais_records(path: Path) -> Iterator[AisRecord]:
             zstandard.ZstdDecompressor().stream_reader(binary) as decoded,
             io.TextIOWrapper(decoded, encoding="utf-8-sig") as text,
         ):
-            yield from _records_from_text(text)
+            yield from _records_from_text(text, strict=strict, stats=stats)
         return
 
     if suffix == ".csv":
         with path.open(encoding="utf-8-sig", newline="") as text:
-            yield from _records_from_text(text)
+            yield from _records_from_text(text, strict=strict, stats=stats)
         return
 
     raise ValueError(f"unsupported AIS extract {path}; expected .zip, .zst or .csv")

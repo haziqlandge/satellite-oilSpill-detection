@@ -14,6 +14,7 @@ from backend.ingest.sar.preprocess import (
     build_command,
     check_has_data,
     find_gpt,
+    partial_target,
     summarise_snap_failure,
 )
 
@@ -44,7 +45,9 @@ def test_build_command_passes_graph_parameters_and_heap(tmp_path: Path) -> None:
     assert command[0] == str(gpt)
     assert command[1] == str(DEFAULT_GRAPH)
     assert f"-Psource={source}" in command
-    assert f"-Ptarget={target}" in command
+    # gpt writes to `<target>.partial`; `run_graph` renames on success only, so a
+    # killed run cannot leave something the skip-if-exists path treats as done.
+    assert f"-Ptarget={partial_target(target)}" in command
     assert "-J-Xmx6G" in command, "heap must be set explicitly, not left to the SNAP default"
     assert not any("snap.userdir" in part for part in command), (
         "snap.userdir is SNAP's home, not a cache override -- setting it to the output "
@@ -211,3 +214,114 @@ def test_summarise_snap_failure_falls_back_to_the_tail() -> None:
 
     summary = summarise_snap_failure("weird\noutput\nwith no markers")
     assert "output" in summary
+
+
+def test_graph_is_well_formed_xml() -> None:
+    """A malformed graph must fail here, not four hours into a scene.
+
+    Caught for real on 2026-08-30: a `--` inside an XML comment (illegal in XML)
+    made `gpt` die at graph init with an XStream parser trace. Nothing in the
+    suite parsed the graph, so the only way to find it was to start a run.
+    """
+
+    import xml.etree.ElementTree as ElementTree
+
+    ElementTree.parse(DEFAULT_GRAPH)
+
+
+def _graph_chain() -> list[str]:
+    """Node ids in source order, plus the source each node reads from."""
+
+    import xml.etree.ElementTree as ElementTree
+
+    root = ElementTree.parse(DEFAULT_GRAPH).getroot()
+    return [node.get("id", "") for node in root.findall("node")]
+
+
+def test_db_conversion_is_the_last_step_before_write() -> None:
+    """sigma0 -> dB must happen after speckle filtering and terrain correction.
+
+    Speckle is multiplicative in the linear domain, which is what Refined Lee
+    assumes, and Terrain-Correction resamples -- averaging power in dB is a
+    geometric mean and biases interpolated pixels low. Recorded in
+    PLAN/CONSTRAINTS.md, decided with the user 2026-08-30.
+    """
+
+    chain = _graph_chain()
+
+    assert "LinearToFromdB" in chain, "the chain no longer converts sigma0 to dB"
+    assert chain.index("LinearToFromdB") > chain.index("Speckle-Filter")
+    assert chain.index("LinearToFromdB") > chain.index("Terrain-Correction")
+    assert chain[-1] == "Write" and chain[-2] == "LinearToFromdB"
+
+
+def test_write_reads_from_the_db_node() -> None:
+    """Appending a node is not enough -- Write must actually consume it."""
+
+    import xml.etree.ElementTree as ElementTree
+
+    root = ElementTree.parse(DEFAULT_GRAPH).getroot()
+    write = next(n for n in root.findall("node") if n.get("id") == "Write")
+    source = write.find("sources/sourceProduct")
+    assert source is not None
+    assert source.get("refid") == "LinearToFromdB"
+
+
+def test_calibration_does_not_ask_for_db_output() -> None:
+    """`outputImageScaleInDb=true` is silently ignored by SNAP.
+
+    Measured 2026-08-30 on the Case 1 fixture: calibrating a subset with the
+    flag true and with it false produced byte-identical rasters, both linear.
+    The graph must not claim a conversion that does not happen -- the real one
+    is the LinearToFromdB node at the end.
+    """
+
+    import xml.etree.ElementTree as ElementTree
+
+    root = ElementTree.parse(DEFAULT_GRAPH).getroot()
+    calibration = next(n for n in root.findall("node") if n.get("id") == "Calibration")
+    flag = calibration.find("parameters/outputImageScaleInDb")
+    assert flag is not None and (flag.text or "").strip() == "false"
+
+
+def test_run_graph_writes_through_a_partial_name(tmp_path: Path) -> None:
+    """An externally killed run must not leave a file that looks finished.
+
+    Happened for real on 2026-08-30: the batch process was killed 69 minutes into
+    Case 1, leaving a 3.46 GB truncated raster where a complete one is ~5.6 GB.
+    `_discard_partial` only runs on timeout or a non-zero exit -- a SIGKILL to the
+    parent bypasses every handler -- and `preprocess_fixtures.py` skips any target
+    that already exists, so the truncation would have been silently accepted as
+    the finished product.
+
+    Writing to `<target>.partial` and renaming only after the CRS and data checks
+    pass makes the final name unreachable unless the run actually completed.
+    """
+
+    from backend.ingest.sar.preprocess import build_command
+
+    gpt = tmp_path / "gpt.exe"
+    gpt.write_text("")
+    target = tmp_path / "scene_s0db.tif"
+
+    command = build_command(gpt, tmp_path / "in.SAFE", target)
+
+    written = next(arg for arg in command if arg.startswith("-Ptarget="))
+    assert written != f"-Ptarget={target}", (
+        "gpt must write to a partial name; the final name is claimed only on success"
+    )
+    assert ".partial" in written
+    assert written.endswith(".tif"), "SNAP appends the format extension if one is missing"
+
+
+def test_partial_target_keeps_the_extension() -> None:
+    """SNAP appends the format extension if the name lacks one.
+
+    `scene_s0db.tif.partial` became `scene_s0db.tif.partial.tif` on disk, so
+    `run_graph` could not find the file it had just told gpt to write.
+    """
+
+    partial = partial_target(Path("data/processed/sar/scene_s0db.tif"))
+
+    assert partial.suffix == ".tif"
+    assert partial.name == "scene_s0db.partial.tif"

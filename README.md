@@ -30,25 +30,43 @@ See [`RESEARCH/SYNTHESIS.md`](RESEARCH/SYNTHESIS.md) §4.
 
 ## Status
 
-**PHASE-00 complete** — environment, package scaffold, database schema, research corpus.
-No pipeline code yet. Current position and the exact next action: [`HANDOFF.md`](HANDOFF.md).
-
-`frontDemo/` is **SlickTrace**, the demonstration interface feeding PHASE-07 -- a home page
-and an operations console over the same simulation. It has its own
-[README](frontDemo/README.md) and is not part of the pipeline.
+**Updated 2026-09-01.** Current position and the exact next action:
+[`HANDOFF.md`](HANDOFF.md) — read its state header first.
 
 ```
-PHASE-00  scaffold + research corpus          done
-PHASE-01  data acquisition + SAR preprocess   next
-PHASE-02  detection model (YOLO-seg + LSK)
-PHASE-03  characterisation + wind gate
-PHASE-04  met-ocean + drift engine            } independent of 02/03
-PHASE-05  AIS pipeline + synthetic generator  } can run in parallel
-PHASE-06  attribution engine
-PHASE-07  API + visual interface
-PHASE-08  evaluation + validation
-PHASE-09  demo packaging
+PHASE-00  scaffold + research corpus          done, committed
+PHASE-01  data acquisition + SAR preprocess   substantially done, uncommitted
+PHASE-02  detection model (YOLO-seg + LSK)    in progress -- 3 done; L3 at 43/60
+PHASE-03  characterisation + wind gate        not started
+PHASE-04  met-ocean + drift engine            engine done; 3 criteria need a CMEMS account
+PHASE-05  AIS pipeline + synthetic generator  COMPLETE, uncommitted
+PHASE-06  attribution engine                  not started
+PHASE-07  API + visual interface              not started
+PHASE-08  evaluation + validation             not started
+PHASE-09  demo packaging                      not started
 ```
+
+**441 tests pass**, ruff and mypy clean. Everything after PHASE-00 is **uncommitted**.
+
+> **Training is stopped.** `L3-ciou` is checkpointed at 43/60 epochs. Future sessions must retain
+> the process-only CPU/GPU limits and the **90 C pause / 80 C resume** policy. CPU temperature
+> is checked in Armoury Crate after every completed epoch because shell sensor APIs cannot
+> read the CPU die. Full detail is in the state header of [`HANDOFF.md`](HANDOFF.md).
+
+`frontDemo/` is a parallel landing-page layout study feeding PHASE-07; it has its own
+[README](frontDemo/README.md) and is **owned by a separate session — do not edit it from the
+backend track**.
+
+### Running things
+
+```bash
+run.bat
+```
+
+An interactive menu: watch progress, resume the ablation grid, benchmark the input pipeline,
+run tests, check the environment, watch temperatures. It exports the thread caps before
+Python starts, which is load-bearing — the OMP runtime reads them once, at first
+`import torch`.
 
 ---
 
@@ -92,8 +110,21 @@ Heavy dependencies are optional groups so they can fail independently:
 ```
 
 ```bash
-.venv/Scripts/python.exe -m ruff check . && .venv/Scripts/python.exe -m mypy backend
+.venv/Scripts/python.exe -m ruff check . && .venv/Scripts/python.exe -m mypy ml backend scripts
 ```
+
+### Machine limits
+
+This runs on a laptop the user also works on. The limits are **correctness requirements, not
+preferences** — a run that breaches them is a defect regardless of its results. Full detail in
+[`PLAN/CONSTRAINTS.md`](PLAN/CONSTRAINTS.md).
+
+| Resource | Limit | Enforced by |
+|---|---|---|
+| CPU | 80% ceiling; current mask is 16/24 E-cores (67%) | `cap_cpu()`, in-process before workers spawn |
+| RAM | **24 GB absolute**, machine-wide | `RAM_CEILING_GB`; `workers=2` |
+| GPU | about 80%, training process only | 80% CUDA-memory fraction plus an ~80% in-process duty cycle |
+| Temperature | pause at **90 C**, resume at **80 C** | GPU guard plus post-epoch CPU checks in Armoury Crate |
 
 ---
 
