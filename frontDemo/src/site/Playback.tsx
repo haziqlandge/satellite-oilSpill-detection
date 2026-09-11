@@ -44,7 +44,7 @@ export function EventTransport({
   hour: number;
   onChange: (h: number) => void;
 }) {
-  const min = 0;
+  const min = -run.drift.backwardHours;
   const max = run.drift.forwardHours;
 
   const [playing, setPlaying] = useState(false);

@@ -117,6 +117,7 @@ export function Damage({ spill }: { spill: SpillState }) {
                 style={{ borderColor: "var(--line)", height: 420 }}
               >
                 <MapCanvas
+                  showHindcastAreas
                   run={run}
                   paint={paint}
                   hour={horizon}

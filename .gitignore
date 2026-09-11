@@ -42,6 +42,8 @@ frontend/.vite/
 .idea/
 Thumbs.db
 desktop.ini
+.DS_Store
+._*
 
 # --- outputs ---
 runs/

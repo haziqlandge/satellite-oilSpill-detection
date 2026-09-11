@@ -19,11 +19,12 @@
  * cannot see.
  */
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { hrefFor } from "../lib/hash";
 import { stamp } from "../lib/format";
 import { momentAt } from "../lib/playback";
 import { useSpill } from "../lib/spill";
+import { reconstructionRun } from "../lib/reconstruction";
 import { DEFAULT_TOGGLES, type LayerToggles } from "../map/basemap";
 import { REPO_URL } from "../theme";
 import { usePaint } from "../lib/palette";
@@ -35,10 +36,18 @@ import { Workspace } from "./Workspace";
 import { Detect, Drift, Traffic } from "./panes";
 import { Attribute, Evidence, Method } from "./reports";
 import { SpillKey } from "./SpillKey";
+import { SampleImagePanel, useSampleSession } from "./SampleImagePanel";
 import { PanelsMenu } from "./PanelsMenu";
 import { DockRail } from "./dock/DockRail";
 import { FloatWindow } from "./dock/FloatWindow";
 import { PANELS, useDock, useDockDrag, type PanelId } from "./dock/useDock";
+import {
+  type DemoSampleKey,
+  DEMO_PRESETS,
+} from "../site/demoData";
+import { buildRun, scenarioListing, type ScenarioId } from "../sim/scenarios";
+import { isSample } from "../sim/samples";
+import type { Run } from "../sim/types";
 
 /** Layer switches, in the order they stack on the map. */
 const LAYERS: { key: keyof LayerToggles; label: string; hint: string }[] = [
@@ -48,10 +57,16 @@ const LAYERS: { key: keyof LayerToggles; label: string; hint: string }[] = [
   { key: "particles", label: "particles", hint: "the ensemble members themselves" },
   { key: "traffic", label: "ais traffic", hint: "tracks the gate rejected" },
   { key: "candidates", label: "candidates", hint: "tracks that survived the gate" },
+  { key: "darkVessel", label: "dark vessels", hint: "AIS gaps while near the spill field" },
   { key: "targets", label: "radar targets", hint: "bright contacts, matched or dark" },
   { key: "forecast", label: "72 h forecast", hint: "forward impact envelope" },
+  { key: "hindcast", label: "hindcast", hint: "show or hide the persistent hindcast areas before T0" },
   { key: "labels", label: "place labels", hint: "coastline names from the basemap" },
 ];
+
+const SAMPLE_SCENARIOS: Record<DemoSampleKey, ScenarioId> = { sample1: "sample1", sample2: "sample2", sample3: "sample3" };
+
+type DemoMapStage = "idle" | "processing" | "mask" | "complete";
 
 export default function ConsoleShell() {
   // Merged over `SURFACES.console.map` by the colour panel. `MapCanvas` already
@@ -72,10 +87,42 @@ export default function ConsoleShell() {
   */
   const drag = useDockDrag(dock);
   const { run, loading, hour, setHour, selectedId, setSelectedId } = state;
+  const [activeDemoPreset, setActiveDemoPreset] = useState<DemoSampleKey | null>(
+    null,
+  );
+  const [activeDemoRun, setActiveDemoRun] = useState<Run | null>(
+    null,
+  );
+  const scenarioSwitchRef = useRef(0);
+  const sampleSession = useSampleSession();
+  const observedUpload = useRef(0);
+  const completedUpload = useRef(0);
+  const [demoMapStage, setDemoMapStage] = useState<DemoMapStage>("idle");
 
   const [toggles, setToggles] = useState<LayerToggles>(DEFAULT_TOGGLES);
   const narrow = useNarrow();
   const [booting, setBooting] = useState(true);
+  const sourceRun = activeDemoRun ?? run;
+  const activeRun = useMemo(() => sourceRun ? reconstructionRun(sourceRun) : null, [sourceRun]);
+
+  useEffect(() => {
+    if (!activeDemoPreset) {
+      setActiveDemoRun(null);
+      return;
+    }
+    setActiveDemoRun(buildRun(SAMPLE_SCENARIOS[activeDemoPreset], state.variant));
+  }, [activeDemoPreset, state.variant]);
+
+  // Pre-render/cache all three authored sample runs during idle time. They are
+  // never exposed in the picker until their image is uploaded, but switching
+  // between completed samples is then immediate and uses the same full Run
+  // shape as the original cases.
+  useEffect(() => {
+    const warm = window.setTimeout(() => {
+      (Object.keys(SAMPLE_SCENARIOS) as DemoSampleKey[]).forEach((id) => buildRun(SAMPLE_SCENARIOS[id], state.variant));
+    }, 250);
+    return () => window.clearTimeout(warm);
+  }, [state.variant]);
 
   /* --- the one clock ------------------------------------------------ */
 
@@ -84,13 +131,56 @@ export default function ConsoleShell() {
   // every fractional step of a playback for an identical result.
   const rounded = Math.round(hour);
   const moment = useMemo(
-    () => (run ? momentAt(run, rounded) : null),
-    [run, rounded],
+    () => (activeRun ? momentAt(activeRun, rounded) : null),
+    [activeRun, rounded],
   );
 
-  const entries = useEventLog(run, moment);
-  const halt = run?.drift.insufficientEvidence ?? null;
-  const selected = run?.suspects.find((s) => s.id === selectedId) ?? null;
+  useEffect(() => {
+    if (!sampleSession.key || sampleSession.startedAt < scenarioSwitchRef.current || sampleSession.state === "idle") return;
+    setActiveDemoPreset(sampleSession.key);
+    if (observedUpload.current !== sampleSession.startedAt) {
+      observedUpload.current = sampleSession.startedAt;
+      setHour(0);
+    }
+    if (sampleSession.state === "complete") {
+      setDemoMapStage("complete");
+      if (completedUpload.current !== sampleSession.startedAt) {
+        completedUpload.current = sampleSession.startedAt;
+        setHour(-36);
+      }
+    } else {
+      setDemoMapStage(sampleSession.step >= 2 && sampleSession.maskPresented ? "mask" : "processing");
+    }
+  }, [sampleSession.key, sampleSession.startedAt, sampleSession.state, sampleSession.step, sampleSession.maskPresented, setHour]);
+
+  const handleScenarioChange = useCallback((scenario: ScenarioId) => {
+    scenarioSwitchRef.current = Date.now();
+    if (isSample(scenario)) {
+      setActiveDemoPreset(scenario);
+      setActiveDemoRun(buildRun(scenario, state.variant));
+      setDemoMapStage("complete");
+      setHour(-36);
+      return;
+    }
+    setActiveDemoPreset(null);
+    setActiveDemoRun(null);
+    setDemoMapStage("idle");
+    const now = Date.now();
+    scenarioSwitchRef.current = now;
+    state.setScenario(scenario);
+  }, [state]);
+
+  const panelState = useMemo(() => activeRun
+    ? { ...state, run: activeRun, scenario: activeRun.meta.id, listing: scenarioListing(activeRun.meta.id) }
+    : state, [state, activeRun]);
+
+  const entries = useEventLog(activeRun, moment);
+  const halt = activeRun?.drift.insufficientEvidence ?? null;
+  const activeSelected = activeRun
+    ? activeRun.suspects.find((s) => s.id === selectedId) ??
+      activeRun.suspects[0] ??
+      null
+    : null;
 
   /* --- panel keys --------------------------------------------------- */
 
@@ -116,6 +206,13 @@ export default function ConsoleShell() {
   /* --- panel bodies -------------------------------------------------- */
 
   const renderPanel = (id: PanelId) => {
+    if (id === "sampleLab")
+      return (
+        <SampleImagePanel
+          onSelect={handleScenarioChange}
+        />
+      );
+
     if (id === "layers") {
       return (
         <div
@@ -134,7 +231,7 @@ export default function ConsoleShell() {
               <Toggle
                 key={l.key}
                 on={toggles[l.key]}
-                label={l.label}
+                label={l.key === "hindcast" && activeRun ? `−${activeRun.drift.backwardHours} h hindcast` : l.label}
                 title={l.hint}
                 onChange={(v) => setToggles((t) => ({ ...t, [l.key]: v }))}
               />
@@ -158,28 +255,28 @@ export default function ConsoleShell() {
             <br />← → step one hour
           </p>
 
-          {run && (
+          {activeRun && (
             <GroupHead right={<Flag tone="warn">sim</Flag>}>case</GroupHead>
           )}
-          {run && (
+          {activeRun && (
             <div className="mt-1.5 px-2">
               <p
                 className="text-[9.5px] tracking-[0.16em] uppercase"
                 style={{ color: "var(--ink-dim)" }}
               >
-                {state.listing.name}
+                {activeRun.meta.name}
               </p>
               <p
                 className="num mt-0.5 text-[9.5px]"
                 style={{ color: "var(--ink-faint)" }}
               >
-                {run.vessels.length} tracks · {run.suspects.length} cand
+                {activeRun.vessels.length} tracks · {activeRun.suspects.length} cand
               </p>
               <p
                 className="mt-1 text-[9px] leading-[1.5]"
                 style={{ color: "var(--ink-faint)" }}
               >
-                {state.listing.tests}
+                {activeRun.meta.tests}
               </p>
             </div>
           )}
@@ -220,12 +317,33 @@ export default function ConsoleShell() {
       );
     }
 
-    if (!run) return null;
-    if (id === "detect") return <Detect run={run} />;
+    if (id === "modelTiming") {
+      const sample = isSample(activeRun?.meta.id ?? null) ? DEMO_PRESETS[activeRun!.meta.id as DemoSampleKey] : null;
+      const rows = sample?.timings ?? [
+        { label: "Run preparation", durationMs: 840 },
+        { label: "Hindcast ensemble", durationMs: 1840 },
+        { label: "AIS and vessel correlation", durationMs: 920 },
+        { label: "Forecast rollout", durationMs: 1960 },
+        { label: "Evidence and animation", durationMs: 1180 },
+      ];
+      const total = rows.reduce((sum, row) => sum + row.durationMs, 0);
+      return <div data-pane-narrow className="min-h-0 flex-1 overflow-y-auto px-2 py-2" style={SCROLL}>
+        <GroupHead right={<Flag tone="warn">simulated</Flag>}>model train time</GroupHead>
+        <p className="num mt-2 px-2 text-[10px]" style={{ color: "var(--ink-faint)" }}>pipeline timings for {activeRun?.meta.name ?? "current run"}</p>
+        <ul className="mt-2 border" style={{ borderColor: "var(--line)" }}>
+          {rows.map((row) => <li key={row.label} className="flex justify-between gap-3 border-b px-2 py-2 text-[11px]" style={{ borderColor: "var(--line)" }}><span>{row.label}</span><span className="num shrink-0" style={{ color: "var(--accent)" }}>{row.durationMs >= 1000 ? `${(row.durationMs / 1000).toFixed(1)} s` : `${row.durationMs} ms`}</span></li>)}
+          <li className="flex justify-between px-2 py-2 text-[11px] font-medium"><span>Total</span><span className="num">{(total / 1000).toFixed(1)} s</span></li>
+        </ul>
+        <p className="mt-2 px-2 text-[9.5px] leading-[1.5]" style={{ color: "var(--ink-faint)" }}>Timing is simulated for this demonstration; vessel correlation is included in the total.</p>
+      </div>;
+    }
+
+    if (!activeRun) return null;
+    if (id === "detect") return <Detect run={activeRun} />;
     if (id === "drift")
       return (
         <Drift
-          run={run}
+          run={activeRun}
           hour={hour}
           variant={state.variant}
           setVariant={state.setVariant}
@@ -234,16 +352,16 @@ export default function ConsoleShell() {
     if (id === "traffic")
       return (
         <Traffic
-          run={run}
+          run={activeRun}
           moment={moment}
           hour={rounded}
           selectedId={selectedId}
           setSelectedId={setSelectedId}
         />
       );
-    if (id === "attribute") return <Attribute run={run} state={state} />;
-    if (id === "evidence") return <Evidence run={run} state={state} />;
-    return <Method state={state} />;
+    if (id === "attribute") return <Attribute run={activeRun} state={panelState} />;
+    if (id === "evidence") return <Evidence run={activeRun} state={panelState} />;
+    return <Method state={panelState} />;
   };
 
   return (
@@ -314,17 +432,19 @@ export default function ConsoleShell() {
         </span>
 
         <SpillKey
-          scenario={state.scenario}
-          setScenario={state.setScenario}
+          scenario={(activeRun?.meta.id ?? state.scenario) as ScenarioId}
+          setScenario={handleScenarioChange}
           busy={loading}
+          unlockedSamples={sampleSession.completed}
+          onSampleSelect={(id) => handleScenarioChange(id)}
         />
 
-        {run && (
+        {activeRun && (
           <span
             className="num hidden shrink-0 text-[10px] whitespace-nowrap lg:inline"
             style={{ color: "var(--ink-dim)" }}
           >
-            acq {stamp(run.meta.acquiredAt)}
+            acq {stamp(activeRun.meta.acquiredAt)}
           </span>
         )}
 
@@ -394,15 +514,28 @@ export default function ConsoleShell() {
           className="flex min-h-0 min-w-0 flex-1 flex-col"
         >
           <Workspace
-            run={run}
+            run={activeRun}
             paint={paint}
             hour={hour}
-            toggles={toggles}
-            selected={selected}
+            toggles={activeDemoPreset && demoMapStage !== "complete" ? {
+              ...toggles,
+              slick: demoMapStage === "mask",
+              release: false,
+              contours: false,
+              particles: false,
+              traffic: false,
+              candidates: false,
+              darkVessel: false,
+              targets: false,
+              forecast: false,
+              hindcast: false,
+              labels: toggles.labels,
+            } : toggles}
+            selected={activeSelected}
             onSelect={setSelectedId}
-            booting={booting && !!run}
+            booting={booting && !!activeRun && !activeDemoRun}
             onBooted={() => setBooting(false)}
-            loading={loading}
+          loading={loading && !activeDemoRun}
           />
         </div>
 
@@ -424,13 +557,13 @@ export default function ConsoleShell() {
         {/* ========================================================== *
          * foot: the operational timeline. Structural, never a panel.
          * ========================================================== */}
-        {run && (
+        {activeRun && (
           <div
             className="flex shrink-0"
             style={{ height: narrow ? 96 : "clamp(150px, 18vh, 196px)" }}
           >
             <div className="flex min-w-0 flex-1">
-              <Timeline run={run} hour={hour} setHour={setHour} moment={moment} />
+              <Timeline run={activeRun} hour={hour} setHour={setHour} moment={moment} autoPlay={!!activeDemoRun && demoMapStage === "complete"} />
             </div>
           </div>
         )}

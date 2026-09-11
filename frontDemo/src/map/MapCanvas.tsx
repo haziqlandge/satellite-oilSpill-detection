@@ -1,3 +1,4 @@
+import { reconstructionRun } from "../lib/reconstruction";
 /**
  * The map. MapLibre GL JS, driven from the simulation.
  *
@@ -40,6 +41,7 @@ import { ParticleOverlay } from "./ParticleOverlay";
 import type { MapPaint } from "../theme";
 import type { LngLat, Run, Suspect } from "../sim/types";
 import { positionAt } from "../sim/ais";
+import { pointInPolygon, distanceToPathKm } from "../sim/geo";
 
 interface Props {
   run: Run;
@@ -60,6 +62,8 @@ interface Props {
    * not have the hindcast sitting behind it under a different meaning.
    */
   direction?: "both" | "forward";
+  /** Persistent reconstruction checkpoints, independent of playback hour. */
+  showHindcastAreas?: boolean;
   toggles: LayerToggles;
   selected: Suspect | null;
   onSelect?: (id: string | null) => void;
@@ -149,10 +153,11 @@ function isDarkGround(colour: string): boolean {
 }
 
 export function MapCanvas({
-  run,
+  run: sourceRun,
   paint,
   hour,
   direction = "both",
+  showHindcastAreas = false,
   toggles,
   selected,
   onSelect,
@@ -162,6 +167,7 @@ export function MapCanvas({
   camera = null,
   onMap,
 }: Props) {
+  const run = useMemo(() => reconstructionRun(sourceRun), [sourceRun]);
   const holder = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const overlayRef = useRef<ParticleOverlay | null>(null);
@@ -188,6 +194,7 @@ export function MapCanvas({
   } | null>(null);
   const [ready, setReady] = useState(false);
   const [basemapFailed, setBasemapFailed] = useState(false);
+  const layerOpacity = useRef(new Map<string, unknown>());
 
   /* --- instance ---------------------------------------------------- */
 
@@ -274,6 +281,7 @@ export function MapCanvas({
           SOURCE.axis,
           SOURCE.contour,
           SOURCE.forecast,
+          SOURCE.hindcast,
           // Omitted here once, which meant `dataLayers` tried to add the two
           // release layers against a source that did not exist. MapLibre
           // rejects the layer and the whole rest of the load handler unwinds,
@@ -286,6 +294,9 @@ export function MapCanvas({
           SOURCE.targets,
           SOURCE.infrastructure,
           SOURCE.markers,
+          SOURCE.trackingGap,
+          SOURCE.trackingPredicted,
+          SOURCE.trackingMarkers,
         ]) {
           map.addSource(id, { type: "geojson", data: EMPTY });
         }
@@ -393,6 +404,8 @@ export function MapCanvas({
       ["candidates", "line-color", paint.candidate],
       ["suspect-track", "line-color", paint.suspect],
       ["matched-segment", "line-color", paint.suspect],
+      ["hindcast-fill", "fill-color", paint.hindcast],
+      ["hindcast-line", "line-color", paint.hindcast],
       ["forecast-fill", "fill-color", paint.forecast],
       ["forecast-line", "line-color", paint.forecast],
       ["infrastructure", "circle-color", paint.infrastructure],
@@ -632,6 +645,17 @@ export function MapCanvas({
       ]),
     );
 
+    // The same reconstructed frames as the animated cloud, retained at every
+    // playback hour so past and future footprints can be compared together.
+    src(SOURCE.hindcast).setData(collection(
+      run.drift.frames
+        .filter(f => f.hour < 0 && (f.hour % 12 === 0 || f.hour === -run.drift.backwardHours))
+        .flatMap(f => f.contour90.map(ring => ({
+          type: "Feature" as const, properties: { hour: f.hour },
+          geometry: { type: "Polygon" as const, coordinates: [ring] },
+        }))),
+    ));
+
     src(SOURCE.forecast).setData(
       collection(
         run.forwardImpact.map((ring) => ({
@@ -656,7 +680,7 @@ export function MapCanvas({
     overlayRef.current?.setReleaseFrames(
       forwardOnly
         ? []
-        : run.release.map((f) => ({ hour: f.hour, particles: f.particles })),
+        : [],
     );
   }, [run, ready, direction, paint.graticuleStepDeg]);
 
@@ -673,13 +697,15 @@ export function MapCanvas({
     const src = (id: string) => map.getSource(id) as maplibregl.GeoJSONSource;
 
     overlayRef.current?.setHour(hour);
+    overlayRef.current?.setColour(hour < 0 ? paint.hindcast : paint.particle);
+    const fieldColour = hour < 0 ? paint.hindcast : paint.forecast;
+    for (const id of ["contour50-line", "contour90-line"]) if (map.getLayer(id)) map.setPaintProperty(id, "line-color", fieldColour);
+    for (const id of ["contour50-fill", "contour90-fill"]) if (map.getLayer(id)) map.setPaintProperty(id, "fill-color", fieldColour);
 
     // Origin field at this hour. The contours and the particle cloud are the
     // same field shown two ways: the rings say where the credible regions are,
     // the cloud says how the mass is distributed inside them.
-    const frame =
-      run.drift.frames.find((f) => f.hour === Math.round(hour)) ??
-      run.drift.frames[0];
+    const frame = run.drift.frames.find(f => f.hour === Math.round(hour)) ?? run.drift.frames[0];
 
     const rings: GeoJSON.Feature[] = [];
     for (const ring of frame.contour90) {
@@ -705,9 +731,9 @@ export function MapCanvas({
     const releaseFrame =
       run.release.find((f) => f.hour === Math.round(hour)) ?? null;
     src(SOURCE.release).setData(
-      releaseFrame && hour <= 0.5
+      releaseFrame && hour === 0
         ? collection(
-            releaseFrame.extent.map((ring) => ({
+            (run.meta.id.startsWith("sample") ? run.detection.parts : releaseFrame.extent).map((ring) => ({
               type: "Feature",
               properties: { released: releaseFrame.releasedFraction },
               geometry: { type: "Polygon", coordinates: [ring] },
@@ -723,22 +749,37 @@ export function MapCanvas({
     const traffic: GeoJSON.Feature[] = [];
     const candidates: GeoJSON.Feature[] = [];
     const vessels: GeoJSON.Feature[] = [];
+    const trackingGap: GeoJSON.Feature[] = [];
+    const trackingPredicted: GeoJSON.Feature[] = [];
+    const trackingMarkers: GeoJSON.Feature[] = [];
 
     for (const v of run.vessels) {
       const pts = v.points.filter((p) => p.t <= at);
       if (pts.length < 2) continue;
       const coords = pts.map((p) => [p.lon, p.lat] as LngLat);
       const isCandidate = candidateIds.has(v.mmsi);
-      const feature = line(coords, { mmsi: v.mmsi });
-      if (isCandidate) candidates.push(feature);
-      else traffic.push(feature);
-
       const now = positionAt(v, at);
+      const nearField = now ? pointInPolygon(now, run.detection.parts) || distanceToPathKm(now, run.characterisation.medialAxis).km < 12 : false;
+      const dark = isCandidate && nearField && v.points.some((p, i) => i > 0 && p.t - v.points[i - 1].t > 2700_000);
+      const feature = line(coords, { mmsi: v.mmsi });
+      if (isCandidate) candidates.push(feature); else traffic.push(feature);
+      if (dark) for (let i = 1; i < v.points.length; i++) {
+        const a=v.points[i-1], b=v.points[i], gapH=(b.t-a.t)/3600_000;
+        if (gapH <= 0.75 || a.t > at) continue;
+        const pa: LngLat=[a.lon,a.lat], pb: LngLat=[b.lon,b.lat];
+        trackingGap.push(line([pa,pb], {mmsi:v.mmsi}));
+        if (a.t <= at) trackingPredicted.push(line([pa, b.t <= at ? pb : (now ?? pb)], {mmsi:v.mmsi}));
+        trackingMarkers.push(point(pa,{kind:"tracking-off",mmsi:v.mmsi}));
+        if (b.t <= at) trackingMarkers.push(point(pb,{kind:"tracking-on",mmsi:v.mmsi}));
+      }
       if (now && isCandidate) vessels.push(point(now, { kind: "vessel" }));
     }
 
     src(SOURCE.traffic).setData(collection(traffic));
     src(SOURCE.candidates).setData(collection(candidates));
+    src(SOURCE.trackingGap).setData(collection(trackingGap));
+    src(SOURCE.trackingPredicted).setData(collection(trackingPredicted));
+    src(SOURCE.trackingMarkers).setData(collection(trackingMarkers));
 
     src(SOURCE.markers).setData(
       collection([
@@ -747,7 +788,7 @@ export function MapCanvas({
         ...vessels,
       ]),
     );
-  }, [hour, run, ready, candidateIds]);
+  }, [hour, run, ready, candidateIds, paint]);
 
   /* --- camera ------------------------------------------------------ */
 
@@ -834,8 +875,20 @@ export function MapCanvas({
     const map = mapRef.current;
     if (!map || !ready) return;
     const set = (layer: string, on: boolean) => {
-      if (map.getLayer(layer)) {
-        map.setLayoutProperty(layer, "visibility", on ? "visible" : "none");
+      const definition = map.getLayer(layer);
+      if (!definition) return;
+      const before = map.getLayoutProperty(layer, "visibility");
+      const property = definition.type === "fill" ? "fill-opacity" : definition.type === "line" ? "line-opacity" : definition.type === "circle" ? "circle-opacity" : null;
+      if (property && !layerOpacity.current.has(layer)) layerOpacity.current.set(layer, map.getPaintProperty(layer, property) ?? 1);
+      map.setLayoutProperty(layer, "visibility", on ? "visible" : "none");
+      if (on && before === "none" && property && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        map.setPaintProperty(layer, property + "-transition", { duration: 0 });
+        map.setPaintProperty(layer, property, 0);
+        window.requestAnimationFrame(() => {
+          if (!map.getLayer(layer)) return;
+          map.setPaintProperty(layer, property + "-transition", { duration: 700 });
+          map.setPaintProperty(layer, property, layerOpacity.current.get(layer));
+        });
       }
     };
 
@@ -856,8 +909,17 @@ export function MapCanvas({
     set("candidates", toggles.candidates);
     set("suspect-track", toggles.candidates);
     set("matched-segment", toggles.candidates);
+    set("tracking-gap", toggles.darkVessel);
+    set("tracking-predicted", toggles.darkVessel);
+    set("tracking-markers", toggles.darkVessel);
     set("targets", toggles.targets);
     set("infrastructure", toggles.targets);
+    set("markers", detected || toggles.candidates);
+    if (map.getLayer("markers")) map.setFilter("markers", ["in", ["get", "kind"], ["literal", [
+      ...(detected ? ["head", "tail"] : []), ...(toggles.candidates ? ["vessel"] : []),
+    ]]]);
+    set("hindcast-fill", showHindcastAreas);
+    set("hindcast-line", showHindcastAreas);
     set("forecast-fill", toggles.forecast);
     set("forecast-line", toggles.forecast);
     set("labels", toggles.labels);
@@ -866,7 +928,7 @@ export function MapCanvas({
     // is a control that lies about what it controls.
     overlayRef.current?.setVisible(toggles.particles);
     overlayRef.current?.setReleaseVisible(toggles.release);
-  }, [toggles, ready, hour]);
+  }, [toggles, ready, hour, showHindcastAreas]);
 
   /* --- picking ----------------------------------------------------- */
 
@@ -895,6 +957,12 @@ export function MapCanvas({
           an absolutely positioned holder collapses to zero height the moment
           the map initialises. */}
       <div ref={holder} className="h-full w-full" />
+      {showHindcastAreas && (
+        <div className="absolute bottom-10 left-3 z-10 flex gap-4 bg-base-2/90 px-2 py-1 font-mono text-[10px]" aria-label="Area legend">
+          <span style={{ color: paint.hindcast }}>▱ Hindcast · before T0</span>
+          <span style={{ color: paint.forecast }}>▱ Forecast · after T0</span>
+        </div>
+      )}
       {basemapFailed && (
         <div
           className="border-line bg-base-2/90 text-dim absolute bottom-3 left-3 z-10 max-w-[30ch] border px-3 py-2 font-mono text-[10.5px] leading-relaxed backdrop-blur"

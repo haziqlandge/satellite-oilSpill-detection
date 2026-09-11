@@ -1,3 +1,4 @@
+import { reconstructionRun } from "../lib/reconstruction";
 /**
  * The operational timeline.
  *
@@ -68,11 +69,13 @@ export function Timeline({
   hour,
   setHour,
   moment,
+  autoPlay = false,
 }: {
   run: Run;
   hour: number;
   setHour: (h: number) => void;
   moment: Moment | null;
+  autoPlay?: boolean;
 }) {
   const [holder, width] = useWidth<HTMLDivElement>();
   const [playing, setPlaying] = useState(false);
@@ -94,8 +97,7 @@ export function Timeline({
    */
   const spread = useMemo(
     () =>
-      run.drift.frames
-        .filter((f) => f.hour >= 0)
+      reconstructionRun(run).drift.frames
         .map((f) => ({ hour: f.hour, area: f.area90Km2 })),
     [run],
   );
@@ -127,6 +129,7 @@ export function Timeline({
    */
   const marks: Mark[] = useMemo(() => {
     const out: Mark[] = [
+      { hour: -run.drift.backwardHours, label: "hindcast origin", tone: "dim" },
       { hour: 0, label: "sar acquisition", tone: "ok", strong: true },
       { hour: run.drift.forwardHours, label: "forecast horizon", tone: "warn" },
     ];
@@ -134,7 +137,7 @@ export function Timeline({
     // label. The ruler under them already prints the hour, and a label reading
     // "+12 +12h" is the same number twice.
     for (const c of checkpointsFor(run)) {
-      if (c === 0 || c >= run.drift.forwardHours) continue;
+      if (c <= -run.drift.backwardHours || c === 0 || c >= run.drift.forwardHours) continue;
       out.push({ hour: c, label: "", tone: "dim" });
     }
     return out.sort((a, b) => a.hour - b.hour);
@@ -194,7 +197,7 @@ export function Timeline({
 
   // A new run resets the hour in `useRun`; letting playback survive that would
   // leave the transport running against a case the operator did not start.
-  useEffect(() => setPlaying(false), [run]);
+  useEffect(() => setPlaying(autoPlay), [run, autoPlay]);
 
   useEffect(() => {
     if (!playing) return;
@@ -299,7 +302,7 @@ export function Timeline({
   const stepH = h1 - h0 > 96 ? 12 : 6;
   for (let h = Math.ceil(h0 / stepH) * stepH; h <= h1; h += stepH) ruler.push(h);
 
-  const phase = moment ? PHASE_LABEL[moment.phase] : "";
+  const phase = hour < 0 ? "Hindcast reconstruction" : moment ? PHASE_LABEL[moment.phase] : "";
 
   /*
     Which marks get to print their label.

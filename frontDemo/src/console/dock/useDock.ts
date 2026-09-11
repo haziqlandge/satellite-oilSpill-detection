@@ -40,9 +40,11 @@ export type PanelId =
   | "attribute"
   | "evidence"
   | "method"
+  | "sampleLab"
   | "layers"
   | "palette"
-  | "log";
+  | "log"
+  | "modelTiming";
 
 export type DockSide = "left" | "right";
 
@@ -116,9 +118,11 @@ export const PANELS = [
   { id: "attribute", title: "attribute", index: "04", key: "4" },
   { id: "evidence", title: "evidence", index: "05", key: "5" },
   { id: "method", title: "method", index: "06", key: "6" },
+  { id: "sampleLab", title: "add image", index: "//", key: undefined },
   { id: "layers", title: "control attributes", index: "//", key: undefined },
   { id: "palette", title: "colour attributes", index: "//", key: undefined },
   { id: "log", title: "event log", index: "//", key: undefined },
+  { id: "modelTiming", title: "model timing", index: "//", key: undefined },
 ] as const satisfies readonly PanelDef[];
 
 export function panelDef(id: PanelId): PanelDef {
@@ -156,9 +160,11 @@ const DEFAULT_LAYOUT: Record<PanelId, DockPlacement> = {
   attribute: { kind: "dock", side: "right" },
   evidence: { kind: "dock", side: "right" },
   method: { kind: "dock", side: "right" },
+  sampleLab: { kind: "dock", side: "right" },
   layers: { kind: "dock", side: "left" },
   palette: { kind: "dock", side: "left" },
   log: { kind: "dock", side: "left" },
+  modelTiming: { kind: "dock", side: "left" },
 };
 
 /**

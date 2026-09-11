@@ -28,7 +28,8 @@ import {
   type Corridor,
 } from "./ais";
 import { score, type DriftVariant } from "./scoring";
-import { buildSlick, characterise, seedPoints, windGate } from "./slick";
+import { buildSlick, characterise, seedPoints, windGate, type SlickGeometry } from "./slick";
+import { SAMPLE_SPECS, SAMPLE_LISTINGS } from "./samples";
 import type {
   Environment,
   LngLat,
@@ -45,7 +46,7 @@ export interface ScenarioListing {
   id: ScenarioId;
   name: string;
   short: string;
-  region: "gulf-of-mexico" | "indian-waters";
+  region: "gulf-of-mexico" | "indian-waters" | "south-china-sea";
   tests: string;
 }
 
@@ -94,7 +95,8 @@ export const SCENARIOS: ScenarioListing[] = [
  * Scenario definitions
  * ------------------------------------------------------------------ */
 
-interface ScenarioSpec {
+export interface ScenarioSpec {
+  geometry?: SlickGeometry;
   meta: Omit<ScenarioMeta, "acquiredAt"> & { acquiredAtIso: string };
   field: FieldConfig;
   /** Where the oil entered the water, before any drift. */
@@ -189,6 +191,7 @@ const KUTCH: LngLat = [69.42, 22.46];
 const MUMBAI_HIGH: LngLat = [71.62, 19.48];
 
 const SPECS: Record<ScenarioId, ScenarioSpec> = {
+  ...SAMPLE_SPECS,
   "gom-moving": {
     meta: {
       id: "gom-moving",
@@ -984,7 +987,7 @@ function assemble(id: ScenarioId, variant: DriftVariant): Run {
 
   // The ribbon's bearing at acquisition: the bearing it was laid on, rotated by
   // however much the flow sheared it.
-  const geom = buildSlick(
+  const geom = spec.geometry ?? buildSlick(
     {
       source: slickHead,
       axisDeg: spec.slick.axisDeg,
@@ -1342,7 +1345,7 @@ function refineAge(
 export { windGate, circleRing, distanceKm, bearingDeg, positionAt };
 
 export function scenarioListing(id: ScenarioId): ScenarioListing {
-  return SCENARIOS.find((s) => s.id === id) ?? SCENARIOS[0];
+  return [...SCENARIOS, ...SAMPLE_LISTINGS].find((s) => s.id === id) ?? SCENARIOS[0];
 }
 
 /** Clears the memo, used when the scoring variant changes shape. */

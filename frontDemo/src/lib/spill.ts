@@ -83,7 +83,7 @@ function readParam(name: string): string | null {
 }
 
 export function isScenario(v: string | null): v is ScenarioId {
-  return !!v && SCENARIOS.some((s) => s.id === v);
+  return !!v && scenarioListing(v as ScenarioId).id === v;
 }
 
 export function useSpill(

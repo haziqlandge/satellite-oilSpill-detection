@@ -238,7 +238,7 @@ export class ParticleOverlay {
     // forecast is oil.
     if (this.fieldVisible) {
       const field = this.sample(this.frames, false);
-      const subordinate = beforePass && this.releaseVisible;
+      const subordinate = beforePass && this.releaseVisible && this.releaseFrames.length > 0;
       if (subordinate) this.paint(ctx, field, this.colour, 0.16, 1.3, w, h, 2);
       else this.paint(ctx, field, this.colour, 0.3, 1.8, w, h, 1);
     }

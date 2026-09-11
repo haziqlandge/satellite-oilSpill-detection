@@ -70,6 +70,7 @@ export const SOURCE = {
   axis: "slick-axis",
   contour: "origin-contour",
   forecast: "forecast",
+  hindcast: "hindcast",
   release: "release-extent",
   traffic: "ais-traffic",
   candidates: "ais-candidates",
@@ -78,6 +79,9 @@ export const SOURCE = {
   targets: "cfar-targets",
   infrastructure: "infrastructure",
   markers: "markers",
+  trackingGap: "tracking-gap",
+  trackingPredicted: "tracking-predicted",
+  trackingMarkers: "tracking-markers",
 } as const;
 
 /* ------------------------------------------------------------------ *
@@ -345,6 +349,15 @@ export function dataLayers(paint: MapPaint): LayerSpecification[] {
       },
     },
     {
+      id: "hindcast-fill", type: "fill", source: SOURCE.hindcast,
+      paint: { "fill-color": paint.hindcast, "fill-opacity": 0.16 },
+    },
+    {
+      id: "hindcast-line", type: "line", source: SOURCE.hindcast,
+      paint: { "line-color": paint.hindcast, "line-width": 1.3,
+        "line-dasharray": [3, 2], "line-opacity": 0.85 },
+    },
+    {
       id: "forecast-fill",
       type: "fill",
       source: SOURCE.forecast,
@@ -577,9 +590,12 @@ export interface LayerToggles {
   candidates: boolean;
   targets: boolean;
   forecast: boolean;
+  /** Persistent pre-acquisition areas, independently switchable from forecast. */
+  hindcast: boolean;
   labels: boolean;
   /** The release itself, played forward from the first hour of the discharge. */
   release: boolean;
+  darkVessel: boolean;
 }
 
 export const DEFAULT_TOGGLES: LayerToggles = {
@@ -589,7 +605,9 @@ export const DEFAULT_TOGGLES: LayerToggles = {
   traffic: true,
   candidates: true,
   targets: true,
-  forecast: false,
+  forecast: true,
+  hindcast: true,
   labels: true,
   release: true,
+  darkVessel: true,
 };

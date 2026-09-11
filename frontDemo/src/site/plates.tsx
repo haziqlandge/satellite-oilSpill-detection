@@ -25,6 +25,7 @@ import { createTimeline, stagger, svg, utils } from "animejs";
 import { useAnimeScope } from "../lib/motion";
 import { formatHour, relHour } from "../lib/format";
 import { checkpointsFor } from "../lib/playback";
+import { reconstructionRun } from "../lib/reconstruction";
 import {
   forecastHours,
   fieldProjection,
@@ -523,8 +524,9 @@ function StackReadout({
  * nobody asked.
  */
 export function OriginFieldPlate({ run }: { run: Run }) {
+  const display = reconstructionRun(run);
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
-  const hours = useMemo(() => forecastHours(run, 7), [run]);
+  const hours = useMemo(() => [-run.drift.backwardHours, -Math.round(run.drift.backwardHours * 0.66), -Math.round(run.drift.backwardHours * 0.33), ...[-run.drift.backwardHours, -Math.round(run.drift.backwardHours / 2), ...forecastHours(run, 7)]], [run]);
   /**
    * The map, biased to the left of the neat line.
    *
@@ -540,7 +542,7 @@ export function OriginFieldPlate({ run }: { run: Run }) {
    * its ticks and `boundsOf` all still describe the same geography.
    */
   const proj = useMemo(() => {
-    const base = fieldProjection(run, W - M * 2, H - M * 2, hours, 1.2, {
+    const base = fieldProjection(display, W - M * 2, H - M * 2, hours, 1.2, {
       includeTrack: false,
     });
     const dx = base.width * 0.17;
@@ -573,7 +575,7 @@ export function OriginFieldPlate({ run }: { run: Run }) {
   }, [run.meta.id], { backstop: PLATE_BACKSTOP });
 
   const frames = hours
-    .map((h) => ({ hour: h, frame: run.drift.frames.find((f) => f.hour === h) }))
+    .map((h) => ({ hour: h, frame: display.drift.frames.find((f) => f.hour === h) }))
     .filter((x): x is { hour: number; frame: NonNullable<typeof x.frame> } => !!x.frame);
 
   // Two hours carry emphasis, and they are the two ends.
@@ -589,9 +591,9 @@ export function OriginFieldPlate({ run }: { run: Run }) {
   const bestHour = 0;
   const horizonHour = hours[hours.length - 1];
   const hatchFrame =
-    run.drift.frames.find((f) => f.hour === horizonHour) ??
+    display.drift.frames.find((f) => f.hour === horizonHour) ??
     frames[frames.length - 1]?.frame ??
-    run.drift.frames[0];
+    display.drift.frames[0];
 
   const head = proj.toXY(run.characterisation.head);
   const top = run.suspects[0];
@@ -826,6 +828,7 @@ export function OriginFieldPlate({ run }: { run: Run }) {
  * figures can be read against each other hour for hour.
  */
 export function ForecastSpreadPlate({ run }: { run: Run }) {
+  const display = reconstructionRun(run);
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const CW = 920;
   // Matched to the origin-field plate beside it. The two sit on one row and a
@@ -844,13 +847,12 @@ export function ForecastSpreadPlate({ run }: { run: Run }) {
   // The series starts at the pass rather than after it: T0 is the tightest the
   // region ever is, and a curve that starts one step up hides how much of the
   // spreading happens in the first hours.
-  const pts = run.drift.frames
-    .filter((f) => f.hour >= 0)
+  const pts = display.drift.frames
     .map((f) => ({ hour: f.hour, area90Km2: f.area90Km2, spreadKm: f.spreadKm }));
   const hours = pts.length ? pts.map((c) => c.hour) : [0];
   const areas = pts.length ? pts.map((c) => c.area90Km2) : [1];
 
-  const hMin = 0;
+  const hMin = -run.drift.backwardHours;
   const hMax = Math.max(1, Math.max(...hours));
   const aMax = Math.max(...areas) * 1.08;
   const x = (h: number) => L + ((h - hMin) / (hMax - hMin || 1)) * (CW - L - R);
@@ -886,7 +888,7 @@ export function ForecastSpreadPlate({ run }: { run: Run }) {
         viewBox={`0 0 ${CW} ${CH}`}
         className="w-full"
         role="img"
-        aria-label="Area of the 90 per cent forecast region against hours after acquisition"
+        aria-label="Area of the 90 per cent forecast region against hours relative to acquisition"
       >
         <defs>
           <Hatch id={`hz-${uid}`} colour="var(--accent)" gap={6} />

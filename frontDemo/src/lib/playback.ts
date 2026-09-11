@@ -23,6 +23,7 @@ import { distanceKm, pointInPolygon } from "../sim/geo";
 import { positionAt } from "../sim/ais";
 import type { ReleaseFrame } from "../sim/drift";
 import type { LngLat, Run, Vessel } from "../sim/types";
+import { reconstructionRun } from "./reconstruction";
 
 export type EventPhase =
   | "pre"
@@ -130,7 +131,8 @@ export function momentAt(
         run.release[run.release.length - 1] ??
         null);
 
-  const extent = release?.extent ?? [];
+  const displayFrame = reconstructionRun(run).drift.frames.find(f => f.hour === rounded);
+  const extent = displayFrame?.contour90 ?? release?.extent ?? [];
   const candidateIds = new Set(run.suspects.map((s) => s.id));
   const contacts: Contact[] = [];
 
@@ -169,7 +171,7 @@ export function momentAt(
     phase,
     release,
     releasedFraction: release?.releasedFraction ?? 0,
-    areaKm2: release?.areaKm2 ?? 0,
+    areaKm2: displayFrame?.area90Km2 ?? release?.areaKm2 ?? 0,
     sinceStart: hour - run.releaseStartHour,
     contacts,
     inContact: contacts.filter((c) => c.distanceKm <= 0.001).length,
@@ -191,7 +193,7 @@ export function momentAt(
  * marks along it.
  */
 export function eventSpan(run: Run): [number, number] {
-  return [0, run.drift.forwardHours];
+  return [-run.drift.backwardHours, run.drift.forwardHours];
 }
 
 /**
@@ -209,7 +211,7 @@ export function checkpointsFor(run: Run): number[] {
   const steps = run.drift.frames
     .filter((f) => f.hour > 0 && f.hour % 12 === 0)
     .map((f) => f.hour);
-  return [0, ...steps];
+  return [...new Set([-run.drift.backwardHours, ...run.drift.frames.filter((f) => f.hour < 0 && f.hour % 12 === 0).map((f) => f.hour), 0, ...steps])];
 }
 
 /**
@@ -231,9 +233,9 @@ export function checkpointsFor(run: Run): number[] {
  * four-design study. There are two surfaces now and only one of them draws it.)
  */
 export function growthCurve(run: Run): { hour: number; areaKm2: number; released: number }[] {
-  return run.release.map((f) => ({
+  return reconstructionRun(run).drift.frames.map((f) => ({
     hour: f.hour,
-    areaKm2: f.areaKm2,
-    released: f.releasedFraction,
+    areaKm2: f.area90Km2,
+    released: run.release.find(r => r.hour === f.hour)?.releasedFraction ?? 0,
   }));
 }

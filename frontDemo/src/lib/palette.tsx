@@ -181,6 +181,7 @@ export interface MapFlagField {
 
 /** Every colour field on `MapPaint`, in the order the panel lists them. */
 export const MAP_COLOUR_FIELDS = [
+  { key: "hindcast", label: "hindcast field", blurb: "Colour used for the backward drift reconstruction." },
   { key: "slick", label: "the oil itself", blurb:
     "The patch the detector outlined and called an operational discharge." },
   { key: "slickUnknown", label: "oil of unknown origin", blurb:

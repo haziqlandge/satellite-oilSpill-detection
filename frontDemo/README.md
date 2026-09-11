@@ -17,8 +17,7 @@ npm install --prefix frontDemo
 npm run dev --prefix frontDemo
 ```
 
-Opens on port 5180. `.claude/launch.json` defines this as a preview target named
-`frontDemo`.
+Opens on port 5180. Open `http://127.0.0.1:5180/#/console` for the operations console.
 
 ```bash
 npm run build --prefix frontDemo

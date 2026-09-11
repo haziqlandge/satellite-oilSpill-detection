@@ -1,3 +1,4 @@
+import { reconstructionRun } from "../lib/reconstruction";
 /**
  * The three live panes: 01 DETECT, 02 DRIFT, 03 TRAFFIC.
  *
@@ -15,6 +16,8 @@
 
 import { useMemo, type ReactNode } from "react";
 import { SarTile, boundsFor } from "../components/SarTile";
+import { SampleEvidenceImages } from "./SampleImagePanel";
+import { isSample } from "../sim/samples";
 import { distanceKm } from "../sim/geo";
 import { ageStatement, formatHour, stamp } from "../lib/format";
 import { CONTACT_RADIUS_KM, PHASE_LABEL, type Moment } from "../lib/playback";
@@ -68,6 +71,7 @@ export function PaneBody({ children }: { children: ReactNode }) {
 const REGION: Record<string, string> = {
   "gulf-of-mexico": "gulf of mexico",
   "indian-waters": "indian waters",
+  "south-china-sea": "south china sea",
 };
 
 /* ================================================================== *
@@ -108,6 +112,7 @@ export function Detect({ run }: { run: Run }) {
       }
     >
       <PaneBody>
+        {isSample(run.meta.id) && <Block label="Uploaded SAR evidence"><SampleEvidenceImages sample={run.meta.id} /></Block>}
         <Block label="Scene">
           <Row label="scene" value={d.sceneId} />
           <Row label="acq" value={stamp(d.acquiredAt)} />
@@ -255,7 +260,7 @@ export function Detect({ run }: { run: Run }) {
  * ================================================================== */
 
 export function Drift({
-  run,
+  run: sourceRun,
   hour,
   variant,
   setVariant,
@@ -265,14 +270,13 @@ export function Drift({
   variant: DriftVariant;
   setVariant: (v: DriftVariant) => void;
 }) {
+  const run = useMemo(() => reconstructionRun(sourceRun), [sourceRun]);
   const d = run.drift;
   const age = ageStatement(d);
   const rounded = Math.round(hour);
   const frame = d.frames.find((f) => f.hour === rounded) ?? null;
-  // The forward half of the record, filtered exactly as `ConvergencePlot`
-  // filters it, so the endpoints printed beside the plot are the endpoints the
-  // plot drew rather than a second answer to the same question.
-  const forward = useMemo(() => d.frames.filter((f) => f.hour >= 0), [d.frames]);
+  // The complete event record, including the compact hindcast ramp into T0 and the forecast after acquisition.
+  const forward = useMemo(() => d.frames, [d.frames]);
   const first = forward[0] ?? null;
   const last = forward[forward.length - 1] ?? null;
   const next = d.frames.find((f) => f.hour === rounded + 1) ?? null;
@@ -344,14 +348,12 @@ export function Drift({
               max
             </Btn>
           </div>
-          <Note label="ensemble, not a trajectory">
-            Members stepped through perturbed forcing produce a probability field
-            over space and time, in both directions. There is no single track
-            anywhere in this system and the display never draws one: what widens
-            away from the pass is a stack of credible regions, and its width is
-            the answer rather than an error bar on a better one. The hindcast
-            runs the other way and is what the attribution is gated on; the
-            scopes here draw the forecast.
+          <Note label="hindcast reconstruction + forecast">
+            Before T0, the illustrated reconstruction moves from a separate origin
+            into the T0 field, with growth and recession varying by case.
+            The map, scope and area plots share these same
+            frames. After T0, the original forecast is shown. Attribution and
+            age estimates still use the underlying backward probability field.
           </Note>
         </Block>
 
@@ -406,7 +408,7 @@ export function Drift({
               />
             </div>
             <Note label="how to read the scope">
-              One 90% contour per forward hour, faintest at the pass. The filled
+              Contours sampled across hindcast and forecast. The filled
               shape at the centre is the detection itself, drawn for scale — the
               field is read against the slick it came from, not against the
               frame.
@@ -424,7 +426,7 @@ export function Drift({
             }
           >
             <Note>
-              Published as the model emits it, unsmoothed. What it shows is the
+              The illustrated hindcast grows into T0, followed by the original
               forward horizon: how much the region has stopped ruling out by the
               time the forecast runs out.{" "}
               <strong style={{ color: "var(--ink)", fontWeight: 500 }}>

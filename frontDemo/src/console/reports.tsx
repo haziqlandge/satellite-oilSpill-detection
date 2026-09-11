@@ -14,6 +14,8 @@
  */
 
 import { useMemo } from "react";
+import { SampleEvidenceImages } from "./SampleImagePanel";
+import { isSample } from "../sim/samples";
 import {
   KIND_LABEL,
   KIND_SHORT,
@@ -520,6 +522,7 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
       right={<Flag tone={KIND_TONE[selected.kind] ?? "dim"}>{KIND_SHORT[selected.kind]}</Flag>}
     >
       <PaneBody>
+        {isSample(run.meta.id) && <Block label="Image evidence"><SampleEvidenceImages sample={run.meta.id} /></Block>}
         {/*
           "Hypothesis" under halt, and it is the same word 04 uses.
 

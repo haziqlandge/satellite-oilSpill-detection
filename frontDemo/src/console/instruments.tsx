@@ -42,6 +42,7 @@
 
 import { useId, useMemo, type CSSProperties, type ReactNode } from "react";
 import { formatHour, relHour } from "../lib/format";
+import { usePaint } from "../lib/palette";
 import { fieldProjection, forecastHours, ringPath } from "../lib/project";
 import { pathLengthKm } from "../sim/geo";
 import { windGate } from "../sim/slick";
@@ -224,7 +225,7 @@ export function ConvergencePlot({ run }: { run: Run }) {
   const c = useMemo(
     () =>
       run.drift.frames
-        .filter((f) => f.hour >= 0)
+        .filter(() => true)
         .map((f) => ({
           hour: f.hour,
           area90Km2: f.area90Km2,
@@ -285,7 +286,7 @@ export function ConvergencePlot({ run }: { run: Run }) {
       className="mt-1 w-full"
       style={figW(FIG_320)}
       role="img"
-      aria-label={`Area of the 90 percent forecast contour against hours after acquisition, reaching ${last.area90Km2.toFixed(1)} square kilometres at the horizon`}
+      aria-label={`Area of the hindcast reconstruction and forecast contour against hours relative to acquisition, reaching ${last.area90Km2.toFixed(1)} square kilometres at the horizon`}
     >
       <Reticle w={CONV_W} h={CONV_H} stepX={CONV_W / 8} stepY={CONV_H / 4} />
 
@@ -353,7 +354,7 @@ const SPREAD_H = 54;
  * the curve that decides the age.
  */
 export function SpreadPlot({ run, hour }: { run: Run; hour: number }) {
-  const c = run.drift.frames.filter((f) => f.hour >= 0);
+  const c = run.drift.frames.filter(() => true);
   if (!c.length) return null;
 
   const hours = c.map((p) => p.hour);
@@ -373,7 +374,7 @@ export function SpreadPlot({ run, hour }: { run: Run; hour: number }) {
       className="w-full"
       style={figW(FIG_320)}
       role="img"
-      aria-label="Ensemble spread in kilometres against hours after acquisition"
+      aria-label="Ensemble spread in kilometres against hours relative to acquisition"
     >
       <Reticle w={SPREAD_W} h={SPREAD_H} stepX={SPREAD_W / 8} stepY={SPREAD_H / 2} />
       <path d={d} fill="none" stroke="var(--ink-dim)" strokeWidth={1} />
@@ -411,7 +412,7 @@ export function FieldScope({ run, hour }: { run: Run; hour: number }) {
   // Forward, in step with the map and the timeline beside it. The stack now
   // widens away from the pass instead of contracting toward the release; the
   // shape of the argument is the same and its direction is not.
-  const hours = useMemo(() => forecastHours(run, 7), [run]);
+  const hours = useMemo(() => [-run.drift.backwardHours, -Math.round(run.drift.backwardHours / 2), ...forecastHours(run, 5)], [run]);
   const proj = useMemo(
     () => fieldProjection(run, SCOPE, SCOPE, hours, 1.22, { includeTrack: false }),
     [run, hours],
@@ -422,7 +423,7 @@ export function FieldScope({ run, hour }: { run: Run; hour: number }) {
   // frame to be live, and drawing the hindcast ring inside a forward stack puts
   // two opposite meanings in one picture.
   const live =
-    (rounded >= 0
+    (rounded >= -run.drift.backwardHours
       ? run.drift.frames.find((f) => f.hour === rounded)
       : undefined) ?? run.drift.frames.find((f) => f.hour === 0) ?? run.drift.frames[0];
 
@@ -448,7 +449,7 @@ export function FieldScope({ run, hour }: { run: Run; hour: number }) {
       className="mt-1 w-full"
       style={figW(330)}
       role="img"
-      aria-label="Stack of 90 percent credible forecast regions, one per forward hour, widening away from the satellite pass"
+      aria-label="Hindcast reconstruction and forecast contours, matching the animated map"
     >
       <rect width={SCOPE} height={SCOPE} fill="var(--base)" />
       <Reticle w={SCOPE} h={SCOPE} stepX={SCOPE / 8} stepY={SCOPE / 8} />
@@ -860,7 +861,8 @@ export function TrackScope({
   // once. `useId` emits colons, which are legal in an id but not in the
   // fragment syntax of a `url(#...)` reference in every engine.
   const clip = `tsclip-${useId().replace(/:/g, "")}`;
-  const hours = useMemo(() => forecastHours(run, 4), [run]);
+  const paint = usePaint();
+  const hours = useMemo(() => [-run.drift.backwardHours, -Math.round(run.drift.backwardHours / 2), ...forecastHours(run, 4)], [run]);
   // The track *is* framed here, unlike the home page's plate: this instrument
   // exists to show a vessel against a field, and a frame that cut the track off
   // would be hiding the comparison.
@@ -889,23 +891,22 @@ export function TrackScope({
   // is a hindcast, and drawing that ring here would put two opposite meanings
   // in one picture -- the confusion this plot was turned around to end.
   const live =
-    rounded !== null && rounded >= 0
+    rounded !== null && rounded >= -run.drift.backwardHours
       ? (run.drift.frames.find((f) => f.hour === rounded) ?? null)
       : null;
 
   const nowLine =
     rounded === null
       ? null
-      : rounded < 0
-        ? `map at ${formatHour(rounded)} · before this stack`
-        : live
+      : live
           ? `now ${formatHour(rounded)} · 90% ${live.area90Km2.toFixed(0)} km2`
           : `now ${formatHour(rounded)} · outside this stack`;
 
   /* --- which way the oil is going ---------------------------------- */
 
-  const outerFrame = run.drift.frames.find((f) => f.hour === oldest) ?? null;
-  const from = useMemo(() => centroidOf(run.detection.parts), [run]);
+  const originFrame = run.drift.frames.find((f) => f.hour === oldest) ?? null;
+  const outerFrame = run.drift.frames.find((f) => f.hour === newest) ?? null;
+  const from = useMemo(() => originFrame ? centroidOf(originFrame.contour90) : centroidOf(run.detection.parts), [run, originFrame]);
   const to = useMemo(
     () => (outerFrame ? centroidOf(outerFrame.contour90) : null),
     [outerFrame],
@@ -948,7 +949,7 @@ export function TrackScope({
       style={figW(TRACK_FIG)}
       role="img"
       aria-label={
-        `Forward forecast field for scene ${run.meta.id}, ${formatHour(oldest)} to ` +
+        `Hindcast and forecast field for scene ${run.meta.id}, ${formatHour(oldest)} to ` +
         `${formatHour(newest)}, running the same way as the live map. The candidate ` +
         `track is drawn over it, with the segment that fell inside the credible ` +
         `region at a matching hour drawn heavier.`
@@ -973,7 +974,7 @@ export function TrackScope({
                 key={`${h}-${j}`}
                 d={ringPath(ring, proj)}
                 fill="none"
-                stroke="var(--ink-dim)"
+                stroke={h < 0 ? paint.hindcast : paint.forecast}
                 strokeWidth={0.9}
                 opacity={0.34 + i * 0.16}
                 vectorEffect="non-scaling-stroke"
@@ -988,7 +989,7 @@ export function TrackScope({
               key={`live-${j}`}
               d={ringPath(ring, proj)}
               fill="none"
-              stroke="var(--accent)"
+              stroke={live.hour < 0 ? paint.hindcast : paint.forecast}
               strokeWidth={1.3}
               strokeDasharray="4 3"
               vectorEffect="non-scaling-stroke"
@@ -1034,7 +1035,7 @@ export function TrackScope({
                   fill: "var(--warn)",
                 }}
               >
-                DOWNSTREAM
+                T− → T+
               </text>
             </g>
           )}
@@ -1089,7 +1090,7 @@ export function TrackScope({
           line is the only nearby statement of which scene is drawn. */}
       <FigLine
         left={`case ${run.meta.id}`}
-        right={`forecast ${formatHour(oldest)} → ${formatHour(newest)}`}
+        right={`hindcast + forecast ${formatHour(oldest)} → ${formatHour(newest)}`}
         toneRight="warn"
       />
       {nowLine && (
@@ -1128,8 +1129,8 @@ export function TrackScope({
         className="mt-2 text-[10.5px] leading-[1.6]"
         style={{ color: "var(--ink-dim)" }}
       >
-        The forecast field: where the oil is going, running the same direction
-        as the live map.
+        Hindcast and forecast share the live map's hourly geometry and colors:
+        reconstructed history before T0, then forecast after T0.
       </p>
 
       {/*

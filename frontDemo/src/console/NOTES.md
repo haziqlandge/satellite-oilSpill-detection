@@ -70,3 +70,13 @@ Two invariants the rest of the console leans on, both easy to break by accident:
   rail, and reopening mounts a fresh element whose deps have not changed, so the
   effect never re-ran and the panel took the whole viewport. Only the drag writes
   to the DOM now, and React owns the value either side of it.
+
+## September 10 — shared hindcast presentation
+
+`lib/reconstruction.ts` now owns the illustrated negative-hour growth. It uses
+28% of the T0 linear size at the oldest hour (7.84% area), increasing monotonically
+to T0. Forecast frame objects pass through unchanged. Map particles, contours,
+timeline area and Drift panel figures consume this same presentation. The raw
+convergence/grids remain unchanged for attribution. This is an illustrated
+reconstruction, not a claim that reversing diffusion concentrates uncertainty.
+Validated all five scenarios for monotonic growth and unchanged forecast frames.

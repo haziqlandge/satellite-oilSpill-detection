@@ -474,7 +474,8 @@ export function Workspace({
               subject -- the drift and evidence panes are built on it -- it is
               simply not something this map animates through any more.
             */
-            direction="forward"
+            direction="both"
+            showHindcastAreas={toggles.hindcast}
             toggles={toggles}
             selected={selected}
             onSelect={onSelect}

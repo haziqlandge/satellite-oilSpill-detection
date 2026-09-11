@@ -26,7 +26,10 @@ export type ScenarioId =
   | "gom-berthed"
   | "gom-platform"
   | "kutch-dark"
-  | "mumbai-null";
+  | "mumbai-null"
+  | "sample1"
+  | "sample2"
+  | "sample3";
 
 export type SlickClass = "oos" | "slick_unknown";
 
@@ -201,7 +204,7 @@ export interface Suspect {
 export interface ScenarioMeta {
   id: ScenarioId;
   name: string;
-  region: "gulf-of-mexico" | "indian-waters";
+  region: "gulf-of-mexico" | "indian-waters" | "south-china-sea";
   /**
    * The water this scene is in, as a person would name it.
    *

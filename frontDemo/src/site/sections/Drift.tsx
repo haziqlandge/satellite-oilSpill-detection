@@ -115,6 +115,7 @@ export function Drift({ spill }: { spill: SpillState }) {
                 style={{ borderColor: "var(--line)", height: 520 }}
               >
                 <MapCanvas
+                  showHindcastAreas
                   run={run}
                   paint={paint}
                   hour={hour}
@@ -124,7 +125,7 @@ export function Drift({ spill }: { spill: SpillState }) {
                     things on one map and asked the caption to keep them apart.
                     This figure is about where the oil goes.
                   */
-                  direction="forward"
+                  direction="both"
                   /*
                     No traffic and no candidate tracks on this map. This figure
                     is about where the oil goes; twenty-odd AIS lines crossing

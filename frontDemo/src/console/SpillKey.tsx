@@ -14,6 +14,8 @@
  */
 
 import { SCENARIOS, type ScenarioId } from "../sim/scenarios";
+import { SAMPLE_LISTINGS, isSample } from "../sim/samples";
+import type { DemoSampleKey } from "../site/demoData";
 import { Flag } from "./components";
 import { Popover, usePopover } from "./Popover";
 
@@ -21,13 +23,17 @@ export function SpillKey({
   scenario,
   setScenario,
   busy = false,
+  unlockedSamples = [],
+  onSampleSelect,
 }: {
   scenario: ScenarioId;
   setScenario: (id: ScenarioId) => void;
   busy?: boolean;
+  unlockedSamples?: readonly DemoSampleKey[];
+  onSampleSelect?: (id: DemoSampleKey) => void;
 }) {
   const pop = usePopover();
-  const current = SCENARIOS.find((s) => s.id === scenario) ?? SCENARIOS[0];
+  const current = [...SCENARIOS, ...SAMPLE_LISTINGS].find((s) => s.id === scenario) ?? SCENARIOS[0];
 
   return (
     <>
@@ -97,6 +103,23 @@ export function SpillKey({
               </li>
             );
           })}
+          {unlockedSamples?.length ? (
+            <>
+              <li className="mt-1 border-t px-2.5 pt-1.5 text-[9px] tracking-[0.18em] uppercase" style={{ borderColor: "var(--line)", color: "var(--accent)" }}>
+                image reconstructions
+              </li>
+              {SAMPLE_LISTINGS.filter((s) => unlockedSamples.includes(s.id as DemoSampleKey)).map((s) => {
+                const on = s.id === scenario;
+                return <li key={s.id}><button type="button" role="option" aria-selected={on}
+                  onClick={() => { if (isSample(s.id)) onSampleSelect?.(s.id); pop.close(); }}
+                  className="w-full cursor-pointer px-2.5 py-1.5 text-left"
+                  style={{ background: on ? "color-mix(in oklab, var(--accent) 14%, transparent)" : "transparent", boxShadow: on ? "inset 2px 0 0 var(--accent)" : undefined }}>
+                  <span className="text-[10.5px] tracking-[0.1em] uppercase" style={{ color: on ? "var(--accent)" : "var(--ink)" }}>{s.name}</span>
+                  <span className="mt-0.5 block text-[9.5px]" style={{ color: "var(--ink-faint)" }}>{s.short}</span>
+                </button></li>;
+              })}
+            </>
+          ) : null}
           <li
             className="mt-1 border-t px-2.5 pt-1.5 text-[9px] leading-[1.5]"
             style={{ borderColor: "var(--line)", color: "var(--ink-faint)" }}

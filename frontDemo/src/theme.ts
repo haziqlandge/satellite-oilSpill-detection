@@ -79,6 +79,7 @@ export interface MapPaint {
   dark: string;
   infrastructure: string;
   forecast: string;
+  hindcast: string;
 
   /** The degree grid. Its own ink rather than a reuse of the traffic colour. */
   graticule: string;
@@ -148,6 +149,7 @@ export const SURFACES: Record<SurfaceKey, SurfaceDef> = {
       target: "#f4f1ea",
       dark: "#ff4d4d",
       infrastructure: "#f0c419",
+      hindcast: "#b878d1",
       forecast: "#6b4a2a",
       strokeScale: 1,
       contourFill: false,
@@ -220,6 +222,7 @@ export const SURFACES: Record<SurfaceKey, SurfaceDef> = {
       target: "#dbe6de",
       dark: "#ff6b62",
       infrastructure: "#ffc94d",
+      hindcast: "#d98b8b",
       forecast: "#3a7458",
       strokeScale: 0.85,
       contourFill: false,
