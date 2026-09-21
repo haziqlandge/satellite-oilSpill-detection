@@ -28,6 +28,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { setDriving, setPlayhead } from "../lib/playhead";
 import { formatHour, relHour } from "../lib/format";
 import {
   PHASE_LABEL,
@@ -226,6 +227,8 @@ export function Timeline({
     */
     const from = hourRef.current >= h1 - 0.01 ? h0 : hourRef.current;
     if (from !== hourRef.current) setHour(from);
+    setDriving(true);
+    setPlayhead(from);
 
     let raf = 0;
     let last = performance.now();
@@ -240,6 +243,11 @@ export function Timeline({
       acc += dt * speed;
 
       const next = Math.round(acc);
+      // The canvas gets the continuous value; React still gets whole hours.
+      // See lib/playhead.ts -- the particle cloud is the one consumer that
+      // interpolates, and feeding it integers is what made playback a
+      // slideshow.
+      setPlayhead(Math.min(acc, h1));
       if (acc >= h1) {
         setHour(h1);
         setPlaying(false);
@@ -257,7 +265,10 @@ export function Timeline({
     };
 
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      setDriving(false);
+    };
   }, [playing, speed, h0, h1, setHour]);
 
   /* --- keyboard ---------------------------------------------------- */

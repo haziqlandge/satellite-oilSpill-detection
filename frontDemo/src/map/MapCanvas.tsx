@@ -38,6 +38,7 @@ import {
   type LayerToggles,
 } from "./basemap";
 import { ParticleOverlay } from "./ParticleOverlay";
+import { subscribePlayhead, syncPlayhead } from "../lib/playhead";
 import type { MapPaint } from "../theme";
 import type { LngLat, Run, Suspect } from "../sim/types";
 import { positionAt } from "../sim/ais";
@@ -677,14 +678,31 @@ export function MapCanvas({
         .filter((f) => (forwardOnly ? f.hour >= 0 : true))
         .map((f) => ({ hour: f.hour, particles: f.particles })),
     );
+    // The oil itself, parcel by parcel. This was `forwardOnly ? [] : []` --
+    // both branches empty -- so the accumulating release the overlay documents
+    // at length had not been drawn at all. After the pass the oil on screen is
+    // the forecast, which the contour layers own, so only the pre-pass frames
+    // are handed over.
     overlayRef.current?.setReleaseFrames(
       forwardOnly
         ? []
-        : [],
+        : run.release.map((f) => ({ hour: f.hour, particles: f.particles })),
     );
   }, [run, ready, direction, paint.graticuleStepDeg]);
 
   /* --- time -------------------------------------------------------- */
+
+  /**
+   * The canvas follows the fractional playhead, not React state.
+   *
+   * `hour` is deliberately whole-numbered -- every other consumer rounds, and
+   * rebuilding the AIS tracks, the contours and the release extent sixty times
+   * a second would be ruinous. The particle cloud is the one layer that
+   * interpolates, so it subscribes to the continuous value and repaints from
+   * its own loop. See lib/playhead.ts.
+   */
+  useEffect(() => subscribePlayhead((h) => overlayRef.current?.setHour(h)), []);
+
 
   const candidateIds = useMemo(
     () => new Set(run.suspects.map((s) => s.id)),
@@ -696,7 +714,8 @@ export function MapCanvas({
     if (!map || !ready) return;
     const src = (id: string) => map.getSource(id) as maplibregl.GeoJSONSource;
 
-    overlayRef.current?.setHour(hour);
+    // Discrete changes only; the transport owns the playhead while playing.
+    syncPlayhead(hour);
     overlayRef.current?.setColour(hour < 0 ? paint.hindcast : paint.particle);
     const fieldColour = hour < 0 ? paint.hindcast : paint.forecast;
     for (const id of ["contour50-line", "contour90-line"]) if (map.getLayer(id)) map.setPaintProperty(id, "line-color", fieldColour);
