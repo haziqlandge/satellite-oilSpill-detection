@@ -8,6 +8,137 @@ session machine. See `CLAUDE.md` §1.
 
 ---
 
+## 0. Start here — where the 2026-09-22 session stopped
+
+Read `CLAUDE.md` first, then this section, then §1. **Delete this section when
+its contents are done** — do not append a second one, or this file becomes the
+`HANDOFF.md` that was just removed.
+
+### The situation
+
+Three days to a **local** demo. The frontend must be top-tier; the backend can
+stay file-driven. After the demo, the public site goes to Cloudflare (§4). The
+user is Haziq; commit as them via the `commitskill` skill and **never add AI
+attribution** — this is an academic/competition submission and authorship
+matters.
+
+### What the 2026-09-22 session did
+
+| Commit | What |
+|---|---|
+| `6ef8039` | Committed the training machine's uncommitted work — 238 files |
+| `7d41224` | Merged `origin/main`; the real frontend is now local |
+| `da1320f` | Tracked the weights manifest |
+| `49d03d0` | 11 handoff docs (311 KB) → 6 living docs |
+| `1496436` | Frontend README; recorded the maplibre advisory |
+| `781c815` | **Fixed the drift ensemble time anchor** — see `ISSUES.md` X9 |
+| `16d4d8d` | Continuous playhead for the particle cloud; restored the release layer |
+
+Baseline is **465 passed, 9 skipped**. `run.bat` is the backend menu;
+`npm run dev --prefix frontDemo` serves the UI on port 5180.
+
+### What is in flight, and exactly how far
+
+**The animation is half-fixed and NOT verified.** The root cause was found and
+addressed; the renderer is untouched.
+
+Found: `Timeline.tsx:249` only ever emitted whole hours, for a good reason —
+changing `hour` rebuilds every AIS track, both origin contours and the release
+extent. `ParticleOverlay` is the single consumer that interpolates, so feeding
+it integers pinned its blend factor at zero and turned a drift animation into a
+slideshow advancing once per simulated hour.
+
+Done: `lib/playhead.ts` publishes the fractional hour outside React; the canvas
+subscribes and repaints from its own rAF loop. `tsc -b` is clean and the
+production build passes.
+
+**Not done, and the next thing to do:**
+
+1. **Verify it actually moves.** Sampling the overlay canvas mid-playback was
+   inconclusive — the hindcast haze draws at alpha 0.16 and only about 25
+   pixels registered under the sampling stride. Use a finer stride over the
+   alpha channel, or temporarily raise the alpha, or count non-zero pixels
+   rather than hashing a sparse sample. **Do not claim this works until you
+   have seen the cloud move between whole hours.**
+2. **Then improve the renderer** in `frontDemo/src/map/ParticleOverlay.ts`: a
+   pre-rendered soft radial sprite drawn with `drawImage` instead of
+   `ctx.fillRect`; Catmull-Rom across four frames instead of the linear lerp in
+   `sample()`; a fading trail buffer instead of `clearRect` every frame;
+   per-particle phase and size jitter. Keep the existing weighting logic —
+   release bright, hindcast a faint haze before the pass, full weight after.
+   That reasoning is sound and hard-won.
+
+### The thing the user noticed, and it is correct
+
+> "animation from t negative x to t0 are just t0 but scaled down"
+
+Exactly right, and worth understanding before touching anything.
+`frontDemo/src/lib/reconstruction.ts` takes the **T0 particle cloud** and
+applies a uniform scale about a moving centre for every negative hour — see its
+`project()` helper. The per-scene constants (`offsetKm`, `start`, `pulse`,
+`peak`) are hand-tuned by eye. **Nothing before the pass is physics.**
+
+Do not try to improve that function. Delete it, and feed the map real backward
+frames from the OpenDrift ensemble (§1.3). `frontDemo/scripts/check-reconstruction.ts`
+must then be rewritten to validate the exported artifacts instead.
+
+### Proven feasible on this machine — do not re-derive
+
+- **The real drift chain runs on CPU in 89 seconds.** 10 members x 200
+  particles, 72 h backward, seeded from a real detection centroid. It produces
+  a `(433, 2000)` history, a `(433, 42, 51)` origin field, contours and an age
+  estimate. OpenDrift 1.14.11, netCDF4, xarray and copernicusmarine are all
+  installed and import cleanly.
+- `eval/final/scenes/*.geojson` hold **three real full-scene detections**
+  (86 / 240 / 40 polygons, EPSG:4326) and are map-ready today. Largest-polygon
+  centroids: `-89.686, 29.609`; `-89.011, 28.954`; `-89.667, 29.614`.
+- With constant forcing the age estimate correctly returns `monotonic` /
+  `indeterminate` — there is no convergence minimum without spatially varying
+  flow. That is right behaviour rather than a bug, but it makes for a weak
+  demo. Real forcing is what gives the hindcast structure.
+
+### Blocked on the user
+
+1. **ERA5 licence.** The CDS credentials authenticate — a 403 specifically on
+   licences proves it. The account has simply not accepted the ERA5 licence:
+   `https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels?tab=download#manage-licences`
+   One click. Until then the only available forcing is constant. The probe
+   script is in the session scratchpad as `cds_probe.py`.
+2. **`PLAN/INDEX.md` lines 100-105** still say `frontDemo/` "is owned by a
+   separate session. Do not edit it from the backend track." True when the
+   trees were split, wrong now. It is protected canon — ask before changing it.
+3. **CMEMS has no credentials at all** (`ISSUES.md` X2), so there are no real
+   currents, only wind.
+
+### Traps this session hit, so the next one does not
+
+- **`.venv/pyvenv.cfg` pointed at the other machine's Python** and nothing ran.
+  Fixed. The same stale prefix (the training machine's home directory) is in
+  the annotation pack, `inventory.json`, every `final-v*` split list and
+  `release.json` — see `DATA.md` §1. Nothing that reads those verbatim will run.
+- **`npm install --prefix frontDemo` fails on npm 10+**; it resolves
+  `package.json` from the working directory. Use `cd frontDemo && npm install`.
+  `npm run --prefix` is unaffected.
+- **Browser probes race the map's async `load`.** Querying the DOM at three
+  seconds showed no overlay canvas and led to a wrong conclusion about
+  StrictMode being at fault. It was not. Wait until `.maplibregl-map` has a
+  bare `<canvas>` child before asserting anything about the overlay.
+- **The drift engine requires naive UTC datetimes** and dies deep inside pandas
+  on tz-aware ones (`ISSUES.md` X10). An ISO-8601 acquisition time parsed from
+  GeoTIFF metadata is naturally tz-aware, so any real ingest path hits this.
+- **`git add -A` used to sweep in 169 MB** of derived eval caches. Now
+  gitignored, but check `git status` before staging.
+
+### Order of work
+
+§1.1 paths → §1.2 upload → §1.3 real artifacts → §1.4 animation → §2 labels.
+
+The labelling route in §2 needs **no retraining**, which matters because this
+machine cannot train anything. §2.5 is written for the 4060 Ti machine and
+should be handed over as a unit.
+
+---
+
 ## 1. Immediate — the local demo
 
 ### 1.1 Make the paths repo-relative

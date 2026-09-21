@@ -41,6 +41,10 @@ repo-relative over patching them per machine. See `DATA.md`.
 
 ## 3. Where to look
 
+**If you are a fresh session, read `FUTURE_WORK.md` §0 next.** It records where
+the last session stopped, what is half-finished, what is blocked on the user,
+and the traps already paid for.
+
 | Question | Document |
 |---|---|
 | What is this, how do I run it | `README.md` |
