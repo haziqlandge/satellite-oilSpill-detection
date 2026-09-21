@@ -30,7 +30,7 @@ trivially rebuilt.
 > **Disk:** budget ~15 GB for the environment alone. Torch unpacks to ~2.6 GB and the three
 > fixture `.SAFE` products are ~1.6 GB each. A torch install that dies mid-extract with
 > `os error 112` is a full disk, not a broken wheel. The Zenodo corpus needs a further
-> **91 GB** — read `HANDOFF.md` before starting any of it.
+> **91 GB** — read `DATA.md` before starting any of it.
 
 Check Python is present:
 
@@ -172,8 +172,8 @@ a **freshly launched** one.
 
 ## 6. Start work
 
-Read [`../HANDOFF.md`](../HANDOFF.md) **including its state header**, then `PLAN/INDEX.md`,
-then your current phase file.
+Read [`../CLAUDE.md`](../CLAUDE.md), then [`../ISSUES.md`](../ISSUES.md) and
+[`../FUTURE_WORK.md`](../FUTURE_WORK.md), then `PLAN/INDEX.md` and your current phase file.
 
 ```bash
 run.bat
@@ -203,7 +203,7 @@ must be regenerated or re-downloaded.** None of it is lost — but budget the ti
 
 > **`runs/` is the one directory worth copying by hand.** `runs/ablation/*/results.csv` and
 > `runs/segment/baseline-screen/results.csv` are the evidence behind the "60 epochs
-> under-trains" and noise-floor findings in `HANDOFF.md`. Re-deriving them costs ~4.5 h of
+> under-trains" and noise-floor findings in `PREVIOUS_WORK.md`. Re-deriving them costs ~4.5 h of
 > GPU time.
 
 ### Machine-specific values that will be wrong elsewhere

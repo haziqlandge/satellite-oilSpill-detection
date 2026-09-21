@@ -12,7 +12,7 @@ Screened at **60 epochs**, not the 100 of P004 §2.7. **A screened grid is not a
 
 Segmentation mask metrics (`M`), single `slick` class — this is a **binary baseline**, not the two-class `oos` / `slick_unknown` model, which needs the human relabelling pass first.
 
-`workers` records the loader setting used on each machine. Hardware and mid-run physical-batch changes are documented in `HANDOFF.md`; `nbs=32` is retained, but does not guarantee numerical equivalence across batches.
+`workers` records the loader setting used on each machine. Hardware and mid-run physical-batch changes are documented in `PREVIOUS_WORK.md`; `nbs=32` is retained, but does not guarantee numerical equivalence across batches.
 
 ## Interpretation updated after multiattribute review — 2026-09-15
 

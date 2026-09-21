@@ -102,7 +102,7 @@ implementation does.
 
 `frontDemo/` is a five-direction landing-page layout study (Vite + React + anime.js). It is
 design exploration feeding **PHASE-07**, not PHASE-07 itself, and it is owned by a separate
-session. See `frontDemo/README.md`. Do not edit it from the backend track.
+session. See the frontend section of `README.md`. Do not edit it from the backend track.
 
 ## Final model decision — 2026-09-17
 
@@ -122,7 +122,7 @@ Current machine: **RTX 4060 Ti 8 GB, 32 GB RAM**, with full resource use authori
 
 ## Reading rule
 
-Do not read every document each session. Start with `HANDOFF.md`, then this index, then the
+Do not read every document each session. Start with `CLAUDE.md` and `ISSUES.md`, then this index, then the
 **current phase file**, then only the sections of ARCHITECTURE / INTERFACES / CONSTRAINTS
 that phase references. Consult `RESEARCH/` through `RESEARCH/INDEX.md`.
 
@@ -131,6 +131,8 @@ that phase references. Consult `RESEARCH/` through `RESEARCH/INDEX.md`.
 ```
 repository        what actually exists  (inspect it; fix stale docs against it)
 PLAN/             what should exist
-HANDOFF.md        what is done, what is next
+PREVIOUS_WORK.md  what is done
+ISSUES.md         what is broken
+FUTURE_WORK.md    what is next
 RESEARCH/         what was learned externally
 ```
