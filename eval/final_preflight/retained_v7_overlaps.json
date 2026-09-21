@@ -1,0 +1,78 @@
+{
+  "method": "SIFT 200 features <=512px, reflection query, global k8 FLANN 96 checks ratio .7, >=8 affine inliers >=65% and >=0.5% coverage; verified if registered non-background Pearson >=.8 over >=1000 pixels",
+  "manifest": "data\\processed\\dataset\\final-v7\\manifest.json",
+  "pairs": [
+    {
+      "left_split": "train",
+      "left": "13761290__Lookalike__00125.png",
+      "right_split": "val",
+      "right": "13761290__Lookalike__00117.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 11,
+      "coverage": 0.01093402598053217,
+      "registered_correlation": 0.9978800770859889,
+      "verified": true,
+      "affine": [
+        [
+          1.0000814727230072,
+          2.3248607689911357e-05,
+          -483.5554162973509
+        ],
+        [
+          -2.3248607689911357e-05,
+          1.0000814727230072,
+          -0.02085562764750771
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "13761290__Lookalike__00062.png",
+      "right_split": "test",
+      "right": "13761290__Lookalike__00063.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.033944688737392426,
+      "registered_correlation": 0.9836531418331341,
+      "verified": true,
+      "affine": [
+        [
+          0.9999852018623957,
+          -0.00011896294507393692,
+          0.0018437104379052523
+        ],
+        [
+          0.00011896294507393692,
+          0.9999852018623957,
+          467.48596624632347
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__val__sentinel_578.png",
+      "right_split": "test",
+      "right": "15298010__train__sentinel_1071.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.0814901813864708,
+      "registered_correlation": 0.834746413205164,
+      "verified": true,
+      "affine": [
+        [
+          -1.6224241634793501,
+          -3.2128212703918885e-05,
+          293.9212330380456
+        ],
+        [
+          3.2128212703918885e-05,
+          -1.6224241634793501,
+          351.17535321052515
+        ]
+      ]
+    }
+  ]
+}

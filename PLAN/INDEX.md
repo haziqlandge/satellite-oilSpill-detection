@@ -22,7 +22,7 @@ Plus a visual interface.
 ## The approach in one paragraph
 
 Instance-segment slicks from Sentinel-1 SAR into two classes (`oos`, `slick_unknown`) using
-YOLO-seg + LSK attention + MPDIoU + SAHI; characterise geometry, head/tail and damping;
+a validation-selected YOLO-seg variant + SAHI; characterise geometry, head/tail and damping;
 run an **ensemble backward drift** in OpenDrift OpenOil to produce an **origin probability
 field `P(lat, lon, t)`**; gate historic AIS traffic on that field; score surviving candidates
 on six explainable terms and collate vessels against infrastructure; present everything —
@@ -51,7 +51,7 @@ not do.
 | Regions | **Dual** — Gulf of Mexico (real AIS, published ground truth) + Indian waters (synthetic AIS demo) |
 | Stack | FastAPI + PostGIS backend; React + MapLibre + deck.gl frontend |
 | Database hosting | **Supabase** (`oilSpill-Detect`), decided 2026-08-28. Trade-offs in `scripts/SETUP_DATABASE.md` |
-| Training machine | RTX 4060 Ti, 16 GB. See PHASE-02 for batch sizing |
+| Training machine | **RTX 4060 Ti 8 GB, 32 GB RAM**; full resource use authorized. Earlier screens also used a 5070 Ti laptop |
 
 ## Documents
 
@@ -72,7 +72,7 @@ in parallel.**
 |---|---|---|---|
 | [00](phases/PHASE-00.md) | Scaffold, environment, research corpus | — | PostGIS, package, RESEARCH/ + PLAN/ (**done**) |
 | [01](phases/PHASE-01.md) | Data acquisition and SAR pre-processing | 00 | Geocoded σ0 tiles; datasets; relabelled classes |
-| [02](phases/PHASE-02.md) | Detection model — the research contribution | 01 | YOLO-seg + LSK(L5) + MPDIoU weights; ablation table |
+| [02](phases/PHASE-02.md) | Detection model — the research contribution | 01 | Selected YOLO-seg/LSK weights after evidence review; ablation table |
 | [03](phases/PHASE-03.md) | Characterisation, geometry, wind gate | 02 (+04 readers) | Geometry, head/tail, damping, wind gate |
 | [04](phases/PHASE-04.md) | Met-ocean forcing and drift engine | 00 | **`origin_field P(lat,lon,t)`**, forecast, age |
 | [05](phases/PHASE-05.md) | AIS pipeline and synthetic generator | 00 | AIS tracks in PostGIS; 5 synthetic scenarios |
@@ -103,6 +103,22 @@ implementation does.
 `frontDemo/` is a five-direction landing-page layout study (Vite + React + anime.js). It is
 design exploration feeding **PHASE-07**, not PHASE-07 itself, and it is owned by a separate
 session. See `frontDemo/README.md`. Do not edit it from the backend track.
+
+## Final model decision — 2026-09-17
+
+**Continuation audit:** Threshold selection and the one-time held-out test are complete. Current scripts now include research-only weights export and streaming full-scene inference. The test split is consumed. See [independent audit](../eval/final/INDEPENDENT_AUDIT.md); it corrects the broad operational superiority, overflow attribution and epoch-jitter tolerance claims in the earlier selection narrative below. Phase 02 acceptance remains open.
+
+All **1,080 planned epochs are complete**. **`L1-ciou` is selected**: it wins repeated mask AP comparisons and leads recall, Dice, boundary quality, small-object recall and source coverage. `L4-ciou` is the precision/box-quality reserve and `none-ciou` the control/fallback. The decision table and caveats are in [`../eval/final/REVIEW.md`](../eval/final/REVIEW.md).
+
+The FP32-safe L1 reproduction and fresh-load parity gate are complete. Current Phase-02 step: run the full evaluator on the frozen validation split, freeze the operating threshold/configuration, then evaluate exactly once on the untouched test set. After that, complete full-scene SAHI seam/runtime acceptance. No additional model-selection training is planned.
+
+## Historical screening decision — 2026-09-15
+
+All **12/12 screens are complete**. Overall budget: **780/1080 epochs complete; 300 remain** for three fresh 100-epoch runs. Selected: **none-ciou (control), L1-ciou (primary), L4-ciou (complementary)**; L5-ciou is reserve. Final training has **not** started.
+
+Read [the review protocol](SCREENING_REVIEW.md) and [the detailed results and selection](../eval/screening/REVIEW.md). Eleven saved checkpoints were evaluated on validation across AP, negatives, mask overlap/boundaries, sizes/shapes, sources, confidence, uncertainty and cost. The none-ciou screen weights are missing; two train/validation duplicate pairs and an MPDIoU coordinate-scale mismatch were found. These are binary single-class candidates, not certified operational/two-class models. Final data and runner preflight steps are in the report.
+
+Current machine: **RTX 4060 Ti 8 GB, 32 GB RAM**, with full resource use authorized. Prior laptop resource limits, stopped-at-43/60 status and timing estimates below are historical.
 
 ## Reading rule
 

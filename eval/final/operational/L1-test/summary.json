@@ -1,0 +1,241 @@
+{
+  "identity": {
+    "inputs": {
+      "models": {
+        "L1": "d4a74906e3a9b692c14f28305baf3cb20ba63da4c38bc30dbabd14c5c6d1fc6c",
+        "none": "d94f24306ffd8a551a754bce1c2088d03bb6aaf17f6a893d304c4bf50b68b1d0"
+      },
+      "data_yaml": "a196ff93a72957b1e9b31d740de3860795f885622be26bdbf744e226786a6b7e",
+      "val": "02ebdef59e5ac183b032daf86c3621690d6a81ab997d0cc848a17735d011fe9f",
+      "test": "1c6a266cf5e80c292b60bc7a2ec876a34baa6367d26f59dfecea06639c3d3770",
+      "settings": {
+        "imgsz": 1024,
+        "batch": 4,
+        "workers": 2,
+        "device": "0",
+        "half": false,
+        "rect": true,
+        "conf": 0.001,
+        "iou": 0.7,
+        "max_det": 1000,
+        "plots": false,
+        "save_json": false,
+        "save_txt": false,
+        "verbose": false
+      },
+      "torch": "2.11.0+cu128",
+      "ultralytics": "8.4.135",
+      "source": {
+        "scripts/evaluate_final_release.py": "4d20b353bac93d01eca90ce9cd1367b1f61bb30031e378f6659e61dbbc4a7c38",
+        "scripts/review_screening.py": "311c554f118bb239d510f593c9d55a44aae3716874f8ca43614a3920874f9b83",
+        "scripts/summarize_screening.py": "d3e12241d6c1ee2de38db386ebf0d9e30683870f64ce8339cf3dcc1f7a2e94d4"
+      },
+      "frozen_sha256": "a14f25187f4ecac389e5d6455115d356f77032e94edf429554ffc2d2803fe979"
+    },
+    "model": "L1",
+    "split": "test",
+    "threshold": 0.2,
+    "sweep": false
+  },
+  "completed_at": "2026-09-17T10:07:46.391888+00:00",
+  "metrics": {
+    "metrics/precision(B)": 0.5355651842357889,
+    "metrics/recall(B)": 0.3739069604756908,
+    "metrics/mAP50(B)": 0.39843264753232394,
+    "metrics/mAP50-95(B)": 0.1970964629311877,
+    "metrics/precision(M)": 0.5417624358695772,
+    "metrics/recall(M)": 0.3361976168943709,
+    "metrics/mAP50(M)": 0.3636221942813702,
+    "metrics/mAP50-95(M)": 0.1499177867813492,
+    "fitness": 0.3470142497125369
+  },
+  "speed": {
+    "preprocess": 2.594089633124202,
+    "inference": 6.859678947403212,
+    "loss": 0.002710526299245501,
+    "postprocess": 2.414717703357345
+  },
+  "operating": {
+    "images": 627,
+    "instances": 2859,
+    "tp": 1017,
+    "fp": 997,
+    "recall": 0.35571878279118574,
+    "precision": 0.5049652432969215,
+    "negative_images": 61,
+    "negative_fp_images": 12,
+    "negative_fp_instances": 21,
+    "lookalike_images": 11,
+    "lookalike_fp_images": 8,
+    "lookalike_fp_instances": 17,
+    "no_oil_images": 29,
+    "no_oil_fp_images": 1,
+    "strata": {
+      "small": {
+        "instances": 967,
+        "recall": 0.10961737331954498
+      },
+      "medium": {
+        "instances": 872,
+        "recall": 0.2889908256880734
+      },
+      "large": {
+        "instances": 1020,
+        "recall": 0.6460784313725491
+      },
+      "elongated": {
+        "instances": 70,
+        "recall": 0.4
+      },
+      "border": {
+        "instances": 0,
+        "recall": 0.0
+      }
+    },
+    "f1": 0.4174020110814693,
+    "dice": 0.7437485679891109,
+    "iou": 0.6343384381093939,
+    "boundary_f1": 0.4449286322559646,
+    "pixel_precision": 0.7998442346432607,
+    "pixel_recall": 0.7940823318625618,
+    "area_bias": -0.007203781100289889
+  },
+  "sources": {
+    "13761290": {
+      "images": 53,
+      "instances": 149,
+      "tp": 22,
+      "fp": 36,
+      "recall": 0.1476510067114094,
+      "precision": 0.3793103448275862,
+      "negative_images": 40,
+      "negative_fp_images": 9,
+      "negative_fp_instances": 18,
+      "lookalike_images": 11,
+      "lookalike_fp_images": 8,
+      "lookalike_fp_instances": 17,
+      "no_oil_images": 29,
+      "no_oil_fp_images": 1,
+      "strata": {
+        "small": {
+          "instances": 127,
+          "recall": 0.07086614173228346
+        },
+        "medium": {
+          "instances": 11,
+          "recall": 0.45454545454545453
+        },
+        "large": {
+          "instances": 11,
+          "recall": 0.7272727272727273
+        },
+        "elongated": {
+          "instances": 1,
+          "recall": 1.0
+        },
+        "border": {
+          "instances": 0,
+          "recall": 0.0
+        }
+      },
+      "f1": 0.21256038647342995,
+      "dice": 0.7220973042989508,
+      "iou": 0.6460063354474582,
+      "boundary_f1": 0.6794133804515602,
+      "pixel_precision": 0.1833153535634744,
+      "pixel_recall": 0.46298188369972426,
+      "area_bias": 1.525603418916098
+    },
+    "15298010": {
+      "images": 464,
+      "instances": 1653,
+      "tp": 719,
+      "fp": 592,
+      "recall": 0.43496672716273443,
+      "precision": 0.5484363081617086,
+      "negative_images": 21,
+      "negative_fp_images": 3,
+      "negative_fp_instances": 3,
+      "lookalike_images": 0,
+      "lookalike_fp_images": 0,
+      "lookalike_fp_instances": 0,
+      "no_oil_images": 0,
+      "no_oil_fp_images": 0,
+      "strata": {
+        "small": {
+          "instances": 31,
+          "recall": 0.0
+        },
+        "medium": {
+          "instances": 696,
+          "recall": 0.20114942528735633
+        },
+        "large": {
+          "instances": 926,
+          "recall": 0.6252699784017278
+        },
+        "elongated": {
+          "instances": 45,
+          "recall": 0.3111111111111111
+        },
+        "border": {
+          "instances": 0,
+          "recall": 0.0
+        }
+      },
+      "f1": 0.4851551956815115,
+      "dice": 0.7258930716647394,
+      "iou": 0.6120125393100004,
+      "boundary_f1": 0.33514549686970063,
+      "pixel_precision": 0.81354167578881,
+      "pixel_recall": 0.799397198147042,
+      "area_bias": -0.017386297546531277
+    },
+    "8346860": {
+      "images": 110,
+      "instances": 1057,
+      "tp": 276,
+      "fp": 369,
+      "recall": 0.261116367076632,
+      "precision": 0.42790697674418604,
+      "negative_images": 0,
+      "negative_fp_images": 0,
+      "negative_fp_instances": 0,
+      "lookalike_images": 0,
+      "lookalike_fp_images": 0,
+      "lookalike_fp_instances": 0,
+      "no_oil_images": 0,
+      "no_oil_fp_images": 0,
+      "strata": {
+        "small": {
+          "instances": 809,
+          "recall": 0.11990111248454882
+        },
+        "medium": {
+          "instances": 165,
+          "recall": 0.6484848484848484
+        },
+        "large": {
+          "instances": 83,
+          "recall": 0.8674698795180723
+        },
+        "elongated": {
+          "instances": 24,
+          "recall": 0.5416666666666666
+        },
+        "border": {
+          "instances": 0,
+          "recall": 0.0
+        }
+      },
+      "f1": 0.3243243243243244,
+      "dice": 0.8182163070770089,
+      "iou": 0.7228719881342712,
+      "boundary_f1": 0.8593434254338935,
+      "pixel_precision": 0.8826495496304276,
+      "pixel_recall": 0.7160926935262628,
+      "area_bias": -0.18870100389662414
+    }
+  },
+  "rows_sha256": "4db50ecfc27ba99a91007dde41cd74f8f4495f73582871d87d3a14557095d19b"
+}

@@ -1,0 +1,44 @@
+[
+  {
+    "image": "13761290__No_oil__00087.png",
+    "duplicate_of": "13761290__No_oil__00005.png",
+    "instances": [
+      0,
+      0
+    ],
+    "mask_areas": [
+      0,
+      0
+    ],
+    "union_iou": 1.0,
+    "label_bytes_equal": true
+  },
+  {
+    "image": "8346860__Oil__00357.png",
+    "duplicate_of": "8346860__Oil__00356.png",
+    "instances": [
+      1,
+      1
+    ],
+    "mask_areas": [
+      72395,
+      72395
+    ],
+    "union_iou": 1.0,
+    "label_bytes_equal": true
+  },
+  {
+    "image": "8346860__Oil__01339.png",
+    "duplicate_of": "8346860__Oil__00007.png",
+    "instances": [
+      1,
+      1
+    ],
+    "mask_areas": [
+      19917,
+      18815
+    ],
+    "union_iou": 0.9286923613185938,
+    "label_bytes_equal": false
+  }
+]

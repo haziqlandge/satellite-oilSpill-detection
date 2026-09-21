@@ -47,3 +47,9 @@ desktop.ini
 runs/
 outputs/
 *.log
+
+# --- eval artifacts: derived, regenerate with scripts/ ---
+# Evidence worth keeping (.json/.md/.geojson/.png) stays tracked; these do not.
+eval/**/feature_cache/
+eval/**/*.npz
+eval/**/*.jsonl

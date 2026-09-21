@@ -1,0 +1,5 @@
+{
+  "method": "SIFT 200 features <=512px, reflection query, global k8 FLANN 96 checks ratio .7, >=8 affine inliers >=65% and >=0.5% coverage; verified if registered non-background Pearson >=.8 over >=1000 pixels",
+  "manifest": "data\\processed\\dataset\\final-v11\\manifest.json",
+  "pairs": []
+}

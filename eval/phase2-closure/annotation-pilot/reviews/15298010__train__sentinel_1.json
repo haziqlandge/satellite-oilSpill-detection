@@ -1,0 +1,46 @@
+{
+  "source": "15298010__train__sentinel_1",
+  "class_scheme": [
+    "oos",
+    "slick_unknown"
+  ],
+  "note": "proposed_class is a suggestion, not a label. Set confirmed_class and confirmed_by to accept or override it. Records left unconfirmed are ignored.",
+  "instances": [
+    {
+      "label": 1,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.687,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.129,
+        "compactness": 0.1543,
+        "solidity": 0.836,
+        "area_px": 54051.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.1 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 1,
+        "area_px": 54051,
+        "perimeter_px": 2097.8742417671947,
+        "elongation": 1.128637998976371,
+        "compactness": 0.154331542215649,
+        "solidity": 0.8355516393822752,
+        "orientation_deg": -47.067102122184224,
+        "centroid_rc": [
+          137.3732955912009,
+          137.0397957484598
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    }
+  ],
+  "image_sha256": "7f79b832741fa4a884a31a14250a1039abbe3f2d6f53cca3927d74c4d8785342",
+  "mask_sha256": "9c63c0194a240eadfd6506fe8ec44256d2091c9c948a53fe7ce88e3a098761cb",
+  "original_image": "C:\\Users\\adi\\Downloads\\oilSpil2l16\\oilSpil2l\\data\\interim\\datasets\\zenodo\\15298010\\images\\images\\train\\sentinel_1.png",
+  "original_mask": "C:\\Users\\adi\\Downloads\\oilSpil2l16\\oilSpil2l\\data\\interim\\datasets\\zenodo\\15298010\\masks\\masks\\train\\sentinel_1.png",
+  "split": "val"
+}

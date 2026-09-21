@@ -1,5 +1,8 @@
 # PHASE-08 — Evaluation and validation
 
+> **Current evaluation evidence — 2026-09-15:** [screening review](../../eval/screening/REVIEW.md) selects none-ciou/L1-ciou/L4-ciou for fresh100 final runs. This is single-class validation selection, not Phase 08 completion. Actual data mixes Part I, Part III and Refined SOS into tile splits; Part II was skipped. Two train/val exact duplicate pairs were found. The historical “held-out Part III + Part II” specification below is an intended external design, **not the current split**. Freeze a versioned scene/duplicate-aware manifest and validation thresholds before final test evaluation. Current review did not use test images or labels. P004 box metrics are not comparable to this dataset's mask AP.
+
+
 ## Objective
 Run the full evaluation defined in `EVALUATION.md`, produce the results artefacts, and state
 honestly what the system does and does not demonstrate.

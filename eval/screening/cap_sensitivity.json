@@ -1,0 +1,20 @@
+{
+  "L1-ciou": {
+    "mask_ap_300": 0.19474831401057466,
+    "mask_ap_1000": 0.19620094674725966,
+    "fixed_counts_unchanged": true,
+    "still_capped_at_1000": 17
+  },
+  "L4-ciou": {
+    "mask_ap_300": 0.18907045999367064,
+    "mask_ap_1000": 0.19028740542825812,
+    "fixed_counts_unchanged": true,
+    "still_capped_at_1000": 12
+  },
+  "L5-ciou": {
+    "mask_ap_300": 0.1885432216667037,
+    "mask_ap_1000": 0.1894970930366682,
+    "fixed_counts_unchanged": true,
+    "still_capped_at_1000": 17
+  }
+}

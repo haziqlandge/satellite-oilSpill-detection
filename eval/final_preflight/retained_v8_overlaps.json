@@ -1,0 +1,54 @@
+{
+  "method": "SIFT 200 features <=512px, reflection query, global k8 FLANN 96 checks ratio .7, >=8 affine inliers >=65% and >=0.5% coverage; verified if registered non-background Pearson >=.8 over >=1000 pixels",
+  "manifest": "data\\processed\\dataset\\final-v8\\manifest.json",
+  "pairs": [
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_442.png",
+      "right_split": "test",
+      "right": "15298010__train__sentinel_2133.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.12355099618434906,
+      "registered_correlation": 0.7564891517437654,
+      "verified": false,
+      "affine": [
+        [
+          -0.9995209526256644,
+          0.00423834129647496,
+          112.9310605418434
+        ],
+        [
+          -0.00423834129647496,
+          -0.9995209526256644,
+          269.6155371506331
+        ]
+      ]
+    },
+    {
+      "left_split": "val",
+      "left": "15298010__train__sentinel_2270.png",
+      "right_split": "test",
+      "right": "15298010__train__sentinel_2931.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.42984819412231445,
+      "registered_correlation": 0.5707678133485211,
+      "verified": false,
+      "affine": [
+        [
+          -0.9989257292476574,
+          -0.0009849318875885628,
+          263.4913257060515
+        ],
+        [
+          0.0009849318875885628,
+          -0.9989257292476574,
+          226.0923175923039
+        ]
+      ]
+    }
+  ]
+}

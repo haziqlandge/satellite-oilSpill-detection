@@ -1,0 +1,108 @@
+{
+  "source": "15298010__train__sentinel_1003",
+  "class_scheme": [
+    "oos",
+    "slick_unknown"
+  ],
+  "note": "proposed_class is a suggestion, not a label. Set confirmed_class and confirmed_by to accept or override it. Records left unconfirmed are ignored.",
+  "instances": [
+    {
+      "label": 1,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.604,
+      "needs_review": true,
+      "terms": {
+        "elongation": 1.964,
+        "compactness": 0.2409,
+        "solidity": 0.734,
+        "area_px": 8463.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.0 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 1,
+        "area_px": 8463,
+        "perimeter_px": 664.4701294725885,
+        "elongation": 1.9639155254615783,
+        "compactness": 0.2408703146343425,
+        "solidity": 0.7336165048543689,
+        "orientation_deg": -33.951960918215285,
+        "centroid_rc": [
+          54.48918823112371,
+          118.18657686399622
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    },
+    {
+      "label": 2,
+      "proposed_class": null,
+      "confidence": 0.0,
+      "needs_review": true,
+      "terms": {
+        "elongation": 3.444,
+        "compactness": 0.1623,
+        "solidity": 0.666,
+        "area_px": 4675.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 3.4 falls between 3.0 and 6.0; morphology does not distinguish the classes here"
+      ],
+      "morphology": {
+        "label": 2,
+        "area_px": 4675,
+        "perimeter_px": 601.6944801964783,
+        "elongation": 3.443911670584673,
+        "compactness": 0.16227044399002058,
+        "solidity": 0.665954415954416,
+        "orientation_deg": -16.60759752893921,
+        "centroid_rc": [
+          184.3638502673797,
+          32.096256684491976
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    },
+    {
+      "label": 4,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.615,
+      "needs_review": true,
+      "terms": {
+        "elongation": 1.847,
+        "compactness": 0.2253,
+        "solidity": 0.586,
+        "area_px": 785.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.8 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 4,
+        "area_px": 785,
+        "perimeter_px": 209.22539674441617,
+        "elongation": 1.8465764082109482,
+        "compactness": 0.22534644992005537,
+        "solidity": 0.585820895522388,
+        "orientation_deg": -86.4651959576806,
+        "centroid_rc": [
+          244.79745222929935,
+          232.43949044585986
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    }
+  ],
+  "image_sha256": "d8bb01acb84cf7df2ec5a891072d3925cda15b063c5808d41a880bd5c33a605d",
+  "mask_sha256": "888fc1923e4749c14413aaa271e359dc7ba222b9c1e872cc3edb0c5d5572eca8",
+  "original_image": "C:\\Users\\adi\\Downloads\\oilSpil2l16\\oilSpil2l\\data\\interim\\datasets\\zenodo\\15298010\\images\\images\\train\\sentinel_1003.png",
+  "original_mask": "C:\\Users\\adi\\Downloads\\oilSpil2l16\\oilSpil2l\\data\\interim\\datasets\\zenodo\\15298010\\masks\\masks\\train\\sentinel_1003.png",
+  "split": "train"
+}

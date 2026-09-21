@@ -1,0 +1,205 @@
+{
+  "method": "63-bit DCT pHash, Hamming <=10 under all 8 right-angle/reflection transforms; 128px SSIM and Pearson verification",
+  "candidates": [
+    {
+      "train": "8346860__Oil__01339.png",
+      "val": "8346860__Oil__00007.png",
+      "hamming": 0,
+      "flip": false,
+      "rotation90": 0,
+      "ssim": 1.0,
+      "correlation": 1.0,
+      "exact": true
+    },
+    {
+      "train": "8346860__Oil__00357.png",
+      "val": "8346860__Oil__00356.png",
+      "hamming": 0,
+      "flip": false,
+      "rotation90": 0,
+      "ssim": 1.0,
+      "correlation": 1.0,
+      "exact": true
+    },
+    {
+      "train": "8346860__Oil__00613.png",
+      "val": "13761290__No_oil__00039.png",
+      "hamming": 10,
+      "flip": true,
+      "rotation90": 2,
+      "ssim": 0.6914539814358382,
+      "correlation": 0.984085284167038,
+      "exact": false
+    },
+    {
+      "train": "8346860__Oil__00729.png",
+      "val": "13761290__No_oil__00039.png",
+      "hamming": 10,
+      "flip": true,
+      "rotation90": 2,
+      "ssim": 0.6911518908803991,
+      "correlation": 0.9822579576018576,
+      "exact": false
+    },
+    {
+      "train": "13761290__No_oil__00003.png",
+      "val": "13761290__Lookalike__00081.png",
+      "hamming": 10,
+      "flip": true,
+      "rotation90": 0,
+      "ssim": 0.8229410240811063,
+      "correlation": 0.9811622759037443,
+      "exact": false
+    },
+    {
+      "train": "13761290__No_oil__00138.png",
+      "val": "13761290__Lookalike__00081.png",
+      "hamming": 8,
+      "flip": false,
+      "rotation90": 2,
+      "ssim": 0.7311053067860226,
+      "correlation": 0.9765088560801649,
+      "exact": false
+    },
+    {
+      "train": "8346860__Oil__01315.png",
+      "val": "13761290__Lookalike__00082.png",
+      "hamming": 10,
+      "flip": true,
+      "rotation90": 2,
+      "ssim": 0.5949395381870185,
+      "correlation": 0.9728672560243938,
+      "exact": false
+    },
+    {
+      "train": "8346860__Oil__00949.png",
+      "val": "13761290__No_oil__00028.png",
+      "hamming": 10,
+      "flip": true,
+      "rotation90": 1,
+      "ssim": 0.7680220224656303,
+      "correlation": 0.9704854548009387,
+      "exact": false
+    },
+    {
+      "train": "13761290__No_oil__00052.png",
+      "val": "13761290__Lookalike__00082.png",
+      "hamming": 6,
+      "flip": true,
+      "rotation90": 0,
+      "ssim": 0.7173311916536549,
+      "correlation": 0.9661225645150257,
+      "exact": false
+    },
+    {
+      "train": "13761290__Oil__00056.png",
+      "val": "8346860__Oil__01052.png",
+      "hamming": 6,
+      "flip": false,
+      "rotation90": 2,
+      "ssim": 0.7168785696902946,
+      "correlation": 0.9636507818507422,
+      "exact": false
+    },
+    {
+      "train": "8346860__Oil__00949.png",
+      "val": "13761290__Lookalike__00081.png",
+      "hamming": 10,
+      "flip": false,
+      "rotation90": 0,
+      "ssim": 0.7630433159145575,
+      "correlation": 0.9552049014051505,
+      "exact": false
+    },
+    {
+      "train": "13761290__No_oil__00056.png",
+      "val": "8346860__Oil__00401.png",
+      "hamming": 8,
+      "flip": false,
+      "rotation90": 0,
+      "ssim": 0.7624234588809244,
+      "correlation": 0.9294382647537827,
+      "exact": false
+    },
+    {
+      "train": "13761290__No_oil__00007.png",
+      "val": "8346860__Oil__00401.png",
+      "hamming": 10,
+      "flip": false,
+      "rotation90": 0,
+      "ssim": 0.6080311433182598,
+      "correlation": 0.9210676042399402,
+      "exact": false
+    },
+    {
+      "train": "8346860__Oil__00837.png",
+      "val": "13761290__No_oil__00039.png",
+      "hamming": 10,
+      "flip": false,
+      "rotation90": 3,
+      "ssim": 0.6206228247416486,
+      "correlation": 0.9029599477041451,
+      "exact": false
+    },
+    {
+      "train": "13761290__No_oil__00000.png",
+      "val": "13761290__No_oil__00136.png",
+      "hamming": 10,
+      "flip": true,
+      "rotation90": 3,
+      "ssim": 0.7264795007906235,
+      "correlation": 0.8819972508398607,
+      "exact": false
+    },
+    {
+      "train": "8346860__Oil__01323.png",
+      "val": "13761290__No_oil__00143.png",
+      "hamming": 8,
+      "flip": false,
+      "rotation90": 0,
+      "ssim": 0.7358087096581702,
+      "correlation": 0.851544410989394,
+      "exact": false
+    },
+    {
+      "train": "8346860__Oil__00399.png",
+      "val": "13761290__No_oil__00143.png",
+      "hamming": 10,
+      "flip": false,
+      "rotation90": 3,
+      "ssim": 0.7166375910750087,
+      "correlation": 0.8336570357333623,
+      "exact": false
+    },
+    {
+      "train": "8346860__Oil__00371.png",
+      "val": "13761290__No_oil__00039.png",
+      "hamming": 10,
+      "flip": true,
+      "rotation90": 1,
+      "ssim": 0.5761749436601274,
+      "correlation": 0.8301041355398415,
+      "exact": false
+    },
+    {
+      "train": "8346860__Oil__01323.png",
+      "val": "8346860__Oil__00245.png",
+      "hamming": 8,
+      "flip": true,
+      "rotation90": 0,
+      "ssim": 0.7594720703817691,
+      "correlation": 0.8217561800300192,
+      "exact": false
+    },
+    {
+      "train": "15298010__train__sentinel_825.png",
+      "val": "13761290__No_oil__00039.png",
+      "hamming": 10,
+      "flip": false,
+      "rotation90": 3,
+      "ssim": 0.18110674724123005,
+      "correlation": 0.8140553865792943,
+      "exact": false
+    }
+  ]
+}

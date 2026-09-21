@@ -1,5 +1,10 @@
 # EVALUATION
 
+> **2026-09-17:** L1's internal final-v11 tile test has been evaluated once after a validation-only threshold freeze. It is consumed, not available for further tuning. Full results, comparison and limitations: [independent audit](../eval/final/INDEPENDENT_AUDIT.md). External scene independence, two-class metrics and operational reliability are not established. The available December raster has a different acquisition time from the specified Case 3 fixture.
+
+> **Current evaluation evidence — 2026-09-15:** [screening review](../eval/screening/REVIEW.md) selects none-ciou/L1-ciou/L4-ciou for fresh100 final runs. This is single-class validation selection, not Phase 08 completion. Actual data mixes Part I, Part III and Refined SOS into tile splits; Part II was skipped. Two train/val exact duplicate pairs were found. The historical “held-out Part III + Part II” specification below is an intended external design, **not the current split**. Freeze a versioned scene/duplicate-aware manifest and validation thresholds before final test evaluation. Current review did not use test images or labels. P004 box metrics are not comparable to this dataset's mask AP.
+
+
 How we know the system works. Executed in PHASE-08; targets referenced by earlier phases.
 
 ## Guiding principle

@@ -1,0 +1,1494 @@
+{
+  "method": "SIFT 200 features <=512px, reflection query, global k8 FLANN 96 checks ratio .7, >=8 affine inliers >=65% and >=0.5% coverage; verified if registered non-background Pearson >=.8 over >=1000 pixels",
+  "manifest": "data\\processed\\dataset\\final-v2\\manifest.json",
+  "pairs": [
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_588.png",
+      "right_split": "val",
+      "right": "15298010__train__sentinel_1032.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.22575634717941284,
+      "registered_correlation": 0.8100634891303979,
+      "verified": true,
+      "affine": [
+        [
+          1.6231741564975293,
+          -0.003386924758218175,
+          -99.22887088518561
+        ],
+        [
+          0.003386924758218175,
+          1.6231741564975293,
+          -5.208327393372586
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_313.png",
+      "right_split": "val",
+      "right": "15298010__train__sentinel_1201.png",
+      "flip": false,
+      "inliers": 9,
+      "matches": 9,
+      "coverage": 0.26337021589279175,
+      "registered_correlation": 0.8825152133470572,
+      "verified": true,
+      "affine": [
+        [
+          1.62398142576863,
+          -0.0003341136289207251,
+          -49.62958590729632
+        ],
+        [
+          0.0003341136289207251,
+          1.62398142576863,
+          -36.782742635077554
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_352.png",
+      "right_split": "val",
+      "right": "15298010__train__sentinel_1240.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.28632786870002747,
+      "registered_correlation": 0.7929130489410121,
+      "verified": false,
+      "affine": [
+        [
+          1.6259905799699501,
+          -0.0004220325567722459,
+          -90.0993432878019
+        ],
+        [
+          0.0004220325567722459,
+          1.6259905799699501,
+          -59.873808973328686
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__val__sentinel_749.png",
+      "right_split": "val",
+      "right": "15298010__train__sentinel_1242.png",
+      "flip": false,
+      "inliers": 9,
+      "matches": 9,
+      "coverage": 0.04715440422296524,
+      "registered_correlation": 0.862004187395641,
+      "verified": true,
+      "affine": [
+        [
+          -1.624915046936152,
+          -0.0003086411485501312,
+          349.34604090985886
+        ],
+        [
+          0.0003086411485501312,
+          -1.624915046936152,
+          269.28833328684505
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__val__sentinel_336.png",
+      "right_split": "val",
+      "right": "15298010__train__sentinel_1273.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.1520550698041916,
+      "registered_correlation": 0.8601413380537876,
+      "verified": true,
+      "affine": [
+        [
+          -0.0003880282140174274,
+          1.6266791245957144,
+          -69.94652898876228
+        ],
+        [
+          -1.6266791245957144,
+          -0.0003880282140174274,
+          301.743591804138
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__val__sentinel_128.png",
+      "right_split": "val",
+      "right": "15298010__train__sentinel_177.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.17659294605255127,
+      "registered_correlation": 0.7476588327991724,
+      "verified": false,
+      "affine": [
+        [
+          0.001215491543888604,
+          0.9997924935435386,
+          -35.2739445535291
+        ],
+        [
+          -0.9997924935435386,
+          0.001215491543888604,
+          336.29799761986544
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_2982.png",
+      "right_split": "val",
+      "right": "15298010__train__sentinel_2321.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.2817462682723999,
+      "registered_correlation": 0.8684149272115879,
+      "verified": true,
+      "affine": [
+        [
+          -1.000848129486919,
+          -0.0016280860955717332,
+          247.91419147897474
+        ],
+        [
+          0.0016280860955717332,
+          -1.000848129486919,
+          337.4573204336502
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_1664.png",
+      "right_split": "val",
+      "right": "15298010__train__sentinel_2986.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.1320020705461502,
+      "registered_correlation": 0.6286319177318864,
+      "verified": false,
+      "affine": [
+        [
+          0.006029094730641999,
+          0.9987610758013649,
+          57.17641208706772
+        ],
+        [
+          -0.9987610758013649,
+          0.006029094730641999,
+          236.74656473814858
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_1196.png",
+      "right_split": "val",
+      "right": "15298010__train__sentinel_308.png",
+      "flip": false,
+      "inliers": 9,
+      "matches": 9,
+      "coverage": 0.5799902677536011,
+      "registered_correlation": 0.7082973737474281,
+      "verified": false,
+      "affine": [
+        [
+          0.6146748654653768,
+          -0.0005011799815737052,
+          6.8518639543840125
+        ],
+        [
+          0.0005011799815737052,
+          0.6146748654653768,
+          25.050694754732028
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_1229.png",
+      "right_split": "val",
+      "right": "15298010__train__sentinel_341.png",
+      "flip": false,
+      "inliers": 9,
+      "matches": 9,
+      "coverage": 0.801927924156189,
+      "registered_correlation": 0.6314443883858397,
+      "verified": false,
+      "affine": [
+        [
+          0.6152837095857788,
+          -0.0005993296360116993,
+          12.392285013669902
+        ],
+        [
+          0.0005993296360116993,
+          0.6152837095857788,
+          63.84421497687643
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_1232.png",
+      "right_split": "val",
+      "right": "15298010__train__sentinel_788.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.15545928478240967,
+      "registered_correlation": 0.9524053564295235,
+      "verified": true,
+      "affine": [
+        [
+          0.6157357308377899,
+          0.0004912618928731554,
+          25.60986449288028
+        ],
+        [
+          -0.0004912618928731554,
+          0.6157357308377899,
+          86.14397544944075
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_980.png",
+      "right_split": "val",
+      "right": "15298010__train__sentinel_92.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.6256436109542847,
+      "registered_correlation": 0.51967548361772,
+      "verified": false,
+      "affine": [
+        [
+          0.6155771304551599,
+          -5.226988385128952e-05,
+          65.70590907085003
+        ],
+        [
+          5.226988385128952e-05,
+          0.6155771304551599,
+          75.6505897261593
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_1141.png",
+      "right_split": "val",
+      "right": "15298010__val__sentinel_204.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.29512351751327515,
+      "registered_correlation": 0.9178187684407205,
+      "verified": true,
+      "affine": [
+        [
+          -4.625084238186976e-05,
+          -0.6152086701013393,
+          218.6957812724616
+        ],
+        [
+          0.6152086701013393,
+          -4.625084238186976e-05,
+          44.277471725487224
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_1266.png",
+      "right_split": "val",
+      "right": "15298010__val__sentinel_773.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.11798422783613205,
+      "registered_correlation": 0.8107889732624766,
+      "verified": true,
+      "affine": [
+        [
+          -0.6151355627176452,
+          -0.00012990202750746483,
+          165.79671608836244
+        ],
+        [
+          0.00012990202750746483,
+          -0.6151355627176452,
+          227.23312741485591
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__00369.png",
+      "right_split": "val",
+      "right": "8346860__Oil__00370.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.014777700416743755,
+      "registered_correlation": 0.9450928661537418,
+      "verified": true,
+      "affine": [
+        [
+          1.0016637864870113,
+          8.399376719530581e-05,
+          -447.2889838499158
+        ],
+        [
+          -8.399376719530581e-05,
+          1.0016637864870113,
+          -99.64963591119971
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_264.png",
+      "right_split": "test",
+      "right": "15298010__train__sentinel_1152.png",
+      "flip": false,
+      "inliers": 10,
+      "matches": 10,
+      "coverage": 0.2304762750864029,
+      "registered_correlation": 0.8237007868665296,
+      "verified": true,
+      "affine": [
+        [
+          1.625063997066731,
+          -0.0015397309367467709,
+          -96.72664004684867
+        ],
+        [
+          0.0015397309367467709,
+          1.625063997066731,
+          -23.906984596930485
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_1413.png",
+      "right_split": "test",
+      "right": "15298010__train__sentinel_1218.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.10837054997682571,
+      "registered_correlation": 0.7318193150322245,
+      "verified": false,
+      "affine": [
+        [
+          0.0010989516755222114,
+          1.622471201698063,
+          -58.42293881122061
+        ],
+        [
+          -1.622471201698063,
+          0.0010989516755222114,
+          201.05955376119397
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_842.png",
+      "right_split": "test",
+      "right": "15298010__train__sentinel_1286.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.22117900848388672,
+      "registered_correlation": 0.9077905543356476,
+      "verified": true,
+      "affine": [
+        [
+          1.6235470374396268,
+          0.00044359991982968543,
+          -134.65646361928256
+        ],
+        [
+          -0.00044359991982968543,
+          1.6235470374396268,
+          -7.740838869962615
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_888.png",
+      "right_split": "test",
+      "right": "15298010__train__sentinel_1332.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.27398398518562317,
+      "registered_correlation": 0.8533591897033963,
+      "verified": true,
+      "affine": [
+        [
+          1.6256680307805047,
+          5.462668418001366e-05,
+          -147.95120501518352
+        ],
+        [
+          -5.462668418001366e-05,
+          1.6256680307805047,
+          -130.96466699681775
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_3086.png",
+      "right_split": "test",
+      "right": "15298010__train__sentinel_1764.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.20948737859725952,
+      "registered_correlation": 0.6306858530862879,
+      "verified": false,
+      "affine": [
+        [
+          -0.0003316073953343864,
+          -0.998355095631125,
+          194.42724760925708
+        ],
+        [
+          0.998355095631125,
+          -0.0003316073953343864,
+          16.270371628700598
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_1080.png",
+      "right_split": "test",
+      "right": "15298010__train__sentinel_192.png",
+      "flip": false,
+      "inliers": 9,
+      "matches": 9,
+      "coverage": 0.6538527011871338,
+      "registered_correlation": 0.7788829326980847,
+      "verified": false,
+      "affine": [
+        [
+          0.6150447113035983,
+          0.00023913179671562738,
+          69.41212821815161
+        ],
+        [
+          -0.00023913179671562738,
+          0.6150447113035983,
+          20.8241769523425
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_990.png",
+      "right_split": "test",
+      "right": "15298010__train__sentinel_2706.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.2841315269470215,
+      "registered_correlation": 0.5621105162735963,
+      "verified": false,
+      "affine": [
+        [
+          0.6168004872827635,
+          0.0006251545875289751,
+          40.23353163148485
+        ],
+        [
+          -0.0006251545875289751,
+          0.6168004872827635,
+          153.04218139339196
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_882.png",
+      "right_split": "test",
+      "right": "15298010__train__sentinel_438.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.12391325831413269,
+      "registered_correlation": 0.7173775965621132,
+      "verified": false,
+      "affine": [
+        [
+          0.9976851375174927,
+          0.0037780252736205285,
+          -73.3044146240082
+        ],
+        [
+          -0.0037780252736205285,
+          0.9976851375174927,
+          -93.90925184810996
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_1362.png",
+      "right_split": "test",
+      "right": "15298010__train__sentinel_474.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.26971492171287537,
+      "registered_correlation": 0.7982985043589008,
+      "verified": false,
+      "affine": [
+        [
+          0.614417014908952,
+          0.00021380003844312555,
+          78.15565776596534
+        ],
+        [
+          -0.00021380003844312555,
+          0.614417014908952,
+          52.45508092401228
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__val__sentinel_495.png",
+      "right_split": "test",
+      "right": "15298010__train__sentinel_988.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.22793947160243988,
+      "registered_correlation": 0.6202486683447234,
+      "verified": false,
+      "affine": [
+        [
+          -1.6258782745023244,
+          -0.002527701056055051,
+          336.95279264040676
+        ],
+        [
+          0.002527701056055051,
+          -1.6258782745023244,
+          347.1280261181036
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_295.png",
+      "right_split": "test",
+      "right": "15298010__val__sentinel_246.png",
+      "flip": false,
+      "inliers": 9,
+      "matches": 9,
+      "coverage": 0.1389809548854828,
+      "registered_correlation": 0.8701223580057222,
+      "verified": true,
+      "affine": [
+        [
+          -0.0008378288238907641,
+          -1.0041367274671966,
+          324.3177435116205
+        ],
+        [
+          1.0041367274671966,
+          -0.0008378288238907641,
+          12.459876981672238
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_232.png",
+      "right_split": "test",
+      "right": "15298010__val__sentinel_627.png",
+      "flip": false,
+      "inliers": 10,
+      "matches": 10,
+      "coverage": 0.05478089675307274,
+      "registered_correlation": 0.8703740605244304,
+      "verified": true,
+      "affine": [
+        [
+          -1.0016427368539544,
+          -0.003867456742793994,
+          294.4168919686023
+        ],
+        [
+          0.003867456742793994,
+          -1.0016427368539544,
+          185.72233512720484
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "15298010__train__sentinel_2137.png",
+      "right_split": "test",
+      "right": "15298010__val__sentinel_742.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.06415899842977524,
+      "registered_correlation": 0.9703735932019918,
+      "verified": true,
+      "affine": [
+        [
+          0.9998791193385647,
+          0.0001922462667900978,
+          224.98187439116637
+        ],
+        [
+          -0.0001922462667900978,
+          0.9998791193385647,
+          -3.9635558933869213
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01154.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00074.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.02432759292423725,
+      "registered_correlation": 0.22460812782845135,
+      "verified": false,
+      "affine": [
+        [
+          1.000505139856023,
+          -0.0027126638512793297,
+          142.1672985813999
+        ],
+        [
+          0.0027126638512793297,
+          1.000505139856023,
+          48.67433036564488
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01154.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00075.png",
+      "flip": false,
+      "inliers": 10,
+      "matches": 10,
+      "coverage": 0.10824449360370636,
+      "registered_correlation": 0.24091217962673556,
+      "verified": false,
+      "affine": [
+        [
+          0.9997549893837956,
+          -0.0011394135847274858,
+          -7.63706197274924
+        ],
+        [
+          0.0011394135847274858,
+          0.9997549893837956,
+          -125.42866990976589
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__00456.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00372.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.04753878340125084,
+      "registered_correlation": 0.23085329358277376,
+      "verified": false,
+      "affine": [
+        [
+          0.9989858464595779,
+          8.943473843128187e-05,
+          -90.96244710437755
+        ],
+        [
+          -8.943473843128187e-05,
+          0.9989858464595779,
+          -182.86787979461033
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__00419.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00372.png",
+      "flip": false,
+      "inliers": 9,
+      "matches": 9,
+      "coverage": 0.10727960616350174,
+      "registered_correlation": 0.22555768636095028,
+      "verified": false,
+      "affine": [
+        [
+          1.0006751173471966,
+          -0.0005743268345966672,
+          -12.451564351202856
+        ],
+        [
+          0.0005743268345966672,
+          1.0006751173471966,
+          3.8806499525945886
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__00701.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00372.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.08414636552333832,
+      "registered_correlation": 0.2828756259483976,
+      "verified": false,
+      "affine": [
+        [
+          0.9998515844820953,
+          0.00010382395332429198,
+          58.035880642297236
+        ],
+        [
+          -0.00010382395332429198,
+          0.9998515844820953,
+          -29.078578981446135
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__00419.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00377.png",
+      "flip": false,
+      "inliers": 11,
+      "matches": 11,
+      "coverage": 0.10034473985433578,
+      "registered_correlation": 0.21067897684573078,
+      "verified": false,
+      "affine": [
+        [
+          0.9983540325888997,
+          5.8033486079891545e-05,
+          5.098009245185557
+        ],
+        [
+          -5.8033486079891545e-05,
+          0.9983540325888997,
+          24.29434323571982
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01107.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00377.png",
+      "flip": false,
+      "inliers": 13,
+      "matches": 14,
+      "coverage": 0.08204460889101028,
+      "registered_correlation": 0.2356286840864112,
+      "verified": false,
+      "affine": [
+        [
+          1.0052473462712652,
+          -0.004208220408827872,
+          -97.48933709124499
+        ],
+        [
+          0.004208220408827872,
+          1.0052473462712652,
+          -11.108422407052888
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__00700.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00377.png",
+      "flip": false,
+      "inliers": 11,
+      "matches": 11,
+      "coverage": 0.07726587355136871,
+      "registered_correlation": 0.3077673299765535,
+      "verified": false,
+      "affine": [
+        [
+          0.9992122393518155,
+          -0.0002176667720645426,
+          -264.7003155884003
+        ],
+        [
+          0.0002176667720645426,
+          0.9992122393518155,
+          52.57443699681262
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01154.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00377.png",
+      "flip": false,
+      "inliers": 9,
+      "matches": 9,
+      "coverage": 0.09959496557712555,
+      "registered_correlation": 0.06941089997933826,
+      "verified": false,
+      "affine": [
+        [
+          0.9994720671551899,
+          -0.0010945876492977138,
+          19.648715267658957
+        ],
+        [
+          0.0010945876492977138,
+          0.9994720671551899,
+          50.631555338037444
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__00703.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00377.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.026295049116015434,
+      "registered_correlation": 0.2323924427807148,
+      "verified": false,
+      "affine": [
+        [
+          0.9997713171749637,
+          0.0003863039709894376,
+          -45.832475813920595
+        ],
+        [
+          -0.0003863039709894376,
+          0.9997713171749637,
+          194.78264051028998
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__00700.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00404.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 9,
+      "coverage": 0.06201689690351486,
+      "registered_correlation": 0.28754777628117667,
+      "verified": false,
+      "affine": [
+        [
+          0.9970149301043275,
+          0.00016475299569424962,
+          -95.33455899638123
+        ],
+        [
+          -0.00016475299569424962,
+          0.9970149301043275,
+          -143.7404006141739
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__00419.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00404.png",
+      "flip": false,
+      "inliers": 11,
+      "matches": 11,
+      "coverage": 0.06294745951890945,
+      "registered_correlation": 0.22726364071104282,
+      "verified": false,
+      "affine": [
+        [
+          1.0019003622427425,
+          0.0008869718755238979,
+          172.83838949204838
+        ],
+        [
+          -0.0008869718755238979,
+          1.0019003622427425,
+          -174.19080563725487
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01154.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00769.png",
+      "flip": false,
+      "inliers": 11,
+      "matches": 11,
+      "coverage": 0.07775954902172089,
+      "registered_correlation": 0.23265135101281612,
+      "verified": false,
+      "affine": [
+        [
+          1.0000883529561873,
+          -0.0013880315711973764,
+          200.7516683978478
+        ],
+        [
+          0.0013880315711973764,
+          1.0000883529561873,
+          84.0925880597685
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__00156.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00769.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.0894702896475792,
+      "registered_correlation": 0.14372357388567583,
+      "verified": false,
+      "affine": [
+        [
+          0.9971715024182837,
+          -0.0006813273663039671,
+          33.50201347636678
+        ],
+        [
+          0.0006813273663039671,
+          0.9971715024182837,
+          120.11169037705093
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01107.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00769.png",
+      "flip": false,
+      "inliers": 9,
+      "matches": 9,
+      "coverage": 0.025057656690478325,
+      "registered_correlation": 0.20823006835133598,
+      "verified": false,
+      "affine": [
+        [
+          1.0022343891682917,
+          -0.004855369552072522,
+          85.2031732023197
+        ],
+        [
+          0.004855369552072522,
+          1.0022343891682917,
+          23.716954242044075
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01134.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00769.png",
+      "flip": false,
+      "inliers": 17,
+      "matches": 17,
+      "coverage": 0.17149651050567627,
+      "registered_correlation": 0.3131266351267335,
+      "verified": false,
+      "affine": [
+        [
+          1.0007729047673715,
+          -0.00024115205196062716,
+          -26.250729889826683
+        ],
+        [
+          0.00024115205196062716,
+          1.0007729047673715,
+          -33.909297487941934
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01120.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00769.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.10361051559448242,
+      "registered_correlation": 0.21742795065971746,
+      "verified": false,
+      "affine": [
+        [
+          0.9987595627131085,
+          -0.0013445871302613672,
+          -51.25912544156545
+        ],
+        [
+          0.0013445871302613672,
+          0.9987595627131085,
+          -64.3779601571646
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__00700.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00769.png",
+      "flip": false,
+      "inliers": 16,
+      "matches": 16,
+      "coverage": 0.22696416079998016,
+      "registered_correlation": 0.3851330017653174,
+      "verified": false,
+      "affine": [
+        [
+          0.9997438585905171,
+          2.6554655060020814e-05,
+          -83.41790316001209
+        ],
+        [
+          -2.6554655060020814e-05,
+          0.9997438585905171,
+          85.99818555149604
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__00412.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00769.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.1593760997056961,
+      "registered_correlation": 0.2577977316050526,
+      "verified": false,
+      "affine": [
+        [
+          0.9992103869910617,
+          0.00011723514360208854,
+          93.12533806198155
+        ],
+        [
+          -0.00011723514360208854,
+          0.9992103869910617,
+          33.36809135594839
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01113.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00769.png",
+      "flip": false,
+      "inliers": 9,
+      "matches": 9,
+      "coverage": 0.04338376969099045,
+      "registered_correlation": 0.5317715785929388,
+      "verified": false,
+      "affine": [
+        [
+          1.0000112494020452,
+          0.0002086321279057945,
+          -121.86639308028847
+        ],
+        [
+          -0.0002086321279057945,
+          1.0000112494020452,
+          -206.06152257791177
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01152.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00769.png",
+      "flip": false,
+      "inliers": 9,
+      "matches": 9,
+      "coverage": 0.04864806309342384,
+      "registered_correlation": 0.16531246986786508,
+      "verified": false,
+      "affine": [
+        [
+          1.0001034242970666,
+          0.0003968481694359412,
+          -12.700269603891538
+        ],
+        [
+          -0.0003968481694359412,
+          1.0001034242970666,
+          -178.53964302361337
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__00326.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00769.png",
+      "flip": false,
+      "inliers": 9,
+      "matches": 9,
+      "coverage": 0.10634417831897736,
+      "registered_correlation": 0.385444211149958,
+      "verified": false,
+      "affine": [
+        [
+          0.9996328237141421,
+          0.00023020281641866988,
+          177.88367107510513
+        ],
+        [
+          -0.00023020281641866988,
+          0.9996328237141421,
+          87.6053657937321
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01121.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00769.png",
+      "flip": false,
+      "inliers": 9,
+      "matches": 9,
+      "coverage": 0.20387418568134308,
+      "registered_correlation": 0.23477467277386624,
+      "verified": false,
+      "affine": [
+        [
+          0.9994821287473478,
+          6.045476083061373e-05,
+          175.71694003608806
+        ],
+        [
+          -6.045476083061373e-05,
+          0.9994821287473478,
+          -4.70127112123476
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__00703.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00769.png",
+      "flip": false,
+      "inliers": 9,
+      "matches": 9,
+      "coverage": 0.05253344774246216,
+      "registered_correlation": 0.5202627577807943,
+      "verified": false,
+      "affine": [
+        [
+          1.001390578890642,
+          -0.0017271841514938172,
+          135.6641717325578
+        ],
+        [
+          0.0017271841514938172,
+          1.001390578890642,
+          227.31960594349627
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__00086.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00769.png",
+      "flip": false,
+      "inliers": 10,
+      "matches": 10,
+      "coverage": 0.10546375066041946,
+      "registered_correlation": 0.5460833893848369,
+      "verified": false,
+      "affine": [
+        [
+          0.9995422013630696,
+          -0.00034669520321383053,
+          166.13992270015018
+        ],
+        [
+          0.00034669520321383053,
+          0.9995422013630696,
+          156.54568666351895
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01134.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00776.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.04124552756547928,
+      "registered_correlation": 0.24809190402269007,
+      "verified": false,
+      "affine": [
+        [
+          1.002986763132369,
+          -0.002729044023250368,
+          -67.34780971476347
+        ],
+        [
+          0.002729044023250368,
+          1.002986763132369,
+          192.16882909005292
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01113.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00776.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.022315945476293564,
+      "registered_correlation": 0.48238742325951356,
+      "verified": false,
+      "affine": [
+        [
+          0.9998693224101872,
+          0.00013163450830602977,
+          -162.26980409086127
+        ],
+        [
+          -0.00013163450830602977,
+          0.9998693224101872,
+          20.921563039907717
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__00700.png",
+      "right_split": "test",
+      "right": "8346860__Oil__00776.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.025767315179109573,
+      "registered_correlation": 0.36344296077629484,
+      "verified": false,
+      "affine": [
+        [
+          1.0002141903222999,
+          0.0007931099462193416,
+          -124.11935288500769
+        ],
+        [
+          -0.0007931099462193416,
+          1.0002141903222999,
+          313.08186389888186
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01113.png",
+      "right_split": "test",
+      "right": "8346860__Oil__01098.png",
+      "flip": false,
+      "inliers": 9,
+      "matches": 10,
+      "coverage": 0.005698932334780693,
+      "registered_correlation": 0.4107209262556965,
+      "verified": false,
+      "affine": [
+        [
+          0.9991084613999935,
+          0.0035975256886814164,
+          -384.87826624768525
+        ],
+        [
+          -0.0035975256886814164,
+          0.9991084613999935,
+          -413.70029479665146
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__00419.png",
+      "right_split": "test",
+      "right": "8346860__Oil__01098.png",
+      "flip": false,
+      "inliers": 11,
+      "matches": 11,
+      "coverage": 0.09476490318775177,
+      "registered_correlation": 0.2994255552327145,
+      "verified": false,
+      "affine": [
+        [
+          1.0001434625124335,
+          -0.0011733823518232467,
+          -75.58560061476128
+        ],
+        [
+          0.0011733823518232467,
+          1.0001434625124335,
+          -152.89739020945615
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01154.png",
+      "right_split": "test",
+      "right": "8346860__Oil__01098.png",
+      "flip": false,
+      "inliers": 8,
+      "matches": 8,
+      "coverage": 0.0994548350572586,
+      "registered_correlation": 0.2802658621695004,
+      "verified": false,
+      "affine": [
+        [
+          1.001092583146143,
+          -5.15681320163694e-05,
+          -61.88460930734777
+        ],
+        [
+          5.15681320163694e-05,
+          1.001092583146143,
+          -125.6214874689113
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01113.png",
+      "right_split": "test",
+      "right": "8346860__Oil__01103.png",
+      "flip": false,
+      "inliers": 9,
+      "matches": 9,
+      "coverage": 0.0062575857155025005,
+      "registered_correlation": 0.43709771079952864,
+      "verified": false,
+      "affine": [
+        [
+          0.9990467371077321,
+          0.0028267017405893325,
+          -358.152682887619
+        ],
+        [
+          -0.0028267017405893325,
+          0.9990467371077321,
+          -23.469548695796195
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01261.png",
+      "right_split": "test",
+      "right": "8346860__Oil__01271.png",
+      "flip": false,
+      "inliers": 10,
+      "matches": 10,
+      "coverage": 0.12001346796751022,
+      "registered_correlation": 0.27573903173865805,
+      "verified": false,
+      "affine": [
+        [
+          0.9999272733451766,
+          -0.00022888554659023785,
+          -50.51184249421974
+        ],
+        [
+          0.00022888554659023785,
+          0.9999272733451766,
+          -133.40168120384251
+        ]
+      ]
+    },
+    {
+      "left_split": "train",
+      "left": "8346860__Oil__01269.png",
+      "right_split": "test",
+      "right": "8346860__Oil__01271.png",
+      "flip": false,
+      "inliers": 11,
+      "matches": 11,
+      "coverage": 0.2070857137441635,
+      "registered_correlation": 0.31362290041701785,
+      "verified": false,
+      "affine": [
+        [
+          1.0002195887505554,
+          0.0001657679616127566,
+          29.03150099531605
+        ],
+        [
+          -0.0001657679616127566,
+          1.0002195887505554,
+          -21.116459518651183
+        ]
+      ]
+    }
+  ]
+}

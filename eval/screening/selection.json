@@ -1,0 +1,23 @@
+{
+  "status": "selected_for_final_training_not_deployment",
+  "models": [
+    "none-ciou",
+    "L1-ciou",
+    "L4-ciou"
+  ],
+  "reserve": "L5-ciou",
+  "epochs_each": 100,
+  "completed_epochs": 780,
+  "total_epochs": 1080,
+  "remaining_epochs": 300,
+  "training_started": false,
+  "protocol": "PLAN/SCREENING_REVIEW.md",
+  "report": "eval/screening/REVIEW.md",
+  "gates": [
+    "versioned duplicate/scene-aware split and holdout audit",
+    "binary scope / human two-class relabeling decision",
+    "explicit optimizer and augmentation",
+    "final runner with separate outputs",
+    "preserve missing baseline and MPDIoU limitations"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "completed_at": "2026-09-17",
+  "checkpoint": "runs/final_l1_fp32_release/L1-ciou/weights/best-fp32.pt",
+  "checkpoint_sha256": "d4a74906e3a9b692c14f28305baf3cb20ba63da4c38bc30dbabd14c5c6d1fc6c",
+  "dataset": "data/processed/dataset/final-v11/data.yaml",
+  "split": "val",
+  "images": 482,
+  "instances": 2375,
+  "held_out_test_used": false,
+  "settings": {
+    "imgsz": 1024,
+    "batch": 8,
+    "workers": 2,
+    "device": 0,
+    "rect": true,
+    "half": true
+  },
+  "live_peak": {
+    "epoch": 71,
+    "metrics/mAP50-95(M)": 0.15622
+  },
+  "fresh_reload_metrics": {
+    "fitness": 0.3454347363504512,
+    "metrics/precision(B)": 0.5366139671203641,
+    "metrics/recall(B)": 0.3490526315789474,
+    "metrics/mAP50(B)": 0.3670981860403924,
+    "metrics/mAP50-95(B)": 0.189754712818167,
+    "metrics/precision(M)": 0.5213103690484615,
+    "metrics/recall(M)": 0.3469473684210526,
+    "metrics/mAP50(M)": 0.35702372896129586,
+    "metrics/mAP50-95(M)": 0.15568002353228422
+  },
+  "mask_map5095_delta": 0.00053997646771578,
+  "within_run_tolerance": 0.004,
+  "parity_gate": "passed"
+}

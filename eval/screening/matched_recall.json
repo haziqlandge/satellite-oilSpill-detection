@@ -1,0 +1,104 @@
+{
+  "L1-ciou": {
+    "0.3": {
+      "threshold": 0.29082348942756653,
+      "recall": 0.3003064351378958,
+      "precision": 0.7044728434504792,
+      "negative_fp_images": 4,
+      "lookalike_fp_images": 3,
+      "lookalike_fp_instances": 4
+    },
+    "0.35": {
+      "threshold": 0.22540079057216644,
+      "recall": 0.35001702417432756,
+      "precision": 0.6144650328750747,
+      "negative_fp_images": 6,
+      "lookalike_fp_images": 5,
+      "lookalike_fp_instances": 7
+    },
+    "0.4": {
+      "threshold": 0.16966743767261505,
+      "recall": 0.4000680966973102,
+      "precision": 0.5019222554463905,
+      "negative_fp_images": 8,
+      "lookalike_fp_images": 7,
+      "lookalike_fp_instances": 15
+    },
+    "0.45": {
+      "threshold": 0.12890653312206268,
+      "recall": 0.4501191692202928,
+      "precision": 0.4206172446706968,
+      "negative_fp_images": 10,
+      "lookalike_fp_images": 7,
+      "lookalike_fp_instances": 28
+    }
+  },
+  "L4-ciou": {
+    "0.3": {
+      "threshold": 0.25822076201438904,
+      "recall": 0.3003064351378958,
+      "precision": 0.6863813229571984,
+      "negative_fp_images": 3,
+      "lookalike_fp_images": 2,
+      "lookalike_fp_instances": 2
+    },
+    "0.35": {
+      "threshold": 0.20019064843654633,
+      "recall": 0.35001702417432756,
+      "precision": 0.6061320754716981,
+      "negative_fp_images": 7,
+      "lookalike_fp_images": 4,
+      "lookalike_fp_instances": 4
+    },
+    "0.4": {
+      "threshold": 0.15005791187286377,
+      "recall": 0.4000680966973102,
+      "precision": 0.513548951048951,
+      "negative_fp_images": 10,
+      "lookalike_fp_images": 5,
+      "lookalike_fp_instances": 10
+    },
+    "0.45": {
+      "threshold": 0.10841657966375351,
+      "recall": 0.4501191692202928,
+      "precision": 0.4132541419193498,
+      "negative_fp_images": 14,
+      "lookalike_fp_images": 8,
+      "lookalike_fp_instances": 27
+    }
+  },
+  "L5-ciou": {
+    "0.3": {
+      "threshold": 0.26576489210128784,
+      "recall": 0.3003064351378958,
+      "precision": 0.7,
+      "negative_fp_images": 7,
+      "lookalike_fp_images": 6,
+      "lookalike_fp_instances": 8
+    },
+    "0.35": {
+      "threshold": 0.19705365598201752,
+      "recall": 0.35001702417432756,
+      "precision": 0.5928489042675894,
+      "negative_fp_images": 9,
+      "lookalike_fp_images": 8,
+      "lookalike_fp_instances": 22
+    },
+    "0.4": {
+      "threshold": 0.14424541592597961,
+      "recall": 0.4000680966973102,
+      "precision": 0.49142618151401085,
+      "negative_fp_images": 15,
+      "lookalike_fp_images": 11,
+      "lookalike_fp_instances": 54
+    },
+    "0.45": {
+      "threshold": 0.11017508059740067,
+      "recall": 0.4501191692202928,
+      "precision": 0.40626920712968656,
+      "negative_fp_images": 18,
+      "lookalike_fp_images": 12,
+      "lookalike_fp_instances": 81
+    }
+  }
+}

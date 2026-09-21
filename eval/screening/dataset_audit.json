@@ -1,0 +1,73 @@
+{
+  "counts": {
+    "train/13761290": {
+      "images": 340,
+      "negative": 222,
+      "instances": 1652,
+      "lookalike": 116,
+      "no_oil": 106,
+      "missing_label": 0
+    },
+    "train/15298010": {
+      "images": 3291,
+      "negative": 147,
+      "instances": 11047,
+      "lookalike": 0,
+      "no_oil": 0,
+      "missing_label": 0
+    },
+    "train/8346860": {
+      "images": 975,
+      "negative": 0,
+      "instances": 10080,
+      "lookalike": 0,
+      "no_oil": 0,
+      "missing_label": 0
+    },
+    "val/13761290": {
+      "images": 57,
+      "negative": 38,
+      "instances": 380,
+      "lookalike": 23,
+      "no_oil": 15,
+      "missing_label": 0
+    },
+    "val/15298010": {
+      "images": 413,
+      "negative": 17,
+      "instances": 1369,
+      "lookalike": 0,
+      "no_oil": 0,
+      "missing_label": 0
+    },
+    "val/8346860": {
+      "images": 115,
+      "negative": 0,
+      "instances": 1188,
+      "lookalike": 0,
+      "no_oil": 0,
+      "missing_label": 0
+    }
+  },
+  "duplicates": [
+    [
+      "train/8346860__Oil__00357.png",
+      "val/8346860__Oil__00356.png"
+    ],
+    [
+      "train/8346860__Oil__01339.png",
+      "val/8346860__Oil__00007.png"
+    ]
+  ],
+  "cross_split_duplicates": [
+    [
+      "train/8346860__Oil__00357.png",
+      "val/8346860__Oil__00356.png"
+    ],
+    [
+      "train/8346860__Oil__01339.png",
+      "val/8346860__Oil__00007.png"
+    ]
+  ],
+  "test": "Not read; test images and labels reserved."
+}

@@ -1,0 +1,50 @@
+{
+  "train": {
+    "images": 4606,
+    "instances": 22779,
+    "negative_images": 369,
+    "errors": [],
+    "sizes": [
+      [
+        256,
+        256
+      ],
+      [
+        2048,
+        2048
+      ]
+    ]
+  },
+  "val": {
+    "images": 585,
+    "instances": 2937,
+    "negative_images": 55,
+    "errors": [],
+    "sizes": [
+      [
+        256,
+        256
+      ],
+      [
+        2048,
+        2048
+      ]
+    ]
+  },
+  "test": {
+    "images": 627,
+    "instances": 2859,
+    "negative_images": 61,
+    "errors": [],
+    "sizes": [
+      [
+        256,
+        256
+      ],
+      [
+        2048,
+        2048
+      ]
+    ]
+  }
+}

@@ -36,8 +36,15 @@ class AisTrajectory:
         )
         return f"SRID=4326;LINESTRING M ({coordinates})"
 
-    def as_db_values(self) -> dict[str, object]:
-        """Values matching ``AisTrack`` apart from its generated primary key."""
+    def as_db_values(self, *, behaviour: dict[str, object] | None = None) -> dict[str, object]:
+        """Values matching ``AisTrack`` apart from its generated primary key.
+
+        ``behaviour`` is passed in rather than computed here, so that this stays
+        a pure serialisation step and the caller decides what analysis to
+        persist. Omitting it stores ``{}``, which is what PHASE-05's
+        "BRANDON BORDELON's mooring is visible" criterion caught: the tracks
+        were queryable but carried no behavioural signal for PHASE-06 to read.
+        """
 
         return {
             "mmsi": self.mmsi,
@@ -46,6 +53,7 @@ class AisTrajectory:
             "ended_at": self.ended_at,
             "geom": self.ewkt,
             "source": self.source,
+            "behaviour": behaviour or {},
         }
 
 

@@ -1,0 +1,201 @@
+{
+  "source": "8346860__Oil__00001",
+  "class_scheme": [
+    "oos",
+    "slick_unknown"
+  ],
+  "note": "proposed_class is a suggestion, not a label. Set confirmed_class and confirmed_by to accept or override it. Records left unconfirmed are ignored.",
+  "instances": [
+    {
+      "label": 2,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.532,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.677,
+        "compactness": 0.4492,
+        "solidity": 0.722,
+        "area_px": 91.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.7 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 2,
+        "area_px": 91,
+        "perimeter_px": 50.45584412271571,
+        "elongation": 2.6766095557066794,
+        "compactness": 0.4491881635706805,
+        "solidity": 0.7222222222222222,
+        "orientation_deg": -75.15416964487036,
+        "centroid_rc": [
+          914.4835164835165,
+          1666.098901098901
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    },
+    {
+      "label": 3,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.515,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.853,
+        "compactness": 0.3797,
+        "solidity": 0.768,
+        "area_px": 314.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.9 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 3,
+        "area_px": 314,
+        "perimeter_px": 101.94722215136414,
+        "elongation": 2.8526449482662675,
+        "compactness": 0.37965464589475145,
+        "solidity": 0.7677261613691931,
+        "orientation_deg": -52.827643782658654,
+        "centroid_rc": [
+          945.3662420382166,
+          1639.7866242038217
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    },
+    {
+      "label": 4,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.675,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.246,
+        "compactness": 0.8998,
+        "solidity": 0.91,
+        "area_px": 101.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.2 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 4,
+        "area_px": 101,
+        "perimeter_px": 37.55634918610404,
+        "elongation": 1.24620414883038,
+        "compactness": 0.8998383558630971,
+        "solidity": 0.9099099099099099,
+        "orientation_deg": -80.30879919050082,
+        "centroid_rc": [
+          942.3861386138614,
+          1669.5841584158416
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    },
+    {
+      "label": 5,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.679,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.206,
+        "compactness": 0.9738,
+        "solidity": 0.933,
+        "area_px": 83.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.2 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 5,
+        "area_px": 83,
+        "perimeter_px": 32.72792206135785,
+        "elongation": 1.2060174362081073,
+        "compactness": 0.9737581192837734,
+        "solidity": 0.9325842696629213,
+        "orientation_deg": -59.330940177061585,
+        "centroid_rc": [
+          946.0602409638554,
+          1457.6265060240964
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    },
+    {
+      "label": 9,
+      "proposed_class": null,
+      "confidence": 0.0,
+      "needs_review": true,
+      "terms": {
+        "elongation": 3.93,
+        "compactness": 0.1436,
+        "solidity": 0.698,
+        "area_px": 55172.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 3.9 falls between 3.0 and 6.0; morphology does not distinguish the classes here"
+      ],
+      "morphology": {
+        "label": 9,
+        "area_px": 55172,
+        "perimeter_px": 2197.4114344382924,
+        "elongation": 3.9295127374563803,
+        "compactness": 0.1435839284382419,
+        "solidity": 0.6975056574672246,
+        "orientation_deg": -74.55835456120288,
+        "centroid_rc": [
+          1059.6784782135867,
+          1423.8402631769738
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    },
+    {
+      "label": 12,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.601,
+      "needs_review": true,
+      "terms": {
+        "elongation": 1.991,
+        "compactness": 0.713,
+        "solidity": 0.85,
+        "area_px": 113.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.0 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 12,
+        "area_px": 113,
+        "perimeter_px": 44.62741699796952,
+        "elongation": 1.9906633970153451,
+        "compactness": 0.7129922441311108,
+        "solidity": 0.849624060150376,
+        "orientation_deg": -87.4432539917118,
+        "centroid_rc": [
+          991.9469026548672,
+          1418.2477876106195
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    }
+  ],
+  "image_sha256": "9ee2043faa6851680a22841495f3520e8cb506559f1c3cb371e0ce98318c2672",
+  "mask_sha256": "51c451cf2ac984d82ea32a8f21a195655992d1f7bc9f569198dc4f8a02730dfd",
+  "original_image": "C:\\Users\\adi\\Downloads\\oilSpil2l16\\oilSpil2l\\data\\interim\\datasets\\zenodo\\8346860\\01_Train_Val_Oil_Spill_images\\Oil\\00001.tif",
+  "original_mask": "C:\\Users\\adi\\Downloads\\oilSpil2l16\\oilSpil2l\\data\\interim\\datasets\\zenodo\\8346860\\01_Train_Val_Oil_Spill_mask\\Mask_oil\\00001.tif",
+  "split": "train"
+}

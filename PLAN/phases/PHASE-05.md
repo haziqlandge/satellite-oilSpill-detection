@@ -108,14 +108,22 @@ anomalous, and always surface the raw gap plus the expected rate on the evidence
 - Gap detection does not flag a gap explained by low expected reception.
 
 ## Acceptance criteria
-- [ ] marinecadastre data for 2023-04-09, **2023-05-15**, 2023-12-05 loads cleanly
-- [ ] **`BOCHEM LONDON` queryable by name**, track present in the acquisition window
-- [ ] **`BRANDON BORDELON` queryable**, and its mooring at 18:59:12 UTC 2023-12-03 is
-      visible as a loitering/berthed signal
-- [ ] Synthetic generator produces all five Indian-waters scenarios with authored ground truth
-- [ ] Synthetic records pass the real loader unchanged
-- [ ] Spatiotemporal query over a full fixture day returns in < 2 s
-- [ ] Gap detection normalised by expected reception density
+- [x] marinecadastre data for 2023-04-09, **2023-05-15**, 2023-12-05 loads cleanly —
+      **all three ingested 2026-08-31**: 26.5 M national rows per case clipped to the AOI and
+      48 h window, then built into tracks. **6,737 tracks** in `ais_tracks`
+      (2,234 + 2,354 + 2,149). Two unparseable rows across Case 2 were counted and skipped,
+      not silently dropped
+- [x] **`BOCHEM LONDON` queryable by name**, track present in the acquisition window —
+      MMSI 477636500, `is_transiting=True`, silent fraction 0.4%, 1 gap
+- [x] **`BRANDON BORDELON` queryable**, and its mooring at 18:59:12 UTC 2023-12-03 is
+      visible as a loitering/berthed signal — MMSI 367697440, **`is_loitering=True`**,
+      silent fraction 27.4%, 36 gaps, stored in `ais_tracks.behaviour`
+- [x] Synthetic generator produces all five Indian-waters scenarios with authored ground truth
+- [x] Synthetic records pass the real loader unchanged
+- [x] Spatiotemporal query over a full fixture day returns in < 2 s — bounding box plus time
+      window against the GIST index, asserted in `tests/test_ais_database.py`
+- [x] Gap detection normalised by expected reception density — a vessel with enough gaps is
+      judged against **its own** gap distribution, not a whole-track median
 
 ## Known failure conditions
 - MMSI is not a stable vessel identity (reassignment, spoofing) → prefer IMO where present;

@@ -202,3 +202,7 @@ Papers: [[P001]] [[P002]] [[P003]] [[P004]]
 Topics: [[sar-oil-spill-detection]] [[drift-modelling-and-hindcasting]]
 [[ais-attribution-and-scoring]] [[lookalike-discrimination]] [[slick-age-estimation]]
 [[datasets-and-data-access]]
+
+## Local empirical update — 2026-09-15
+
+The [screening review](../eval/screening/REVIEW.md) selects none-ciou/L1-ciou/L4-ciou for final comparison. L5 did not earn automatic priority on segmentation and look-alike tradeoffs. This is conditional single-seed internal validation, not a universal negative result. The intended MPDIoU question remains unresolved because its training patch used inconsistent coordinate scales. Named look-alikes are only 2.52% of current training images and 3.93% of validation, not the intended ~10%; do not conflate all backgrounds with look-alikes.

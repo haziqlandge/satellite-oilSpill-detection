@@ -1,0 +1,78 @@
+{
+  "matched_recall": {
+    "L1": {
+      "0.3": {
+        "threshold": 0.25855499505996704,
+        "recall": 0.3002105263157895,
+        "precision": 0.6094017094017095,
+        "lookalike_images": 23,
+        "lookalike_fp_images": 11,
+        "lookalike_fp_instances": 29
+      },
+      "0.35": {
+        "threshold": 0.18049807846546173,
+        "recall": 0.3503157894736842,
+        "precision": 0.5015069318866787,
+        "lookalike_images": 23,
+        "lookalike_fp_images": 13,
+        "lookalike_fp_instances": 41
+      },
+      "0.4": {
+        "threshold": 0.11999783664941788,
+        "recall": 0.4,
+        "precision": 0.39207593891869585,
+        "lookalike_images": 23,
+        "lookalike_fp_images": 14,
+        "lookalike_fp_instances": 62
+      }
+    },
+    "none": {
+      "0.3": {
+        "threshold": 0.2424773871898651,
+        "recall": 0.3002105263157895,
+        "precision": 0.5587774294670846,
+        "lookalike_images": 23,
+        "lookalike_fp_images": 8,
+        "lookalike_fp_instances": 26
+      },
+      "0.35": {
+        "threshold": 0.16986986994743347,
+        "recall": 0.3503157894736842,
+        "precision": 0.4622222222222222,
+        "lookalike_images": 23,
+        "lookalike_fp_images": 10,
+        "lookalike_fp_instances": 56
+      },
+      "0.4": {
+        "threshold": 0.11721976101398468,
+        "recall": 0.4,
+        "precision": 0.3747534516765286,
+        "lookalike_images": 23,
+        "lookalike_fp_images": 11,
+        "lookalike_fp_instances": 92
+      }
+    }
+  },
+  "comparison": "L1 minus none, confidence .25, paired validation tiles only",
+  "limitations": "Tile bootstrap excludes unknown scene dependence, seed variability and selection bias. Border flags refer to padded tensor boundaries and are not valid tile-border recall.",
+  "bootstrap": {
+    "dice": {
+      "difference": 0.000368720849053786,
+      "lower": -0.017268480923711974,
+      "upper": 0.017614343969136165,
+      "n": 429
+    },
+    "recall": {
+      "difference": 0.007578947368421052,
+      "lower": -0.004376738863629415,
+      "upper": 0.020479977562700844,
+      "n": 429
+    },
+    "lookalike_alarm": {
+      "difference": 0.13043478260869565,
+      "lower": -0.043478260869565216,
+      "upper": 0.30434782608695654,
+      "n": 23
+    }
+  }
+}

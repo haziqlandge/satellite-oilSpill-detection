@@ -172,10 +172,55 @@ a **freshly launched** one.
 
 ## 6. Start work
 
-Read [`../HANDOFF.md`](../HANDOFF.md), then `PLAN/INDEX.md`, then
-`PLAN/phases/PHASE-01.md`.
+Read [`../HANDOFF.md`](../HANDOFF.md) **including its state header**, then `PLAN/INDEX.md`,
+then your current phase file.
+
+```bash
+run.bat
+```
+
+is the interactive entry point: progress, resume the grid, benchmark, tests, doctor,
+thermal. It sets the OMP thread caps before Python starts, which matters — the OMP runtime
+reads them once, at the first `import torch`.
 
 Do not touch `frontDemo/` - it belongs to the session on the other machine.
+
+### What the zip does NOT carry, and what that costs
+
+The archive is code and documents only. **Everything below is absent on a new machine and
+must be regenerated or re-downloaded.** None of it is lost — but budget the time.
+
+| Missing | Size | How to get it back |
+|---|---|---|
+| `data/raw/` — Zenodo corpus | ~48 GB | `scripts/download_zenodo.py --records essential` (~9 MB/s serial, so hours) |
+| `data/raw/sar/safe/` — three `.SAFE` products | ~10 GB | `scripts/download_cdse_fixture_safe.py` |
+| SNAP-processed scenes | ~10 GB | `scripts/preprocess_fixtures.py --max-heap-gb 8`, ~1 h per scene |
+| `data/processed/dataset/oos/` — the YOLO tree | ~11 GB | `scripts/build_dataset.py` |
+| `*.npy` image cache | ~11 GB | Rebuilt automatically on the first training run (slower first epoch), then `scripts/presize_cache.py --split train` |
+| `runs/` — training runs and curves | ~1 GB | **Not regenerable.** The two finished ablation cells and their loss curves live here; copy `runs/` separately if the analysis matters |
+| `weights/` | varies | Re-download `yolo11n-seg.pt`; trained weights are not regenerable |
+| `.env` | — | Carry separately, see below |
+
+> **`runs/` is the one directory worth copying by hand.** `runs/ablation/*/results.csv` and
+> `runs/segment/baseline-screen/results.csv` are the evidence behind the "60 epochs
+> under-trains" and noise-floor findings in `HANDOFF.md`. Re-deriving them costs ~4.5 h of
+> GPU time.
+
+### Machine-specific values that will be wrong elsewhere
+
+These were measured on the RTX 5070 Ti laptop / Core Ultra 9 275HX and **must be re-measured**
+on different hardware. None of them is a preference; all are measurements.
+
+| Constant | Value here | Re-measure with |
+|---|---|---|
+| `TRAINER_BASE_GB`, `PER_WORKER_GB` | 4.0, 2.9 | `scripts/benchmark_pipeline.py --sweep workers` |
+| `DEFAULT_WORKERS` | 2 | same |
+| batch | 8 | `scripts/train.py --auto-batch` |
+| E-core pinning | 16 E-cores of 24 | automatic — `logical_cores_by_efficiency()` reads the topology, so a non-hybrid CPU falls back to a plain count |
+
+`backend/device.py` already resolves the GPU and a starting batch by inspection, so the
+repository moves between machines without edits — but the **RAM and worker figures do not**,
+because they depend on how much memory the machine's other applications hold.
 
 ---
 

@@ -1,0 +1,201 @@
+{
+  "source": "15298010__train__sentinel_1032",
+  "class_scheme": [
+    "oos",
+    "slick_unknown"
+  ],
+  "note": "proposed_class is a suggestion, not a label. Set confirmed_class and confirmed_by to accept or override it. Records left unconfirmed are ignored.",
+  "instances": [
+    {
+      "label": 1,
+      "proposed_class": null,
+      "confidence": 0.0,
+      "needs_review": true,
+      "terms": {
+        "elongation": 10.217,
+        "compactness": 0.1231,
+        "solidity": 0.469,
+        "area_px": 544.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 10.2 is linear but no bright target within 300 px; a ship wake has this exact morphology, so shape alone is not evidence of an oil spill"
+      ],
+      "morphology": {
+        "label": 1,
+        "area_px": 544,
+        "perimeter_px": 235.67514421272202,
+        "elongation": 10.216703868164377,
+        "compactness": 0.12307821830218925,
+        "solidity": 0.46856158484065463,
+        "orientation_deg": -76.85341500620092,
+        "centroid_rc": [
+          21.248161764705884,
+          63.14705882352941
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    },
+    {
+      "label": 2,
+      "proposed_class": null,
+      "confidence": 0.0,
+      "needs_review": true,
+      "terms": {
+        "elongation": 3.642,
+        "compactness": 0.287,
+        "solidity": 0.586,
+        "area_px": 602.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 3.6 falls between 3.0 and 6.0; morphology does not distinguish the classes here"
+      ],
+      "morphology": {
+        "label": 2,
+        "area_px": 602,
+        "perimeter_px": 162.36143571373725,
+        "elongation": 3.6415532705809923,
+        "compactness": 0.2869727036024594,
+        "solidity": 0.5861733203505355,
+        "orientation_deg": 68.23317291081838,
+        "centroid_rc": [
+          20.46511627906977,
+          219.80897009966776
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    },
+    {
+      "label": 3,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.59,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.1,
+        "compactness": 0.1537,
+        "solidity": 0.524,
+        "area_px": 1469.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.1 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 3,
+        "area_px": 1469,
+        "perimeter_px": 346.5929291125633,
+        "elongation": 2.0995732666997275,
+        "compactness": 0.15367112230820879,
+        "solidity": 0.5242683797287652,
+        "orientation_deg": 83.30717556572732,
+        "centroid_rc": [
+          41.11300204220558,
+          149.63784887678693
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    },
+    {
+      "label": 4,
+      "proposed_class": null,
+      "confidence": 0.0,
+      "needs_review": true,
+      "terms": {
+        "elongation": 5.969,
+        "compactness": 0.1298,
+        "solidity": 0.529,
+        "area_px": 591.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 6.0 falls between 3.0 and 6.0; morphology does not distinguish the classes here"
+      ],
+      "morphology": {
+        "label": 4,
+        "area_px": 591,
+        "perimeter_px": 239.23149339882607,
+        "elongation": 5.969192050858142,
+        "compactness": 0.12976591763704673,
+        "solidity": 0.5290957923008057,
+        "orientation_deg": -75.935533169766,
+        "centroid_rc": [
+          75.60913705583756,
+          33.71742808798646
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    },
+    {
+      "label": 5,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.651,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.493,
+        "compactness": 0.1912,
+        "solidity": 0.598,
+        "area_px": 2364.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.5 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 5,
+        "area_px": 2364,
+        "perimeter_px": 394.1614716074871,
+        "elongation": 1.49297639039031,
+        "compactness": 0.19120929261199984,
+        "solidity": 0.5984810126582278,
+        "orientation_deg": -34.0923427069936,
+        "centroid_rc": [
+          106.07064297800338,
+          207.19585448392556
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    },
+    {
+      "label": 6,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.637,
+      "needs_review": true,
+      "terms": {
+        "elongation": 1.629,
+        "compactness": 0.0813,
+        "solidity": 0.286,
+        "area_px": 1068.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.6 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 6,
+        "area_px": 1068,
+        "perimeter_px": 406.41525958289964,
+        "elongation": 1.6294582623754172,
+        "compactness": 0.08125331805534958,
+        "solidity": 0.2862503350308228,
+        "orientation_deg": 33.61233634638189,
+        "centroid_rc": [
+          232.9129213483146,
+          221.12640449438203
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    }
+  ],
+  "image_sha256": "f81ac536b051579a3cca473e0b1e3a60a4cb04fe320f1fd7bc9c4dcb0674607d",
+  "mask_sha256": "0e13aa39cf71c9481e0cd76d2c027fd5edb64def571b0f360119e20870d6116e",
+  "original_image": "C:\\Users\\adi\\Downloads\\oilSpil2l16\\oilSpil2l\\data\\interim\\datasets\\zenodo\\15298010\\images\\images\\train\\sentinel_1032.png",
+  "original_mask": "C:\\Users\\adi\\Downloads\\oilSpil2l16\\oilSpil2l\\data\\interim\\datasets\\zenodo\\15298010\\masks\\masks\\train\\sentinel_1032.png",
+  "split": "val"
+}

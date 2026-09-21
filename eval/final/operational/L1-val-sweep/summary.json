@@ -1,0 +1,240 @@
+{
+  "identity": {
+    "inputs": {
+      "models": {
+        "L1": "d4a74906e3a9b692c14f28305baf3cb20ba63da4c38bc30dbabd14c5c6d1fc6c",
+        "none": "d94f24306ffd8a551a754bce1c2088d03bb6aaf17f6a893d304c4bf50b68b1d0"
+      },
+      "data_yaml": "a196ff93a72957b1e9b31d740de3860795f885622be26bdbf744e226786a6b7e",
+      "val": "02ebdef59e5ac183b032daf86c3621690d6a81ab997d0cc848a17735d011fe9f",
+      "test": "1c6a266cf5e80c292b60bc7a2ec876a34baa6367d26f59dfecea06639c3d3770",
+      "settings": {
+        "imgsz": 1024,
+        "batch": 4,
+        "workers": 2,
+        "device": "0",
+        "half": false,
+        "rect": true,
+        "conf": 0.001,
+        "iou": 0.7,
+        "max_det": 1000,
+        "plots": false,
+        "save_json": false,
+        "save_txt": false,
+        "verbose": false
+      },
+      "torch": "2.11.0+cu128",
+      "ultralytics": "8.4.135",
+      "source": {
+        "scripts/evaluate_final_release.py": "4d20b353bac93d01eca90ce9cd1367b1f61bb30031e378f6659e61dbbc4a7c38",
+        "scripts/review_screening.py": "311c554f118bb239d510f593c9d55a44aae3716874f8ca43614a3920874f9b83",
+        "scripts/summarize_screening.py": "d3e12241d6c1ee2de38db386ebf0d9e30683870f64ce8339cf3dcc1f7a2e94d4"
+      }
+    },
+    "model": "L1",
+    "split": "val",
+    "threshold": 0.25,
+    "sweep": true
+  },
+  "completed_at": "2026-09-17T10:06:38.953969+00:00",
+  "metrics": {
+    "metrics/precision(B)": 0.5416285108381382,
+    "metrics/recall(B)": 0.347774307379816,
+    "metrics/mAP50(B)": 0.3690284767590145,
+    "metrics/mAP50-95(B)": 0.19067197787409593,
+    "metrics/precision(M)": 0.5290442470690965,
+    "metrics/recall(M)": 0.3423157894736842,
+    "metrics/mAP50(M)": 0.35597323078666493,
+    "metrics/mAP50-95(M)": 0.1544740093156539,
+    "fitness": 0.3451459871897498
+  },
+  "speed": {
+    "preprocess": 2.886230497950018,
+    "inference": 7.2821248962768035,
+    "loss": 0.002774688806138446,
+    "postprocess": 2.490022199134996
+  },
+  "operating": {
+    "images": 482,
+    "instances": 2375,
+    "tp": 720,
+    "fp": 483,
+    "recall": 0.3031578947368421,
+    "precision": 0.5985037406483791,
+    "negative_images": 53,
+    "negative_fp_images": 17,
+    "negative_fp_instances": 42,
+    "lookalike_images": 23,
+    "lookalike_fp_images": 11,
+    "lookalike_fp_instances": 29,
+    "no_oil_images": 15,
+    "no_oil_fp_images": 1,
+    "strata": {
+      "small": {
+        "instances": 1101,
+        "recall": 0.09173478655767484
+      },
+      "medium": {
+        "instances": 518,
+        "recall": 0.2876447876447876
+      },
+      "large": {
+        "instances": 756,
+        "recall": 0.6216931216931217
+      },
+      "elongated": {
+        "instances": 35,
+        "recall": 0.3142857142857143
+      },
+      "border": {
+        "instances": 0,
+        "recall": 0.0
+      }
+    },
+    "f1": 0.40245947456679715,
+    "dice": 0.7439270171678138,
+    "iou": 0.6395280569962615,
+    "boundary_f1": 0.45144670200210324,
+    "pixel_precision": 0.7893715143186478,
+    "pixel_recall": 0.7893068056090597,
+    "area_bias": -8.19749742855401e-05
+  },
+  "sources": {
+    "13761290": {
+      "images": 55,
+      "instances": 364,
+      "tp": 33,
+      "fp": 50,
+      "recall": 0.09065934065934066,
+      "precision": 0.39759036144578314,
+      "negative_images": 38,
+      "negative_fp_images": 12,
+      "negative_fp_instances": 37,
+      "lookalike_images": 23,
+      "lookalike_fp_images": 11,
+      "lookalike_fp_instances": 29,
+      "no_oil_images": 15,
+      "no_oil_fp_images": 1,
+      "strata": {
+        "small": {
+          "instances": 316,
+          "recall": 0.022151898734177215
+        },
+        "medium": {
+          "instances": 29,
+          "recall": 0.3793103448275862
+        },
+        "large": {
+          "instances": 19,
+          "recall": 0.7894736842105263
+        },
+        "elongated": {
+          "instances": 2,
+          "recall": 1.0
+        },
+        "border": {
+          "instances": 0,
+          "recall": 0.0
+        }
+      },
+      "f1": 0.1476510067114094,
+      "dice": 0.7953952261978393,
+      "iou": 0.7304152038393837,
+      "boundary_f1": 0.7230547259357953,
+      "pixel_precision": 0.3010376955962776,
+      "pixel_recall": 0.6700620732464307,
+      "area_bias": 1.2258410924891372
+    },
+    "15298010": {
+      "images": 330,
+      "instances": 1035,
+      "tp": 451,
+      "fp": 271,
+      "recall": 0.4357487922705314,
+      "precision": 0.6246537396121884,
+      "negative_images": 15,
+      "negative_fp_images": 5,
+      "negative_fp_instances": 5,
+      "lookalike_images": 0,
+      "lookalike_fp_images": 0,
+      "lookalike_fp_instances": 0,
+      "no_oil_images": 0,
+      "no_oil_fp_images": 0,
+      "strata": {
+        "small": {
+          "instances": 12,
+          "recall": 0.0
+        },
+        "medium": {
+          "instances": 346,
+          "recall": 0.1329479768786127
+        },
+        "large": {
+          "instances": 677,
+          "recall": 0.5982274741506647
+        },
+        "elongated": {
+          "instances": 18,
+          "recall": 0.2222222222222222
+        },
+        "border": {
+          "instances": 0,
+          "recall": 0.0
+        }
+      },
+      "f1": 0.5133750711439955,
+      "dice": 0.7350135706849567,
+      "iou": 0.6261020182585149,
+      "boundary_f1": 0.3261042114185081,
+      "pixel_precision": 0.8145259832269821,
+      "pixel_recall": 0.7914408983855002,
+      "area_bias": -0.02834174147523637
+    },
+    "8346860": {
+      "images": 97,
+      "instances": 976,
+      "tp": 236,
+      "fp": 162,
+      "recall": 0.24180327868852458,
+      "precision": 0.592964824120603,
+      "negative_images": 0,
+      "negative_fp_images": 0,
+      "negative_fp_instances": 0,
+      "lookalike_images": 0,
+      "lookalike_fp_images": 0,
+      "lookalike_fp_instances": 0,
+      "no_oil_images": 0,
+      "no_oil_fp_images": 0,
+      "strata": {
+        "small": {
+          "instances": 773,
+          "recall": 0.12160413971539456
+        },
+        "medium": {
+          "instances": 143,
+          "recall": 0.6433566433566433
+        },
+        "large": {
+          "instances": 60,
+          "recall": 0.8333333333333334
+        },
+        "elongated": {
+          "instances": 15,
+          "recall": 0.3333333333333333
+        },
+        "border": {
+          "instances": 0,
+          "recall": 0.0
+        }
+      },
+      "f1": 0.3435225618631732,
+      "dice": 0.7638525438543046,
+      "iou": 0.6671994044813864,
+      "boundary_f1": 0.8108853424862238,
+      "pixel_precision": 0.7726563068091895,
+      "pixel_recall": 0.8052648002853067,
+      "area_bias": 0.04220310271041369
+    }
+  },
+  "rows_sha256": "00a10b444ad14b133b87cec458ea9699fc2c01e8a5c8f50d91f83c06bc632ff4"
+}

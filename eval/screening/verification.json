@@ -1,0 +1,15 @@
+{
+  "metric_tests_passed": 2,
+  "ruff": "passed for four new scripts and one test file",
+  "evaluated_best_checkpoints": 11,
+  "validation_images_per_checkpoint": 585,
+  "exact_matched_recall_models": [
+    "L1-ciou",
+    "L4-ciou",
+    "L5-ciou"
+  ],
+  "cap_sensitivity_max_det": 1000,
+  "test_split_used": false,
+  "final_training_started": false,
+  "external_security_scan": "Auto-review rejected external code transfer; authorization requested, no scan result claimed."
+}

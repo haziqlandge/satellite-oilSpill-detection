@@ -1,0 +1,6 @@
+{
+  "completed_epochs": 12,
+  "finite_ema": true,
+  "finite_optimizer": true,
+  "amp": false
+}

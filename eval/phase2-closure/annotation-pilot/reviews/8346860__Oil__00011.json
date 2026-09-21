@@ -1,0 +1,108 @@
+{
+  "source": "8346860__Oil__00011",
+  "class_scheme": [
+    "oos",
+    "slick_unknown"
+  ],
+  "note": "proposed_class is a suggestion, not a label. Set confirmed_class and confirmed_by to accept or override it. Records left unconfirmed are ignored.",
+  "instances": [
+    {
+      "label": 1,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.682,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.18,
+        "compactness": 0.1392,
+        "solidity": 0.614,
+        "area_px": 49339.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.2 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 1,
+        "area_px": 49339,
+        "perimeter_px": 2110.5007922133873,
+        "elongation": 1.1801912165233004,
+        "compactness": 0.13919677327246438,
+        "solidity": 0.6144639832619309,
+        "orientation_deg": -80.11329405810223,
+        "centroid_rc": [
+          908.6942580919759,
+          980.4891465169542
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    },
+    {
+      "label": 4,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.664,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.36,
+        "compactness": 0.9005,
+        "solidity": 0.946,
+        "area_px": 227.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.4 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 4,
+        "area_px": 227,
+        "perimeter_px": 56.2842712474619,
+        "elongation": 1.3600694419711064,
+        "compactness": 0.9004541967459456,
+        "solidity": 0.9458333333333333,
+        "orientation_deg": -31.116733232478154,
+        "centroid_rc": [
+          788.4052863436124,
+          875.5418502202643
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    },
+    {
+      "label": 7,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.529,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.715,
+        "compactness": 0.4273,
+        "solidity": 0.766,
+        "area_px": 396.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.7 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 7,
+        "area_px": 396,
+        "perimeter_px": 107.91168824543144,
+        "elongation": 2.714603341000357,
+        "compactness": 0.4273346179025522,
+        "solidity": 0.7659574468085106,
+        "orientation_deg": 69.25333554263356,
+        "centroid_rc": [
+          942.6565656565657,
+          841.3636363636364
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null
+    }
+  ],
+  "image_sha256": "adbcffcfc19b92a5ffeda4006a052639c9afad5753093bcd7cf143c9dfbffb98",
+  "mask_sha256": "60d072069993f06b53246608895df193ef97ffa492308c67a94f29b71600411d",
+  "original_image": "C:\\Users\\adi\\Downloads\\oilSpil2l16\\oilSpil2l\\data\\interim\\datasets\\zenodo\\8346860\\01_Train_Val_Oil_Spill_images\\Oil\\00011.tif",
+  "original_mask": "C:\\Users\\adi\\Downloads\\oilSpil2l16\\oilSpil2l\\data\\interim\\datasets\\zenodo\\8346860\\01_Train_Val_Oil_Spill_mask\\Mask_oil\\00011.tif",
+  "split": "train"
+}

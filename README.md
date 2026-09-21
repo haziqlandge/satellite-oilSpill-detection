@@ -9,7 +9,7 @@ spills at sea along with AIS data correlations to identify vessel responsible fo
 
 ---
 
-## What it does
+## Intended system capabilities
 
 | Part | Capability |
 |---|---|
@@ -30,24 +30,38 @@ See [`RESEARCH/SYNTHESIS.md`](RESEARCH/SYNTHESIS.md) §4.
 
 ## Status
 
-**PHASE-00 complete** — environment, package scaffold, database schema, research corpus.
-No pipeline code yet. Current position and the exact next action: [`HANDOFF.md`](HANDOFF.md).
+**2026-09-17 independent audit:** Validation threshold .20 is frozen and L1's one-time test evaluation is complete: mask AP50 .363622, AP50–95 .149918; 8/11 named look-alike tiles raised alarms. Research weights export, manifest enforcement and native-resolution GeoTIFF inference are implemented. Training is complete; this remains a one-class research system with unresolved false alarms and two-class annotation requirements. Current evidence and corrections: [INDEPENDENT_AUDIT.md](eval/final/INDEPENDENT_AUDIT.md). The selection/release history below predates these results.
+
+## Historical final model selection — 2026-09-17
+
+All **1,080 planned epochs are complete** (60 reference + 720 screening + 300 final). **`L1-ciou` is selected** because it leads both comparable validation evaluations and the fresh 100-epoch final curves on mask AP, while also leading recall, Dice, boundary F1, small-object recall and source coverage. `L4-ciou` is the precision/box-quality reserve; `none-ciou` remains the control/fallback. Full evidence: [`eval/final/REVIEW.md`](eval/final/REVIEW.md).
+
+The FP32-safe `L1-ciou` release reproduction completed **100/100 epochs**. Its independently reloaded checkpoint produced mask mAP50-95 **0.15568** on the frozen 482-image validation split, only **0.00054** below the live epoch-71 peak of **0.15622** and well inside the project's ~0.004 within-run tolerance. Release artifact: `runs/final_l1_fp32_release/L1-ciou/weights/best-fp32.pt`; SHA-256 `d4a74906e3a9b692c14f28305baf3cb20ba63da4c38bc30dbabd14c5c6d1fc6c`. The untouched test split remains sealed pending validation-threshold selection.
+
+## Historical screening decision — 2026-09-15
+
+All **12/12 screens are complete**. Overall budget: **780/1080 epochs complete; 300 remain** for three fresh 100-epoch runs. Selected: **none-ciou (control), L1-ciou (primary), L4-ciou (complementary)**; L5-ciou is reserve. Final training has **not** started.
+
+Read [the review protocol](PLAN/SCREENING_REVIEW.md) and [the detailed results and selection](eval/screening/REVIEW.md). Eleven saved checkpoints were evaluated on validation across AP, negatives, mask overlap/boundaries, sizes/shapes, sources, confidence, uncertainty and cost. The none-ciou screen weights are missing; two train/validation duplicate pairs and an MPDIoU coordinate-scale mismatch were found. These are binary single-class candidates, not certified operational/two-class models. Final data and runner preflight steps are in the report.
+
+Current machine: **RTX 4060 Ti 8 GB, 32 GB RAM**, with full resource use authorized. Prior laptop resource limits, stopped-at-43/60 status and timing estimates below are historical.
+
+Current broader phase status: Phase 00 complete; Phase 01 substantially implemented with class relabeling pending; Phase 02 training/model selection complete with threshold, untouched-test and SAHI acceptance pending; Phase 04 engine implemented with forcing/validation gaps; Phase 05 implemented; Phases 03 and 06–09 remain unfinished. Earlier test counts describe earlier sessions; this review ran its targeted metric tests and lint.
 
 `frontDemo/` is a parallel landing-page layout study feeding PHASE-07; it has its own
-[README](frontDemo/README.md) and is not part of the pipeline.
+[README](frontDemo/README.md) and is **owned by a separate session — do not edit it from the
+backend track**.
 
+### Running things
+
+```bash
+run.bat
 ```
-PHASE-00  scaffold + research corpus          done
-PHASE-01  data acquisition + SAR preprocess   next
-PHASE-02  detection model (YOLO-seg + LSK)
-PHASE-03  characterisation + wind gate
-PHASE-04  met-ocean + drift engine            } independent of 02/03
-PHASE-05  AIS pipeline + synthetic generator  } can run in parallel
-PHASE-06  attribution engine
-PHASE-07  API + visual interface
-PHASE-08  evaluation + validation
-PHASE-09  demo packaging
-```
+
+An interactive menu: watch progress, resume the ablation grid, benchmark the input pipeline,
+run tests, check the environment, watch temperatures. It exports the thread caps before
+Python starts, which is load-bearing — the OMP runtime reads them once, at first
+`import torch`.
 
 ---
 
@@ -91,8 +105,21 @@ Heavy dependencies are optional groups so they can fail independently:
 ```
 
 ```bash
-.venv/Scripts/python.exe -m ruff check . && .venv/Scripts/python.exe -m mypy backend
+.venv/Scripts/python.exe -m ruff check . && .venv/Scripts/python.exe -m mypy ml backend scripts
 ```
+
+### Machine limits
+
+This runs on a laptop the user also works on. The limits are **correctness requirements, not
+preferences** — a run that breaches them is a defect regardless of its results. Full detail in
+[`PLAN/CONSTRAINTS.md`](PLAN/CONSTRAINTS.md).
+
+| Resource | Limit | Enforced by |
+|---|---|---|
+| CPU | 80% ceiling; current mask is 16/24 E-cores (67%) | `cap_cpu()`, in-process before workers spawn |
+| RAM | **24 GB absolute**, machine-wide | `RAM_CEILING_GB`; `workers=2` |
+| GPU | about 80%, training process only | 80% CUDA-memory fraction plus an ~80% in-process duty cycle |
+| Temperature | pause at **90 C**, resume at **80 C** | GPU guard plus post-epoch CPU checks in Armoury Crate |
 
 ---
 

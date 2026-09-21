@@ -1,0 +1,67 @@
+[
+  {
+    "checkpoint": "epoch10.pt",
+    "amp": true,
+    "first_bad": [],
+    "attention_max": {
+      "model.23.attention.conv_spatial_small": 44.96875,
+      "model.23.attention.conv_spatial_large": 80.3125,
+      "model.23.attention.project_small": 72.9375,
+      "model.23.attention.project_large": 70.9375,
+      "model.23.attention.squeeze": 39.46875,
+      "model.23.attention.expand": 194.5
+    },
+    "optimizer_bad_count": 0
+  },
+  {
+    "checkpoint": "epoch10.pt",
+    "amp": false,
+    "first_bad": [],
+    "attention_max": {
+      "model.23.attention.conv_spatial_small": 44.98339080810547,
+      "model.23.attention.conv_spatial_large": 80.32657623291016,
+      "model.23.attention.project_small": 72.9412841796875,
+      "model.23.attention.project_large": 70.92728424072266,
+      "model.23.attention.squeeze": 39.47251510620117,
+      "model.23.attention.expand": 194.50437927246094
+    },
+    "optimizer_bad_count": 0
+  },
+  {
+    "checkpoint": "last.pt",
+    "amp": true,
+    "first_bad": [
+      "model.24.cv2.2.0.conv",
+      "model.24.cv2.2.0.bn",
+      "model.0.act",
+      "model.24.cv2.2.1.conv",
+      "model.24.cv2.2.1.bn",
+      "model.24.cv2.2.2",
+      "model.24.cv4.2.0.bn",
+      "model.24.cv4.2.1.conv"
+    ],
+    "attention_max": {
+      "model.23.attention.conv_spatial_small": 46.75,
+      "model.23.attention.conv_spatial_large": 78.0,
+      "model.23.attention.project_small": 80.375,
+      "model.23.attention.project_large": 82.0,
+      "model.23.attention.squeeze": 40.875,
+      "model.23.attention.expand": 309.5
+    },
+    "optimizer_bad_count": 0
+  },
+  {
+    "checkpoint": "last.pt",
+    "amp": false,
+    "first_bad": [],
+    "attention_max": {
+      "model.23.attention.conv_spatial_small": 46.72027587890625,
+      "model.23.attention.conv_spatial_large": 77.95390319824219,
+      "model.23.attention.project_small": 80.3301773071289,
+      "model.23.attention.project_large": 81.99860382080078,
+      "model.23.attention.squeeze": 40.86880111694336,
+      "model.23.attention.expand": 309.63153076171875
+    },
+    "optimizer_bad_count": 0
+  }
+]

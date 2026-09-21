@@ -120,13 +120,22 @@ Same engine, positive `time_step`, 0–72 h from the current slick → impact fo
 
 ## Acceptance criteria
 - [ ] **Forward check:** seeding P004 Case 2's source (28 21 31.968 N, 89 13 31.332 W) and
-      running to 00:02 UTC 2023-05-15 produces a ~19 km southward-trending footprint
+      running to 00:02 UTC 2023-05-15 produces a ~19 km southward-trending footprint —
+      **BLOCKED: needs real CMEMS currents.** A constant-forcing run cannot produce a
+      realistic footprint, and asserting one against synthetic currents would test nothing
 - [ ] **Backward hit-rate:** the 90% origin contour contains the true source for all three
-      P004 cases
-- [ ] Case 3's known ~2-day release window falls inside the reported age interval
-- [ ] Ensemble runs complete in < 5 min per detection
-- [ ] Entire drift stage runs with the network disabled, from cache
-- [ ] Over-long backward runs degrade to `insufficient_evidence`
+      P004 cases — **BLOCKED on CMEMS.** The machinery is built and verified
+      (`OriginField.contains`, tested); only the forcing is missing
+- [ ] Case 3's known ~2-day release window falls inside the reported age interval —
+      **BLOCKED on CMEMS**
+- [x] Ensemble runs complete in < 5 min per detection — **measured 28.0 s** for 10 members
+      x 150 particles over a 24 h backward horizon, 0 failures
+- [~] Entire drift stage runs with the network disabled, from cache — the offline-first
+      cache is built and tested (`DEMO_OFFLINE=1` makes a network fetch raise rather than
+      fall back). Cannot be fully demonstrated until there is real forcing to cache
+- [x] Over-long backward runs degrade to `insufficient_evidence` — implemented as three
+      distinct honest outcomes (`beyond_horizon`, `monotonic`, `insufficient_evidence`)
+      rather than one, and tested
 
 ## Known failure conditions
 - **Diffusive irreversibility** — the convergence minimum may be shallow or absent for older
