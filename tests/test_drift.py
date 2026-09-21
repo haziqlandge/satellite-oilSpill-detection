@@ -203,3 +203,28 @@ def test_an_ensemble_stacks_members_rather_than_averaging_them() -> None:
     assert result.member_count == MIN_MEMBERS
     assert result.particle_count == MIN_MEMBERS * 20
     assert result.lon_history.shape[1] == result.particle_count
+
+
+@pytest.mark.slow
+def test_ensemble_is_anchored_at_the_requested_observation_time() -> None:
+    """Every member shares one clock, anchored at the acquisition time.
+
+    `run_drift` already guarantees `times[0] == start`, and the origin field,
+    the age estimate and PHASE-06's AIS gate are all keyed to that axis. The
+    ensemble used to apply each member's wind phase shift by moving the run's
+    clock and then keep whichever member ran first, so `times[0]` came back as
+    `start + shift` -- up to three hours out, with members spanning five hours
+    of disagreement while being stacked at the same row index and binned into
+    one probability slice.
+
+    A vessel at ten knots covers about fifty kilometres in that error.
+    """
+
+    result = run_ensemble(
+        lon=LON, lat=LAT, start=T0, hours=4, backward=True,
+        members=MIN_MEMBERS, particles=4,
+        forcing=Forcing(u_current=0.2), time_step_s=1800,
+    )
+
+    assert result.times[0] == T0, "the ensemble must report the observation time it was given"
+    assert result.times[0] > result.times[-1], "a backward axis descends"

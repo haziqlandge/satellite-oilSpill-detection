@@ -30,7 +30,7 @@ makes the result a probability.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 import numpy as np
@@ -166,14 +166,32 @@ def run_ensemble(
     failures: list[str] = []
 
     for member in sampled:
-        # The wind phase shift is applied by moving the run's clock, which is
-        # what "the wind arrived early or late" actually means.
-        shifted_start = start + timedelta(hours=member.wind_phase_shift_h)
+        # Every member shares one clock, anchored at the observation.
+        #
+        # This used to pass `start + member.wind_phase_shift_h`, on the reading
+        # that moving the run's clock is what "the wind arrived early or late"
+        # means. The intent is right and the mechanism was not. Moving the clock
+        # also moves the output axis, and `times` below is taken from whichever
+        # member ran first, so the ensemble reported `start + shift` as the
+        # observation -- measured at +2.757 h for `seed=0` -- while members
+        # spanned 5.32 h of disagreement yet were stacked at the same row index
+        # and binned into a single probability slice. The origin field, the age
+        # estimate and PHASE-06's AIS gate all key off that axis, and a vessel
+        # at ten knots covers about fifty kilometres in that error.
+        #
+        # No test caught it because every test uses constant `Forcing`, where
+        # shifting the clock leaves the trajectory identical and only relabels
+        # it -- so the shift contributed no diversity and corrupted the axis.
+        #
+        # The shift belongs on the forcing's time reference, not the run's, and
+        # that needs a reader-side offset. `wind_phase_shift_h` is still sampled
+        # and reported in `Member.as_dict()`, but it is NOT applied until real
+        # time-varying readers exist. See FUTURE_WORK.md.
         try:
             result = run_drift(
                 lon=lon,
                 lat=lat,
-                start=shifted_start,
+                start=start,
                 hours=hours,
                 backward=backward,
                 number=particles,
