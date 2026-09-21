@@ -1,11 +1,11 @@
-# frontDemo - landing page layout study
+# SlickTrace — one product, two surfaces
 
-Five switchable landing-page directions for the oil spill attribution system. **Design
-exploration feeding PHASE-07, not PHASE-07 itself.** Nothing here is wired to the backend;
-all content is static and lives in `src/content.ts`.
+A demonstration interface over the SAR + AIS oil-spill attribution system.
+**Design work feeding PHASE-07, not PHASE-07 itself.**
 
-> **Ownership:** this folder belongs to the session on the original laptop. The session on
-> the training machine owns `backend/` and `ml/` and should not edit it.
+> **Ownership:** this folder is worked on from the dev laptop. `backend/` and
+> `ml/` are worked on from the training machine. Keeping the two apart is what
+> stops the frontend and the pipeline colliding in the same tree.
 
 ## Run
 
@@ -17,91 +17,288 @@ npm install --prefix frontDemo
 npm run dev --prefix frontDemo
 ```
 
-Opens on port 5180. `.claude/launch.json` defines this as a preview target named
-`frontDemo`.
+Opens on port 5180. Open `http://127.0.0.1:5180/#/console` for the operations console.
 
 ```bash
 npm run build --prefix frontDemo
 ```
 
-## The five directions
+---
 
-Switch between them from the rail on the right edge. The choice persists in `localStorage`.
+## What this is now
 
-| # | Name | Accent | Language |
-|---|---|---|---|
-| 1 | **Signal** | sodium orange `#ff8a3d` | Halftone print, asymmetric editorial, 0px corners, Space Grotesk |
-| 2 | **Terminal** | phosphor green `#5df2a0` | CRT console, monospace throughout, scanlines, a boot transcript as the hero |
-| 3 | **Orbit** | ice cyan `#43d9e8` | Mission control, radar scope, rounded panels, Chakra Petch |
-| 4 | **Dossier** | signal red `#e5484d` | Forensic case file, hairline rules, a redaction bar that retracts to reveal the headline |
-| 5 | **Deepwater** | iridescent magenta `#ff4fa3` | Atmospheric, very large light type, oil-on-water sheen, scroll-scrubbed parallax |
+It was **four independent design studies** — Signal, Terminal, Orbit, Dossier —
+switchable from a rail on the right edge. That study is finished, and the
+directions have been recombined into one product with two surfaces:
 
-Each direction locks one accent across every section. Dark-locked by design - the brief
-asked for dark with a few bright colours, so there is no light mode.
+| Surface | Route | What it is |
+|---|---|---|
+| **Home** | `#/` | A scroll page that tells a visitor what is happening in the ocean: detection, drift and its forcing, forecast, root cause, suspects, method |
+| **Console** | `#/console` | An operations workstation -- a map, dockable panels, an operational timeline -- and, below it, the same panels at a width you can read them at |
 
-## The switcher
+The harvest, in one line each:
 
-The interaction that was specifically requested:
+- **Signal** gave the home page its composition, typography and masthead.
+- **Dossier** gave it the **graphs** — the chart frame, the origin-field and
+  convergence plates, the SAR plate, the width profile, the wind gate, the event
+  strip, the flag sparkline. Its *paper vocabulary* (stamps, redaction,
+  footnotes, Roman numerals) was deliberately left behind.
+- **Orbit** gave it the **live readouts** — gauges, segment bars, traces, rockers.
+- **Terminal** became the console whole, then grew a window manager.
 
-- Sticky to the right edge, vertically centred
-- **Tucks itself away** after ~2.6 s idle: compresses on the x axis toward the right edge
-  (`scaleX(0.72)`) leaving a ~33 px grab tab
-- **Any click anywhere on the page brings it back**, as does hovering the tab
-- `Escape` tucks it deliberately
+Both plate and instrument files were already **100% token-driven** — no
+hardcoded colours anywhere — which is what made this a recombination rather than
+a rewrite. The one real adaptation was value, not hue: Dossier's plates were
+composed for ink on paper and had to be re-weighted for a near-black ground
+(see *Two things that were measured, not guessed* below).
 
-Implemented in `src/components/LayoutSwitcher.tsx`. The tuck is a **CSS transition, not an
-anime.js tween** - it is a two-state toggle a user can interrupt at any moment, and CSS
-retargets from the current computed value for free. Driving it with a JS tween left the
-transform stranded part-way whenever the state flipped mid-flight.
+---
 
-Measured behaviour: 33 px tucked, opens within 200 ms of a click, holds 2.6 s, re-tucks.
+## Architecture
+
+```
+src/
+  sim/            the simulation. Untouched by the recombination
+  map/            MapCanvas, layer definitions, particle overlay
+  lib/
+    format.ts     vocabulary: term labels, timestamps, ageStatement()
+    playback.ts   the event, hour by hour: phase, extent, contacts, checkpoints
+    project.ts    SVG projection arithmetic for figures
+    motion.ts     anime.js scope + scroll reveal
+    palette.tsx   the runtime colour overlay, both surfaces
+    hash.ts       hash routing
+    spill.ts      per-block scenario state
+  components/     shared by both surfaces
+    FloatShell      a draggable, resizable window with no opinions
+    PalettePanel    the RGB / token / basemap controls
+    SarTile
+  content.ts      the project's FACTS. Not its copy
+  theme.ts        the two surfaces: map paint, fonts, accents
+  site/           the home page
+    SiteShell  Nav  SpillSelect  Loading  ShipTrail
+    components.tsx                (from Signal)
+    scenery.tsx                   the tanker and the stage chain
+    plates.tsx                    (from Dossier)
+    instruments.tsx               (from Orbit)
+    env.tsx                       wind / current / growth charts
+    sections/  Ocean  Drift  Damage  Cause  Method
+  console/        the operations console
+    ConsoleShell  Workspace  Timeline  LogStream  panes  reports
+    (ConsoleShell also owns PanelDeck, the readable section below the fold)
+    SpillKey  PanelsMenu  Popover
+    dock/  useDock  DockRail  FloatWindow
+```
+
+### Every figure owns its own spill
+
+The rule the home page is built around: **each data block carries its own spill
+control, and changing one must not change any other.** `useSpill` in
+`lib/spill.ts` is one instance per block, with its own run, its own clock and
+its own selection.
+
+Two things make that affordable: `buildRun` is memoised per `scenario:variant`,
+so the second block to ask for a case pays nothing; and a block does not build
+its run until it nears the viewport, so four half-second builds are never paid
+at once on load.
+
+Drift and its environment subsection share one control on purpose. Those charts
+*are* the forcing that drift ran through, and letting them disagree would be a
+lie about which ocean moved which oil.
+
+### The console is a window manager
+
+`console/dock/` is hand-rolled, about 600 lines. Panels dock left or right, tear
+off into floating windows on a double-click, close to a menu and come back from
+it. Dock widths drive `--panel-scale`, so widening a dock genuinely enlarges its
+type rather than giving small type more room.
+
+The state is one flat record of panel → placement, not the nested split-tree a
+dock library keeps: there are two fixed docks and no arbitrary splitting, and a
+tree would cost an order of magnitude more code for a rearrangement nobody asked
+for. Layout persists under `slicktrace:dock`, and **there is always a reset**.
+
+---
+
+## Scientific integrity
+
+These are correctness requirements from `PLAN/CONSTRAINTS.md`, not disclaimer
+text, and they survived the recombination:
+
+- **Age is never a bare scalar.** `ageStatement()` in `lib/format.ts` handles the
+  case the old UI got wrong: for an ongoing discharge the interval collapses to
+  `0–0 h`, and printing that as a measurement is false precision. It states
+  "ongoing" instead, with the method beside it.
+- **Damping is a relative dB index, never a thickness.** There is no field for
+  microns or for spilled volume anywhere in the interface.
+- **`insufficient_evidence` is prominent, never an empty list.** The
+  `mumbai-null` scenario triggers it.
+- **Every score decomposes** into six named terms with weights and the geometry
+  that produced them. No bare totals.
+- **Drift is an ensemble** producing credible regions, in either direction.
+  Nothing implies it recovers a precise point. Note that the *figures* now run
+  forward -- see "Which way the figures run" below -- while the attribution
+  underneath them is still conditioned on the backward field.
+- **Wind gate is a continuous multiplier**, surfaced, never a silent filter.
+- **Dark vessels are ranked but never named.** All identities are masked
+  (`MMSI 636•••••4`).
+- **Simulated data stays visibly simulated** — a source note on the home page, a
+  `SIM` flag in the console.
+- Language is **candidate, suspected, score** — never responsible or confirmed.
+
+---
 
 ## Stack
 
-- **Vite + React 19 + TypeScript**
-- **Tailwind v4** via `@tailwindcss/vite`. Design tokens are CSS custom properties in
-  `src/index.css`; each layout re-points the same token names under `[data-layout="..."]`,
-  so no component hard-codes a colour
-- **anime.js v4.5** (`animate`, `createTimeline`, `stagger`, `svg.createDrawable`,
-  `text.split`, `onScroll`, `createScope`)
-- **@phosphor-icons/react** for icons
+- **Vite + React 19 + TypeScript**, `strict`, `noUnusedLocals`
+- **Tailwind v4** via `@tailwindcss/vite`. Tokens are CSS custom properties in
+  `src/index.css`, re-pointed under `[data-surface="..."]`
+- **anime.js v4.5** — named exports (`animate`, `createTimeline`, `stagger`,
+  `svg.createDrawable`, `text.split`, `onScroll`, `createScope`, `utils`,
+  `steps`). Any v3 snippet found online will not work here, and neither will
+  every v4 one: **easing functions are imports now, not strings**. `ease:
+  "steps(2)"` was removed from the core and a rejected easing does not throw —
+  it falls back to the default, which is a fade. `Caret` was doing exactly that,
+  blinking-as-fading, with only a console warning to say so. It is `ease:
+  steps(2)` with `steps` imported
+- **MapLibre GL JS**, no API key. Esri basemaps, no token
 - Fonts self-hosted through `@fontsource`, never a `<link>` to Google Fonts
 
-### anime.js v4, not v3
+---
 
-The API changed completely between v3 and v4. This project uses **named exports**
-(`import { animate } from "animejs"`), not the v3 default `anime({ targets })`. Any v3
-snippet found online will not work here.
+## Which way the figures run
 
-Scroll animation uses anime's **`onScroll()` observer**, never a
-`window.addEventListener("scroll")` handler - a scroll listener fires every frame and janks.
-Note the option is **`repeat: false`**, not `once: true`; `once` is silently ignored.
+Every drawn figure on both surfaces runs **forward from the satellite pass**.
+Figures 2A and 2B on the home page, the console's `FieldScope`,
+`ConvergencePlot`, `SpreadPlot` and `TrackScope`, the console timeline, and both
+maps' particle clouds all start at T0 and end at the forecast horizon.
 
-Every layout wraps its animations in `createScope({ root })` so switching layouts reverts
-the previous one's animations instead of leaking timers.
+This was a deliberate change of subject and it costs something worth naming. The
+backward origin field is what the AIS gate is conditioned on -- it is the
+project's actual contribution -- and it is no longer *drawn* anywhere. The
+system still computes it, `run.drift` still carries it, the score decomposition
+still rests on it, and the panes still state the age interval as a value. What
+has gone is the picture of it.
+
+Two consequences to know before editing:
+
+- `run.drift.convergence` is pre-filtered to backward hours in `sim/drift.ts`
+  and has no forward analogue. Anything forward reads
+  `run.drift.frames.filter(f => f.hour >= 0)`, whose frames already carry
+  `area90Km2` and `spreadKm`
+- `fieldHours()` and `forecastHours()` in `lib/project.ts` are mirrors of each
+  other. `fieldProjection` takes `{ includeTrack }` because a forward plate
+  framed on a vessel's track is mostly empty plate
+
+## Traps worth not re-entering
+
+**`body { overflow-x: hidden }`.** CSS will not give you `overflow-x: hidden`
+with `overflow-y: visible` — the used value of the other axis becomes `auto`,
+which makes the body the scroll container. The viewport then never scrolls, so
+`window` scroll events never fire, so anime's `onScroll()` observer never
+triggers, so every element primed to `opacity: 0` stays there and the page below
+the fold renders as a black rectangle with nothing in the console. Use
+`overflow-x: clip`.
+
+**`overflow-x: auto` on a bar that carries a menu.** The console header had it so
+its content could scroll on a narrow viewport, and it silently clipped both
+dropdowns hung off it: they opened, set their state correctly, and rendered as a
+few-pixel sliver. Raising `z-index` fixes nothing — no z-index escapes an
+overflow clip, and a `z-50` inside a header is only `z-50` *within the header*.
+Both menus now render into `document.body` through a portal (`console/Popover`).
+
+**...and a portal escapes the surface root along with the clip.** The half of
+that trap nobody saw for two sessions. `#root` lives inside `<body>`, so a panel
+portalled to `document.body` is a *sibling* of the surface root, not a
+descendant — and the token ladder is re-pointed under `[data-surface]` on that
+root. Both console menus therefore read the `:root` fallback, where `--accent`
+is the **home page's orange**, and where `--warn`, `--alarm`, `--group` and
+`--group-ink` are not declared at all, so `background: var(--group)` was invalid
+at computed-value time and resolved to nothing. They also could not see the
+colour panel's overrides, which are inline custom properties on that same root:
+moving `--accent` recoloured the whole console *except* its two menus. And they
+inherited Tailwind preflight's system sans while every character around them was
+IBM Plex Mono. `Popover` now restates `data-surface`, spreads `tokenStyle()` and
+sets `fontFamily` — it is a second surface root, deliberately, and it has to be
+kept in step with `App.tsx`'s.
+
+**Drawing the oil and the hindcast at the same weight.** They are the same kind
+of mark and they mean opposite things. The backward ensemble is at its widest at
+the far end of the backward horizon — reversal spreads, it does not focus —
+which is exactly the hour when least oil is in the water. Painted at equal
+weight, the playback claims the spill was larger before it began than at the
+moment it was photographed.
+
+**An animation that primes its targets to `opacity: 0`.** A hidden tab throttles
+`requestAnimationFrame` to roughly one frame a second, so a one-second reveal
+takes most of a minute and anything reading the page meanwhile -- a screenshot,
+a scrape, a reader coming back to the tab -- finds blank space. `revealOnScroll`
+has carried a timed backstop for this since it was written;
+`useAnimeScopeInView` takes a `backstop` selector for the same reason. If a
+setup hides something, arrange for it to come back even when the timeline does
+not run. Prime with `opacity` as well as any transform, so the rescue has one
+uniform signal to look for.
+
+**A CSS custom property set from an effect, consumed by the same element.**
+`DockRail` set `--dock-w` in a `useEffect` keyed on `[size, side]`. Close every
+panel in a dock and the rail unmounts; reopen one and it mounts a fresh element
+whose deps have not changed, so the effect never re-runs, `width: var(--dock-w)`
+resolves to `auto`, and the panel takes the whole viewport. The resting width is
+rendered now; only the drag writes to the DOM.
+
+**Calling a setter from inside a `useState` updater.** It looks like a way to
+read fresh state and act on it in one go, and it works often enough to pass a
+casual test. React has *two* sites at which it may invoke a functional updater:
+eagerly, inside the event handler, when the fiber has no pending lanes — and
+during the **render phase** when it does. On the eager path a nested setter is
+an ordinary batched update and everything is fine. On the render-phase path a
+setter belonging to an *ancestor* cannot join that pass, so React defers it to a
+second render and warns. The timeline's play-at-horizon restart lived in such an
+updater and failed roughly two times in three, worst immediately after the
+playback loop's own auto-stop — because that auto-stop is what leaves a lane on
+the fiber. Keep updaters pure (`p => !p`) and put the decision where the value
+is actually consumed. The tell is `Cannot update a component (X) while rendering
+a different component (Y)`, which is **deduped by component name and printed
+once per session** — easy to scroll past.
+
+**A `<canvas>` cannot read a token, so it bakes one.** `ctx.strokeStyle` takes a
+resolved colour string and silently ignores `var()`, so `SarTile` resolves
+`var(--accent)` through `getComputedStyle` inside its draw effect. That makes
+the drawing only as current as the last time the effect ran — and none of its
+dependencies changes when a token moves, because the `maskColour` prop is the
+*literal string* `"var(--accent)"`. Both SAR tiles kept the outgoing accent
+indefinitely while every SVG figure beside them had already changed. Depend on
+the override's **value**, not on the prop that names it. Note the second half:
+redrawing on every token change means redrawing on every step of a slider drag,
+and the speckle loop is 27–56 ms, so the generated acquisition is cached in a
+ref and only the outline is redrawn.
+
+---
+
+## Two things that were measured, not guessed
+
+**The console map was not lighter until `brightness-min` moved.** Lowering
+`raster-brightness-max` pushes a basemap back but never makes it greyer — Esri's
+dark canvas over open ocean has almost no bright pixels for a ceiling to act on.
+`raster-brightness-min` is the control that lifts the floor. And the lift was
+invisible until the scanline overlay came down from `opacity: 0.22` with a
+radial vignette to a flat `0.1`: the paint properties read back exactly as set
+while a full-viewport wash put the grey straight back to near-black.
+
+**The wind chart is about direction because the speed is constant.**
+`makeForcing` holds wind *speed* fixed per scenario and veers only direction, so
+a speed time series is a dead-flat line and an area fill under it implies an
+accumulation that is not happening. The chart makes the veer the subject, draws
+the speed as the single value it is against the detectability band, and says in
+its caption that the constancy is a property of the simulation rather than a
+calm.
+
+---
 
 ## Known issues
 
 | Issue | Detail |
 |---|---|
-| **Focus does not untuck the rail** | Tabbing to a switcher button while tucked leaves it hidden, so a keyboard user aims at an off-screen target. `onFocusCapture` on the wrapper does not fire. Fix is to bind `onFocus={wake}` on the buttons themselves; the edit was drafted and not applied |
-| Images are placeholders | `src/content.ts` points at `picsum.photos` seeds, duotoned and halftoned. **These are ordinary photographs, not radar.** Swap for real Sentinel-1 VV tiles before showing this to anyone who might mistake them for data |
-| Requires network | The placeholder images are remote, so the demo will not render imagery offline |
-
-## What is deliberate
-
-- **No real vessel names.** The published cases name real ships. Putting a real vessel's
-  name next to the word "polluter" on a marketing page is not something a layout study
-  should do, so identities are masked (`MMSI 636•••••4`)
-- **Every figure is sourced or marked illustrative.** The detection numbers come from
-  Zhao et al. 2025; the candidate scores are labelled as examples. No invented precision
-- **Dark vessels are ranked but never named**, matching the ethics constraints in
-  `PLAN/CONSTRAINTS.md`
-
-## Next steps
-
-1. Pick a direction, or a hybrid
-2. Fix the focus bug above
-3. Replace placeholder imagery with real SAR tiles
-4. Only then consider wiring it to the API in PHASE-07 - at which point the real work is
-   the map, the time slider and the evidence card, none of which exist here yet
+| Age interval is degenerate for ongoing releases | The simulation returns `[0, 0, 0]` for four of the five scenarios. `ageStatement()` presents this honestly, but the underlying `source_coincidence` estimator is worth revisiting in PHASE-04 |
+| Requires network for the basemap | Everything else is generated locally; the map reports a tile failure in the corner and the graticule, scene, slick, origin field and traffic all still draw (C12) |
+| Not wired to the API | All content comes from `src/sim/`. PHASE-07 is where that becomes a transport change — the shapes already mirror `PLAN/INTERFACES.md` §2 |
+| No automated tests | There is no test harness in `frontDemo/` |

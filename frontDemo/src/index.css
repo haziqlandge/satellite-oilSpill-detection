@@ -1,29 +1,86 @@
 @import "tailwindcss";
 
-/* Self-hosted via @fontsource, not <link> to Google Fonts. */
-@import "@fontsource-variable/space-grotesk";
+/*
+  Prose is not a source of class names.
+
+  Tailwind v4 auto-detects its sources by walking up from this file to the
+  repository root and scanning every non-ignored, non-binary file it finds --
+  Markdown included. This repository's Markdown is unusually dangerous for that
+  heuristic, because `ISSUES.md`, `NEXT-SESSION.md` and `HANDOFF.md` are
+  engineering logs that quote class names *as their subject matter*. A note
+  saying "this utility is dead and should be removed" is itself a live
+  reference, so the utility is emitted, and the note documenting the problem
+  becomes the reason the problem persists.
+
+  That is not hypothetical, and it is why these two lines exist. The dead
+  `@media (prefers-reduced-motion: no-preference)` block described further down
+  survived after `.backup/` was excluded, and the surviving occurrence was
+  `ISSUES.md` line 909, which spells `motion-safe:duration-500` out in full.
+  Its two neighbours in that sentence, `motion-safe:ease-` and
+  `motion-safe:transition-`, are written truncated and are therefore not valid
+  candidates -- which is exactly why those two disappeared and this one did
+  not. Measured, not reasoned: excluding Markdown takes the compiled
+  `no-preference` block from one utility to none.
+
+  `.backup/` is excluded explicitly rather than by `.gitignore`. It IS listed
+  in the root `.gitignore` now, and Tailwind's scanner honours that -- but the
+  eight files in it are already tracked, and `.gitignore` has no effect on
+  tracked files, so `git check-ignore` reports nothing for them. Relying on a
+  rule that git itself does not apply is the kind of thing that works until
+  someone untracks or retracks the directory. Stated here, it is a build fact
+  rather than an accident of index state.
+*/
+@source not "../**/*.md";
+@source not "../../**/*.md";
+@source not "../.backup";
+
+/* Imported here rather than from the component, so its cascade position is
+   predictable relative to the utility layer. */
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+/*
+  Self-hosted via @fontsource, never a <link> to Google Fonts.
+
+  Two type systems, one per surface:
+
+    Home     grotesk display over a serif reading column  -- a magazine
+    Console  one monospace, everywhere, no exceptions     -- a workstation
+
+  The home page is read and the console is operated, and the type says so
+  before the colour does.
+*/
 @import "@fontsource-variable/archivo";
+@import "@fontsource-variable/newsreader";
+@import "@fontsource-variable/manrope";
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
 @import "@fontsource/ibm-plex-mono/600.css";
+@import "@fontsource/chakra-petch/400.css";
 @import "@fontsource/chakra-petch/500.css";
 @import "@fontsource/chakra-petch/600.css";
 @import "@fontsource/chakra-petch/700.css";
 
 @theme {
-  --font-display: "Space Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-archivo: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Newsreader Variable", ui-serif, Georgia, serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-grotesk: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Newsreader Variable", ui-serif, Georgia, serif;
   --font-tech: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
+  --font-geo: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
 }
 
 /*
-  The brief is explicitly dark ("darker colors mixed with few bright colors"),
-  so the page is dark-locked rather than dual-mode. Per PLAN theme-lock rules a
-  single theme governs the whole page; each layout below re-points the same
-  token names, so no component ever hard-codes a colour.
+  Colour is the last layer, not the differentiator.
 
-  No pure #000 anywhere. Bases sit between #06080a and #0d1014.
+  Three of the four directions are dark, because the primary surface of this
+  application is a map and a light map loses the low-opacity credible-region
+  contours entirely. Dossier is light, because a case file is paper and every
+  convention it borrows -- exhibit stamps, ruled margins, marginal notes,
+  redaction, footnotes -- is a convention of ink on a light ground. Its map is a
+  printed chart rather than a screen.
+
+  Token names are identical across all four, so nothing hard-codes a colour.
 */
 :root {
   --ink: #e8eaed;
@@ -33,76 +90,67 @@
   --base-2: #0f1216;
   --base-3: #161a20;
   --line: #232830;
-  --accent: #f0b429;
+  --accent: #ff7a2f;
   --accent-ink: #0a0c0f;
-  --signal: #f0b429;
-  --radius: 2px;
 }
 
-/* One accent per layout, locked across every section of that layout. */
-[data-layout="signal"] {
-  --ink: #ece8e1;
-  --ink-dim: #9a938a;
-  --ink-faint: #625c55;
-  --base: #0b0a09;
-  --base-2: #121110;
-  --base-3: #1a1917;
-  --line: #262421;
-  --accent: #ff8a3d; /* sodium orange */
-  --accent-ink: #120c06;
-  --radius: 0px;
+/*
+  HOME -- warm newsprint negative. High contrast, sodium accent.
+
+  `--warn` and `--alarm` are defined on both surfaces now. They used to exist
+  only under Terminal, which meant the instrument components harvested from
+  Orbit had to reach into the map paint for a caution ink. They are real states
+  the home page can also be in -- a degraded wind gate, a withheld attribution
+  -- so they are real tokens.
+*/
+[data-surface="site"] {
+  color-scheme: dark;
+  --ink: #f4f1ea;
+  --ink-dim: #a49a8d;
+  --ink-faint: #6a625a;
+  --base: #0d0c0a;
+  --base-2: #141210;
+  --base-3: #1d1a17;
+  --line: #2a2723;
+  --accent: #ff7a2f;
+  --accent-ink: #140a03;
+  --warn: #f0c419;
+  --alarm: #ff4d4d;
+  /*
+    The console call to action, and nothing else.
+
+    A distinct orange-red rather than a reuse of `--accent`: it is the only
+    filled button on the page, and a filled button in exactly the accent colour
+    reads as another highlight rather than as the one door out of the document.
+  */
+  --cta: #ff4a1c;
+  --cta-ink: #160702;
 }
 
-[data-layout="terminal"] {
-  --ink: #d7e0d9;
-  --ink-dim: #7d8d84;
-  --ink-faint: #4d5a53;
-  --base: #070a09;
-  --base-2: #0c110f;
-  --base-3: #121917;
-  --line: #1c2622;
-  --accent: #5df2a0; /* phosphor */
-  --accent-ink: #04120a;
-  --radius: 0px;
-}
+/*
+  CONSOLE -- phosphor on graphite.
 
-[data-layout="orbit"] {
-  --ink: #e2ecf5;
-  --ink-dim: #8698a8;
-  --ink-faint: #556575;
-  --base: #070b10;
-  --base-2: #0c1219;
-  --base-3: #121a24;
-  --line: #1d2833;
-  --accent: #43d9e8; /* ice */
-  --accent-ink: #04141a;
-  --radius: 14px;
-}
-
-[data-layout="dossier"] {
-  --ink: #eae7e2;
-  --ink-dim: #948e86;
-  --ink-faint: #5d5851;
-  --base: #0c0b0b;
-  --base-2: #131111;
-  --base-3: #1b1818;
-  --line: #272322;
-  --accent: #e5484d; /* signal red */
-  --accent-ink: #150606;
-  --radius: 0px;
-}
-
-[data-layout="deepwater"] {
-  --ink: #eef2f3;
-  --ink-dim: #8d9ba0;
-  --ink-faint: #5a686d;
-  --base: #06090b;
-  --base-2: #0b1013;
-  --base-3: #10171a;
-  --line: #1b2427;
-  --accent: #ff4fa3; /* iridescent magenta, used sparingly */
-  --accent-ink: #16040c;
-  --radius: 999px;
+  The ground is deliberately off near-black. Terminal ran at `--base: #050706`,
+  which is a hole in the screen; every rule, every inactive label and the map
+  underneath all had to fight it. Lifting the whole ladder keeps the phosphor
+  reading as phosphor while giving the panel chrome somewhere to sit.
+*/
+[data-surface="console"] {
+  color-scheme: dark;
+  --ink: #d5e0d9;
+  --ink-dim: #83978c;
+  --ink-faint: #5a6b62;
+  --base: #0e1211;
+  --base-2: #141a17;
+  --base-3: #1b231f;
+  --line: #26322c;
+  --accent: #4fe08a;
+  --accent-ink: #02120a;
+  --warn: #ffbd2e;
+  --alarm: #ff5f56;
+  /* The header band that names a group of controls. */
+  --group: #1c4a33;
+  --group-ink: #bdf5d5;
 }
 
 @layer base {
@@ -111,18 +159,27 @@
     background: var(--base);
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    html {
-      scroll-behavior: auto;
-    }
-  }
-
   body {
     background: var(--base);
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    overflow-x: hidden;
+
+    /*
+      `clip`, not `hidden`.
+
+      `overflow-x: hidden` with `overflow-y: visible` is not a thing CSS will
+      give you: the used value of the other axis becomes `auto`, which turns the
+      body itself into the scroll container. The viewport then never scrolls, so
+      `window` scroll events never fire -- and anime.js's `onScroll()` observer
+      listens to the viewport. Every element primed to `opacity: 0` waiting to
+      be revealed on scroll stayed at zero forever, and the page below the fold
+      rendered as a black rectangle with nothing in the console.
+
+      `clip` has no such coupling. It still contains the full-bleed figures that
+      break out to `100vw`, and the viewport goes on being the scroller.
+    */
+    overflow-x: clip;
   }
 
   ::selection {
@@ -133,6 +190,275 @@
   :focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 3px;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  /*
+    REDUCED MOTION -- all of it, in one block.
+
+    There used to be two: an `html { scroll-behavior: auto }` beside the smooth
+    scroll above, and a universal duration clamp further down the file, outside
+    every layer. Nobody could enumerate what the pair actually covered, and
+    neither had ever run. The only lever available in this environment is a
+    `window.matchMedia` stub, which drives every JavaScript path and cannot make
+    a media query match, so the CSS half of this has been inert in every session
+    since it was written. What follows is the sweep that settled it, kept here
+    because the next person has the same problem: they cannot see this run
+    either.
+
+    HOW TO SEE IT RUN ANYWAY
+
+      The media query cannot be made to match, but the *rules* can be replayed
+      at the same cascade position. Append a `<style>` to `<head>` containing
+      `@layer base { *, *::before, *::after { ... } }` -- the declarations
+      below, minus the query. A layer name that already exists is re-opened
+      rather than re-created, so those rules join the `base` layer declared by
+      the main sheet and inherit its position in the layer order; a plain
+      unlayered `<style>` would land in the weakest important position instead
+      and under-report what this block actually reaches. Then read
+      `getComputedStyle(el).transitionDuration` before and after on an element
+      that demonstrably has a transition -- `a[href="#/console"]` is `0.2s`
+      unclamped, `[data-cross-part]` and the two popover keys are `0.15s` -- and
+      `getComputedStyle(document.documentElement).scrollBehavior`, which goes
+      `smooth` -> `auto`. Read the *change*, never the absolute: after the clamp
+      every element on the page reports a sub-millisecond duration whether or
+      not it ever had a transition, so a bare reading proves nothing on its own.
+
+    WHAT IS ANIMATED, ON BOTH SURFACES
+
+      Forty-four Tailwind utilities, one per line, and nothing else -- no
+      `@keyframes` of our own, no SMIL, no inline `style={{ transition }}`, and
+      nothing in `@layer components`. Forty-three transitions and one keyframe
+      animation:
+
+        33  transition-colors    hover, focus and selected-state feedback on
+                                 buttons, tabs, menu rows and links
+         5  transition-opacity   the two dock grips' ridge dashes; the
+                                 workspace crosshair's two rules and its readout
+         2  transition-[filter]  the `panels` and `spill` header keys, which
+                                 brighten while their popover is open
+         1  transition-all       `Rocker`'s knob (site/instruments.tsx)
+         1  transition-transform `ConsoleKey`'s arrow
+         1  transition-[transform,box-shadow,filter]   `ConsoleKey` itself
+         1  animate-pulse        the ellipsis on `Loading`
+
+      Exactly three of those move something: the rocker knob slides 13px, the
+      console key scales to 1.02 on hover and focus, and its arrow translates
+      2px. The other forty-one are colour, opacity or brightness -- no motion at
+      all. Every substantial motion on either surface is anime.js, not CSS: the
+      plates, the scenery, the ship trail, the sweep carrier, the log tail and
+      the caret, and each is gated in JavaScript by `useReducedMotion` before it
+      is built. The map camera checks the query directly and jumps instead of
+      easing. None of that is reachable from here, and this block is not what
+      makes it safe.
+
+      One thing to know before grepping the *compiled* CSS for
+      `prefers-reduced-motion`: three blocks come back, and only one of them is
+      this. That has now been grepped rather than assumed -- `npm run build`,
+      `dist/assets/index-*.css`, three hits. MapLibre ships one, for a
+      user-location dot this map never draws; nothing on either surface
+      constructs a `GeolocateControl`. The third is
+      `@media (prefers-reduced-motion: no-preference)` carrying three
+      `motion-safe:` utilities -- `transition-[transform,opacity]`,
+      `duration-500` and an `ease-[...]` -- that match no element on either
+      surface. Two of the three came from one className on line 89 of
+      `.backup/2026-08-31-animation/src/components/DesignSwitcher.tsx`: dead CSS
+      from a component that was removed, still in the bundle because Tailwind's
+      source detection walked `.backup/` and nothing excluded it.
+
+      RESOLVED, and the first answer was wrong in an instructive way.
+
+      The obvious exclusion is a `.gitignore` entry -- Tailwind v4's scanner is
+      the Rust `ignore` crate and it does honour `.gitignore`, including one in
+      a directory above the Vite root. That was added, and it was not enough.
+      Rebuilt, the block came back with **one** utility still in it:
+      `motion-safe:duration-500`.
+
+      Two things had been missed, and both are worth keeping.
+
+      The first is that the scanner reads Markdown, and this repository's
+      Markdown quotes class names as its subject matter. The surviving
+      occurrence was `ISSUES.md` line 909, which spells `motion-safe:duration-500`
+      out in full while writing its two neighbours truncated as
+      `motion-safe:ease-` and `motion-safe:transition-`. Truncated names are not
+      valid candidates -- which is precisely why those two died with `.backup/`
+      and this one did not. The note recording that a utility was dead was
+      keeping it alive.
+
+      The second is that `.gitignore` does not apply to tracked files, and the
+      eight files under `.backup/` are tracked. `git check-ignore` reports
+      nothing for them. Tailwind's scanner does not consult the index, so it
+      skips the directory anyway and the bundle improved -- but the rule that
+      appeared to be doing the work is one git itself does not apply, which
+      would have quietly stopped being true the moment anyone untracked or
+      retracked the directory.
+
+      So the exclusion is stated explicitly at the top of this file with
+      `@source not`, covering Markdown and `.backup/` both, rather than left to
+      an inference about ignore semantics. Measured after that change:
+      **two** compiled `prefers-reduced-motion` blocks, zero `motion-safe`
+      rules, and the CSS asset 147.96 kB -> 146.99 kB. The selector diff was
+      checked rather than assumed -- exactly four selectors left the bundle
+      (`.grayscale`, `.transition`, `.duration-200!`, `.motion-safe:duration-500`)
+      and none of the four appears in any `className` in `src/`; every
+      `transition` in this codebase is a hyphenated variant.
+
+    WHY THE CLAMP STAYS BLUNT
+
+      A universal duration clamp flattens all forty-four, not just the three
+      that move, and the standard objection is that a cross-fade is not a
+      vestibular risk -- clamping it strips a control of its only feedback for
+      no benefit. That objection does not apply here, and the reason is
+      checkable rather than asserted: every one of these transitions runs
+      between two states that are each fully legible on their own, and not one
+      of them carries information in the ramp. Clamping removes the ramp and
+      never the state. The hover colour still changes, the crosshair still
+      appears, the knob is still at the other end of the track.
+
+      The condition under which that stops being true is the thing to check
+      before adding a transition to this project: a transition on a value that
+      updates *repeatedly from data* -- a needle, a bar tracking a live number,
+      a figure redrawn per timestep -- is smoothing a sequence of jumps, and
+      clamping it produces more perceived motion, not less. There is no such
+      transition on either surface. Forty-two of the forty-three run between
+      discrete hover, focus, selection or toggle states, all of them driven by
+      an event rather than by the clock.
+
+      The forty-third is worth naming because it is the only near miss, and a
+      later one will look like it. `goto T0` in `reports.tsx` is a
+      `transition-colors` `Btn` whose `active` is `atWindowEnd` -- derived from
+      `hour`, which the playback loop advances in fractional steps. What keeps
+      it discrete is the 0.01 h epsilon around the comparison: the button is
+      lit or unlit, never partway, and the ramp only ever runs on a crossing.
+      Take the epsilon out and this becomes exactly the case above. It is also
+      the one transition the clamp arguably *improves*: at 24 simulated hours a
+      second a crossing can be shorter than the 150 ms ramp, so the lit state
+      the tooltip promises never fully arrives, and clamped it does.
+
+      The forty-fourth is the only loop, and the iteration clamp is what lands
+      it on its resting opacity.
+
+      `ConsoleKey`'s `hover:scale-[1.02]` is the one that looks arguable, and it
+      is clamped on purpose. A two per cent scale is small, but it is motion
+      directly under the pointer, and the remedy for motion-from-interaction is
+      to remove the animation rather than to shrink it. Clamped, the key is
+      still two per cent larger while hovered -- the affordance survives, the
+      travel does not. Sparing it would also read worse than clamping it: its
+      transition list is `transform, box-shadow, filter`, so keeping the ramp
+      for the glow while the size jumps gives one control two different
+      cadences at once.
+
+      Rejected, clamping only the three that move. The reason this was first
+      written down was "CSS cannot express it", and that is not quite true, so
+      it is restated here rather than left as a claim the next person will
+      disprove in five minutes and then distrust the rest of this block over.
+      CSS can express it, per element, positionally:
+      `transition-duration: 0.01ms, 200ms, 200ms` against `ConsoleKey`'s
+      `transition-property: transform, box-shadow, filter` clamps the transform
+      and keeps the glow, and it works. What CSS has no form for is expressing
+      it *generically* -- there is no way to say "clamp whichever entry of this
+      element's transition-property list happens to be a motion property"
+      without already knowing the list. So the rule has to restate that one
+      element's whole transition, in a selector that then has to track its class
+      list, and it goes silently wrong the day a fourth property is added to the
+      className and the positional list is not lengthened to match. That is a
+      worse failure than the blunt clamp's, because nothing about it is visible.
+
+      Rejected too, neutralising the motion rather than the ramp -- a universal
+      `scale: 1 !important; translate: none !important` under hover, which would
+      leave every colour transition intact. Tailwind v4 emits `translate` and
+      `scale` as standalone properties, and this project centres the two dock
+      grips and the workspace readout with `-translate-x-1/2 -translate-y-1/2`.
+      A universal `translate: none` moves them. The idea is sound and the
+      property namespace is shared with layout, which is the end of it.
+
+      Rejected, an allowlist of selectors to clamp: it fails in the direction
+      nobody notices -- a motion added next month is simply not covered and
+      nothing reports it -- whereas a universal clamp fails the other way,
+      turning a fade someone wanted into a snap that someone sees. This file has
+      already outlived `site/figures.tsx`, which is what a selector list here is
+      worth.
+
+      What the blunt clamp does cost, stated so it is not discovered later:
+      `transition-property` initially computes to `all`, and this block sets a
+      duration on every element without touching that. So under reduced motion
+      every element on the page acquires a 0.01ms transition on every animatable
+      property, and every property change fires a `transitionend` that bubbles.
+      Nothing on either surface listens for one -- checked, there is no
+      `transitionend` or `onTransitionEnd` anywhere in `src/` -- and 0.01ms
+      resolves inside a single frame, so the cost today is event dispatch and
+      nothing else. The day something does listen, it will be hearing from the
+      whole document rather than from the element it attached to.
+
+    WHY IT IS IN `@layer base` AND NOT OUTSIDE EVERY LAYER
+
+      Unlayered is the wrong home for an `!important` backstop. For important
+      declarations the cascade reverses the layer order, and unlayered
+      `!important` is the *weakest* important author position: anything
+      important inside a layer beats it. Tailwind's important modifier compiles
+      into `@layer utilities` -- `duration-200!` emits
+      `transition-duration: 200ms !important` there -- so one trailing `!` in a
+      className was enough to punch a silent hole straight through the clamp.
+      `base` is declared before `components` and `utilities`, so under the
+      reversed order it outranks both.
+
+    WHAT THIS BLOCK CANNOT REACH
+
+      `scroll-behavior` governs a scroll only while the scroll itself asks for
+      `auto`. An explicit `behavior: "smooth"` handed to `scrollTo` or
+      `scrollIntoView` overrides the computed property outright, so a scripted
+      smooth scroll is not addressable from CSS at all and needs its own guard.
+
+      It has one. This note used to end here, reading as an open hole, and it is
+      not one: `scrollToTop()` in `site/Nav.tsx` -- the single `window.scrollTo`
+      on that surface, called from the wordmark and from the Home link -- picks
+      its `behavior` from `prefersReducedMotion()` in `src/lib/motion.ts`, and
+      passes `"instant"` rather than `"auto"` so it depends on nothing in this
+      file. `App.tsx` passes `"instant"` unconditionally on a surface change.
+      Both are deliberate and neither is redundant with the rule below; the
+      docblock on `scrollToTop` says at length why deleting it on the strength
+      of this block would be wrong. The only thing left unreachable from here is
+      a *future* scripted scroll that forgets to ask.
+
+      `::backdrop` is deliberately absent from the selector list, and the
+      reason is the second one below rather than the first. A selector list
+      containing one selector an engine cannot parse is invalid *in its
+      entirety*, so adding it would make the project's only reduced-motion
+      backstop conditional on that pseudo-element parsing -- true, but weaker
+      than it sounds, because the bundle already depends on exactly that:
+      Tailwind v4 opens `@layer properties` with
+      `*, ::before, ::after, ::backdrop { --tw-translate-x: 0; ... }`, so an
+      engine that cannot parse `::backdrop` has already dropped every custom
+      property the transform utilities read. The standing reason is the plain
+      one: nothing here uses `<dialog>` or the popover API -- the console's
+      popovers are portalled divs -- so it would cover nothing. Add it the day
+      a modal arrives.
+
+    `0.01ms` and not `0s`: a zero-duration transition never fires
+    `transitionend`, and anything waiting on one waits forever. Nothing listens
+    for one today; the point is that nothing should have to check first.
+  */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-delay: 0s !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-delay: 0s !important;
+      transition-duration: 0.01ms !important;
+
+      /* Not inherited, so it has to be set on every scroller rather than on
+         `html` alone -- the dock's panel stack, every pane body, the log and
+         the popovers all scroll in their own right. None of them asks for
+         smooth today; the universal form is what stops the next one having to
+         remember. Important because a `scroll-smooth` utility sits in
+         `@layer utilities` and would otherwise outrank a base-layer rule. */
+      scroll-behavior: auto !important;
+    }
   }
 }
 
@@ -146,55 +472,323 @@
   .bg-base-3 { background-color: var(--base-3); }
   .bg-accent { background-color: var(--accent); }
   .border-line { border-color: var(--line); }
-  .rad { border-radius: var(--radius); }
 
-  /*
-    Halftone. A dot lattice whose dots are masked by the underlying image
-    luminance, which is what makes it read as print halftone rather than a
-    dot overlay. Size is driven by --dot so density can vary per section.
-  */
-  .halftone {
-    --dot: 5px;
-    background-image: radial-gradient(circle at center, currentColor 42%, transparent 44%);
-    background-size: var(--dot) var(--dot);
-  }
-
-  /* CRT scanlines. Fixed and pointer-events-none so it never repaints on scroll. */
-  .scanlines::after {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: 40;
-    pointer-events: none;
-    background: repeating-linear-gradient(
-      to bottom,
-      rgb(0 0 0 / 0.22) 0px,
-      rgb(0 0 0 / 0.22) 1px,
-      transparent 1px,
-      transparent 3px
-    );
-    mix-blend-mode: multiply;
-  }
-
-  .hairline-grid {
-    background-image:
-      linear-gradient(to right, var(--line) 1px, transparent 1px),
-      linear-gradient(to bottom, var(--line) 1px, transparent 1px);
-    background-size: 64px 64px;
-  }
-
-  .duotone {
-    filter: grayscale(1) contrast(1.35) brightness(0.78);
+  /* Numbers are tabular everywhere. In an interface whose job is comparing six
+     values across four candidates, digits that shift column between rows are
+     not a style choice. */
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
   }
 }
 
-/* Every animation in this project degrades to its resting state. */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+/* ------------------------------------------------------------------ *
+ * Range inputs
+ *
+ * Each direction draws its own time control, but all four keep a real range
+ * input underneath: arrow keys, Home, End and screen-reader announcement all
+ * come from the platform rather than being reimplemented badly on a div. What
+ * varies is the furniture around it, set through these variables.
+ * ------------------------------------------------------------------ */
+
+@layer components {
+  .scrub {
+    --scrub-track: var(--line);
+    --scrub-thumb: var(--accent);
+    --scrub-thumb-w: 3px;
+    --scrub-thumb-h: 22px;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 26px;
+    background: transparent;
+    cursor: ew-resize;
+    width: 100%;
+  }
+
+  .scrub::-webkit-slider-runnable-track {
+    height: 2px;
+    background: var(--scrub-track);
+  }
+
+  .scrub::-moz-range-track {
+    height: 2px;
+    background: var(--scrub-track);
+  }
+
+  .scrub::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: var(--scrub-thumb-w);
+    height: var(--scrub-thumb-h);
+    margin-top: calc((var(--scrub-thumb-h) / -2) + 1px);
+    background: var(--scrub-thumb);
+    border: none;
+    border-radius: 0;
+  }
+
+  .scrub::-moz-range-thumb {
+    width: var(--scrub-thumb-w);
+    height: var(--scrub-thumb-h);
+    background: var(--scrub-thumb);
+    border: none;
+    border-radius: 0;
+  }
+
+  .scrub:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 40%, transparent);
+  }
+
+  .scrub:focus-visible::-moz-range-thumb {
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 40%, transparent);
+  }
+}
+
+/*
+  MapLibre chrome, re-pointed at the tokens.
+
+  The library ships light-mode controls. Left alone on a dark map they are two
+  white boxes, which is the most obvious sign of a map dropped in rather than
+  designed with. Both surfaces are dark, so the inversion is unconditional.
+*/
+.maplibregl-ctrl-group {
+  background: color-mix(in oklab, var(--base-2) 88%, transparent) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(6px);
+}
+
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid var(--line) !important;
+}
+
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(1) opacity(0.62);
+}
+
+.maplibregl-ctrl-group button:hover .maplibregl-ctrl-icon {
+  filter: invert(1) opacity(0.95);
+}
+
+.maplibregl-ctrl-scale {
+  background: transparent !important;
+  border-color: var(--ink-faint) !important;
+  color: var(--ink-dim) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 10px !important;
+}
+
+.maplibregl-ctrl-attrib {
+  background: color-mix(in oklab, var(--base) 76%, transparent) !important;
+  color: var(--ink-faint) !important;
+  font-size: 10px !important;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: var(--ink-dim) !important;
+}
+
+.maplibregl-canvas:focus {
+  outline: none;
+}
+
+/* The console draws its own zoom furniture. */
+[data-surface="console"] .maplibregl-ctrl-top-right {
+  display: none;
+}
+
+/* ------------------------------------------------------------------ *
+ * The console's panel reader
+ * ------------------------------------------------------------------ */
+
+/*
+  The same panes as the docks, rendered to be read rather than monitored.
+
+  The console proper is dense on purpose: it is a room you stand in, everything
+  has to be visible at once, and nine-pixel type in a three-hundred-pixel rail
+  is the cost of that. The reader below it exists precisely because that bargain
+  is a bad one when you actually want to *read* a pane.
+
+  Three layouts have been tried here. Two were wrong and it is worth saying how,
+  because neither failure is visible from the markup.
+
+    1. Poured into dock-width columns. Used the page, kept every compact
+       decision -- the same clunky dashboard, rearranged.
+    2. One column at `zoom: 1.32` in a 52rem measure. `zoom` scales a pane and
+       everything in it by one factor, so the *type* held its proportions. What
+       it never touches is a `w-full` SVG with a fixed viewBox, which sizes to
+       its container and not to the zoom. Given 480px, a plot composed at 320
+       units ran at 1.5x -- 2.2x for the track scope's 220 -- and carried its
+       tick labels up with it, so a caption drawn at 7 units came out at twenty
+       pixels, larger than the pane title above it and the prose beside it.
+    3. A margin column: every block label turned ninety degrees into a 12rem
+       gutter with its body in a measure alongside. It measured correctly and
+       read wrongly. A section label with a rule running off it is what makes
+       one of these panes a console pane rather than a document, and moving all
+       of them into a margin traded the surface's own furniture for tidiness.
+
+  What is here now keeps the labels where they were -- full width, ruled, meta
+  at the far end -- and spends the extra width inside the body instead, where a
+  figure can sit beside the rows and the note that explain it. `Split` is that
+  pairing, and it is used only where there is genuinely both to pair.
+
+  `zoom` stays. It is still the only way to lift a dozen files of hard-coded
+  pixel sizes at once. The thing it never governed -- figure scale -- is now
+  governed directly, by `--fig-w` set beside each viewBox in
+  `console/instruments.tsx`.
+*/
+
+[data-panel-reader] [data-pane-host] {
+  zoom: 1.32;
+  /* Sized by the split, not by a reading measure: a 408px figure, a 1.75rem
+     gutter and enough left for the text beside it to run about fifty
+     characters, plus the body's own padding. Centred, so the slack falls
+     either side rather than leaving the pane hard against the left. */
+  max-width: 52rem;
+  margin-inline: auto;
+}
+
+/* Flow with the page. The workstation above still scrolls inside itself. */
+[data-panel-reader] [data-pane-body],
+[data-panel-reader] [data-pane-narrow] {
+  height: auto;
+  overflow: visible;
+}
+
+/* A pane is a flex child in a dock and a plain block here. */
+[data-panel-reader] [data-pane-body],
+[data-panel-reader] [data-pane-narrow],
+[data-panel-reader] section {
+  min-height: 0;
+  flex: initial;
+}
+
+/* Room to breathe. In a rail the blocks are stacked tight because there is no
+   room to spare; here there is. */
+[data-panel-reader] [data-pane-body],
+[data-panel-reader] [data-pane-narrow] {
+  padding: 1.15rem 1.35rem 1.6rem;
+}
+
+[data-panel-reader] [data-pane-body] > * + * {
+  margin-top: 1.65rem;
+}
+
+/* ---- a figure beside its text ------------------------------------ *
+ *
+ * The figure column is `auto`, so it is the figure's own `--fig-w` that sets
+ * it and the text takes whatever is left. That is deliberate: the field scope
+ * is a square and asks for less width than a wide plot, and the text beside it
+ * should get the difference rather than the layout forcing every figure to one
+ * size.
+ *
+ * Placement is explicit rather than by source order, so a dock rail keeps the
+ * sequence it already had -- figure, then the readings under it.
+ */
+
+[data-panel-reader] [data-block-split] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 1.75rem;
+  align-items: start;
+}
+
+[data-panel-reader] [data-split-text] {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+[data-panel-reader] [data-split-figure] {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+/*
+  The figure needs a definite width, not just a cap.
+
+  An `auto` grid track sizes to its content's max-content contribution, and for
+  a `width: 100%` SVG that is the replaced-element default of 300px -- not the
+  viewBox, and not `max-width`. So the wind gate came out at 300 and the radar
+  tile, which is a canvas carrying real `width` and `height` attributes, came
+  out at its full 408: two figures in the same pane at two different scales for
+  a reason nothing in the markup showed. Reading `--fig-w` as the width as well
+  as the cap makes the track resolve to the number the instrument stated.
+*/
+[data-panel-reader] [data-split-figure] svg,
+[data-panel-reader] [data-split-figure] canvas,
+[data-panel-reader] [data-split-figure] [data-fig] {
+  width: var(--fig-w, 25rem);
+}
+
+/* In a rail these stack, and the note under a plot needs its own gap. */
+[data-block-split] > [data-split-text] {
+  margin-top: 0.5rem;
+}
+
+[data-panel-reader] [data-block-split] > [data-split-text] {
+  margin-top: 0;
+}
+
+/*
+  Prose gets a measure. Everything else on a pane is a row, a box or a table,
+  and those are meant to run the width -- a dotted leader carrying a label
+  across to its value is the whole idiom. A paragraph is not: `Note` bodies and
+  the track scope's caption are the longest text on either surface, and at full
+  width here they ran to a hundred and twenty characters a line.
+*/
+[data-panel-reader] [data-prose] {
+  max-width: 66ch;
+}
+
+/*
+  A row of stat boxes is a readout, not a banner.
+
+  Left to the full measure each cell came out around 260px holding a nine-pixel
+  label and five digits -- fifteen per cent ink and the rest air, which is the
+  same complaint the figures answered. 26rem puts a two-up cell at 208px and a
+  three-up at 139px, which is within a few pixels of what the same grid gets in
+  a 430px dock rail: the proportion these boxes were drawn at.
+*/
+[data-panel-reader] [data-fields] {
+  max-width: 26rem;
+}
+
+
+/*
+  Figures sit at the scale they were composed for.
+
+  `--fig-w` is set on each instrument beside its viewBox; the fallback catches
+  anything that has not stated one. `canvas` is in the selector because the
+  radar tile is one, and a rule that said `svg` let the single largest element
+  in the reader straight through it.
+*/
+[data-panel-reader] [data-pane-body] svg,
+[data-panel-reader] [data-pane-body] canvas,
+[data-panel-reader] [data-pane-body] [data-fig] {
+  max-width: var(--fig-w, 25rem);
+}
+
+/* The log is the one panel with no natural end -- it holds a hundred and sixty
+   transitions. It keeps its own scroller here rather than running the page
+   several thousand pixels past the bottom of every other panel. */
+[data-panel-reader] [role="log"] {
+  max-height: 30rem;
+}
+
+/*
+  Narrow: back to the dock's own shape.
+
+  Below the breakpoint `useNarrow` already uses there is no room to set a figure
+  beside anything, and the split becomes what it is in a rail -- one column,
+  figure then text, which is the layout every one of these components was drawn
+  for in the first place.
+*/
+@media (max-width: 1023px) {
+  [data-panel-reader] [data-block-split] {
+    display: block;
+  }
+
+  [data-panel-reader] [data-block-split] > [data-split-text] {
+    margin-top: 0.5rem;
   }
 }
