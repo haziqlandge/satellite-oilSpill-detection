@@ -79,7 +79,8 @@ operational measures" claim is unsupported.
 | F7 | **Smooth scrolling ignores reduced-motion.** `site/Nav.tsx` calls `window.scrollTo({ behavior: "smooth" })` in two places with no guard; CSS cannot reach an explicit `behavior`. |
 | F8 | **Scenario copy is unverified against the data.** Three separate sessions each found a place where the console states something its own numbers contradict. Treat every `summary`, `short`, `provenance` and `tests` string in `scenarios.ts` as an unchecked assertion. |
 | F9 | **No test harness exists in `frontDemo/`.** |
-| F10 | **Basemap requires network.** Everything else renders locally; the map reports a tile failure and the other layers still draw (C12). |
+| F10 | **`maplibre-gl` has a critical XSS advisory.** Versions <= 6.4.0 are affected by a sanitizer bypass in `DOM.sanitize()` via live NamedNodeMap removal (GHSA-jrc7-96c5-q579). The project is on ^5.24.0; the fix is 6.10.0, a breaking major. Low practical risk while content is ours and local; it matters the moment the site is public. |
+| F11 | **Basemap requires network.** Everything else renders locally; the map reports a tile failure and the other layers still draw (C12). |
 
 ## 7. What must not be claimed
 

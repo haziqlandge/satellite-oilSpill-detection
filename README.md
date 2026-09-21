@@ -57,7 +57,7 @@ Python starts, which is load-bearing — the OMP runtime reads them once, at fir
 ### Frontend
 
 ```bash
-npm install --prefix frontDemo
+cd frontDemo && npm install
 ```
 
 ```bash
@@ -65,6 +65,10 @@ npm run dev --prefix frontDemo
 ```
 
 Opens on port 5180. `http://127.0.0.1:5180/#/console` is the operations console.
+
+`npm install --prefix frontDemo` does **not** work on npm 10+ — it resolves
+`package.json` from the current directory, not the prefix, and fails at the
+repository root. `npm run --prefix` is unaffected.
 
 ---
 
@@ -154,6 +158,7 @@ Read the indexes, not everything.
 | [`PREVIOUS_WORK.md`](PREVIOUS_WORK.md) | What was done, and what must not be re-derived |
 | [`FUTURE_WORK.md`](FUTURE_WORK.md) | What to do next |
 | [`DATA.md`](DATA.md) | Where the data and artifacts live |
+| [`frontDemo/README.md`](frontDemo/README.md) | The frontend: run, layout, and the invariants to respect |
 | [`PLAN/INDEX.md`](PLAN/INDEX.md) | Architecture, interfaces, constraints, evaluation, ten phase files |
 | [`RESEARCH/INDEX.md`](RESEARCH/INDEX.md) | Four papers read in full, six topic syntheses, citation graph |
 | [`RESEARCH/SYNTHESIS.md`](RESEARCH/SYNTHESIS.md) | Every design decision and its justification |
