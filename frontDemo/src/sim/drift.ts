@@ -255,8 +255,23 @@ function integrateHour(
   }
 }
 
-function thin(state: Float64Array, total: number, want: number): Float64Array {
-  const stride = Math.max(1, Math.floor(total / want));
+/**
+ * Every `stride`-th parcel, for rendering. Statistics always use all of them.
+ *
+ * `stride` can be dictated, and for the release it must be. Parcels are stored
+ * append-only, so parcel `i` is the same parcel at every hour -- but a stride
+ * derived from the live count changes as the cloud grows, and then thinned
+ * index `j` means parcel `j*4` in one frame and `j*5` in the next. The overlay
+ * interpolates between frames by index, so that silently blends the path of one
+ * parcel into the path of another: a shimmer that gets worse the smoother the
+ * interpolation is. Passing the final stride keeps the mapping fixed.
+ */
+function thin(
+  state: Float64Array,
+  total: number,
+  want: number,
+  stride = Math.max(1, Math.floor(total / want)),
+): Float64Array {
   const n = Math.floor(total / stride);
   const out = new Float64Array(n * 2);
   for (let i = 0; i < n; i++) {
@@ -453,9 +468,76 @@ export interface ReleaseFrame {
   releasedFraction: number;
 }
 
+/**
+ * How a discharge is delivered across its window.
+ *
+ * Every release used to be a perfectly constant tap: parcel `i` entered the
+ * water at `start + (i / total) * hours`, so the discharged fraction rose in a
+ * dead straight line and every scenario's accumulation curve was the same line
+ * at a different length. Measured before this change, all eight scenarios
+ * reported exactly ONE distinct rate increment across their whole release.
+ *
+ * A shape is the CUMULATIVE fraction released by fraction `t` of the window,
+ * which is the right thing to specify: it is monotonic by construction, it
+ * lands exactly on 1, and the rate is its slope, so no shape can emit more oil
+ * than the scenario says. Rates are authored per scenario (C10), never fitted
+ * to make a curve look better.
+ */
+export type ReleaseShapeName = "steady" | "building" | "tapering" | "pulsed";
+
+const SHAPES: Record<ReleaseShapeName, (t: number) => number> = {
+  /** A valve held open. Rate constant. */
+  steady: (t) => t,
+  /** A fault that worsens: rate 1.9 t^0.9, from nothing to its maximum. */
+  building: (t) => t ** 1.9,
+  /** A tank emptied and then dribbling: rate 2.2 (1-t)^1.2, high then trailing. */
+  tapering: (t) => 1 - (1 - t) ** 2.2,
+  /**
+   * Pumping cycles. Rate is `1 - 0.85 cos(8 pi t)`, four surges across the
+   * window, and the floor of 0.15 is deliberate -- it slows and surges rather
+   * than stopping and restarting, because a discharge that truly stopped would
+   * have to justify why the slick has no gaps in it.
+   */
+  pulsed: (t) => t - (0.85 / (8 * Math.PI)) * Math.sin(8 * Math.PI * t),
+};
+
+/**
+ * The hour each parcel enters the water, by inverting the cumulative shape.
+ *
+ * Numeric rather than analytic so a shape only has to state its cumulative and
+ * does not need a closed-form inverse -- `pulsed` has none. Parcel `i` is
+ * placed where the cumulative reaches `(i + 0.5) / total`, so the count is
+ * exact and no parcel is lost at either end.
+ */
+function births(
+  total: number,
+  startHour: number,
+  releaseHours: number,
+  shape: ReleaseShapeName,
+): Float64Array {
+  const curve = SHAPES[shape] ?? SHAPES.steady;
+  const N = 2048;
+  const cumulative = new Float64Array(N + 1);
+  for (let i = 0; i <= N; i++) cumulative[i] = curve(i / N);
+
+  const out = new Float64Array(total);
+  let j = 0;
+  for (let i = 0; i < total; i++) {
+    const target = (i + 0.5) / total;
+    while (j < N && cumulative[j + 1] < target) j++;
+    const lo = cumulative[j];
+    const hi = cumulative[j + 1];
+    const within = hi > lo ? (target - lo) / (hi - lo) : 0;
+    out[i] = startHour + ((j + within) / N) * releaseHours;
+  }
+  return out;
+}
+
 export interface ReleaseConfig {
   /** Where oil enters the water. A point for a fixed source. */
   source: LngLat;
+  /** How the discharge rate varies across the window. Authored (C10). */
+  shape?: ReleaseShapeName;
   /** For a moving source, where the vessel is at a given hour. */
   sourceAt?: (hour: number) => LngLat;
   forcing: Forcing;
@@ -504,12 +586,7 @@ export function runRelease(cfg: ReleaseConfig, rng: Rng): ReleaseFrame[] {
   const releaseHours = Math.max(1, cfg.endHour - cfg.startHour);
   const total = Math.round(releaseHours * cfg.ratePerHour);
   const positions = new Float64Array(total * 2);
-  // Hour at which each parcel enters the water, spread evenly across the
-  // release so the slick grows steadily rather than in steps.
-  const birth = new Float64Array(total);
-  for (let i = 0; i < total; i++) {
-    birth[i] = cfg.startHour + (i / total) * releaseHours;
-  }
+  const birth = births(total, cfg.startHour, releaseHours, cfg.shape ?? "steady");
 
   const steps = Math.round(60 / STEP_MIN);
   const dt = STEP_MIN * 60;
@@ -547,10 +624,19 @@ export function runRelease(cfg: ReleaseConfig, rng: Rng): ReleaseFrame[] {
           const [wu, wv] = cfg.forcing.wind(at, hour);
           const u = cu + wu * cfg.windFactor;
           const v = cv + wv * cfg.windFactor;
-          positions[k] +=
-            (u * dt + rng.normal() * sigmaM) / 1000 / kmPerDegLon(at[1]);
-          positions[k + 1] +=
-            (v * dt + rng.normal() * sigmaM) / 1000 / KM_PER_DEG_LAT;
+          const lon =
+            positions[k] + (u * dt + rng.normal() * sigmaM) / 1000 / kmPerDegLon(at[1]);
+          const lat =
+            positions[k + 1] + (v * dt + rng.normal() * sigmaM) / 1000 / KM_PER_DEG_LAT;
+          // The oil strands at the shore, exactly as the ensemble does. This
+          // was missing while `integrateHour` had it: with every scene now in
+          // open water no parcel currently reaches a coast, so nothing on
+          // screen changes -- but an uploaded scene or a moved release would
+          // have walked the slick itself inland while the backward field
+          // correctly stopped at the water's edge.
+          if (isLand(lon, lat)) continue;
+          positions[k] = lon;
+          positions[k + 1] = lat;
         }
       }
     }
@@ -631,12 +717,16 @@ export function runRelease(cfg: ReleaseConfig, rng: Rng): ReleaseFrame[] {
     level = levelForMass(atPass.table, (lo + hi) / 2);
   }
 
+  // One stride for the whole release, from the final parcel count, so thinned
+  // index `j` names the same parcel in every frame. See `thin`.
+  const releaseStride = Math.max(1, Math.floor(total / 1200));
+
   return raw.map((r) => {
     const extent = r.grid && level > 0 ? contour(r.grid, level) : [];
     return {
       hour: r.hour,
       at: cfg.acquiredAt + r.hour * 3600_000,
-      particles: thin(r.live, r.alive, 1200),
+      particles: thin(r.live, r.alive, 1200, releaseStride),
       extent,
       areaKm2: extent.reduce((s, ring) => s + ringAreaKm2(ring), 0),
       releasedFraction: r.alive / total,

@@ -56,6 +56,11 @@ function sampleSpec(id: DemoSampleKey, index: number): ScenarioSpec {
       convergence: { centre, radiusKm: 18, strengthMs: 0.02 },
     },
     release: geom.head, releaseAgeHours: 12, ongoing: true,
+    // One shape each, so the three samples do not replay the same straight
+    // accumulation line. Sample 2's release window is an hour long, which is
+    // too short for a rate profile to be visible in it, so it stays steady
+    // rather than being given a shape it cannot show.
+    releaseShape: (["building", "steady", "pulsed"] as const)[index],
     slick: {
       axisDeg: 110, lengthKm: [12, 8, 6][index], headWidthM: 150,
       tailWidthM: 450, meanderKm: 0.1, fragments: 1,

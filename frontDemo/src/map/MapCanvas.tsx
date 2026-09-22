@@ -907,7 +907,7 @@ export function MapCanvas({
         ),
       ),
     );
-    //  is a dependency now: the suspect track is cut at the playhead.
+    // The hour is a dependency now: the suspect track is cut at the playhead.
   }, [selected, ready, run.infrastructure, run.vessels, run.meta.acquiredAt, hour]);
 
   /* --- toggles ----------------------------------------------------- */
@@ -933,10 +933,24 @@ export function MapCanvas({
       }
     };
 
-    // The detection is what the satellite recorded at the pass. Showing it
-    // during the hours before the pass would be showing the answer before the
-    // question.
-    const detected = toggles.slick && hour >= -0.5;
+    /*
+      The detected mask is drawn at every hour, not only from the pass onward.
+
+      It used to appear at T-0.5h, on the argument that the detection is what
+      the satellite recorded at the pass and showing it earlier is showing the
+      answer before the question. That argument is sound and it is why the
+      layer was built this way -- but it is an argument about the logic of the
+      investigation, and what a first-time viewer sees is a spill that was not
+      there a moment ago and now is. They read it as the oil appearing, which
+      is the wrong story entirely: the oil was in the water the whole time and
+      the satellite is what arrived.
+
+      Whoever already knows the pipeline loses nothing by having the outline on
+      screen early, because the timeline states the hour and the pass is marked
+      on it. A new viewer loses the whole frame. The toggle is still there for
+      anyone who wants the strict reading back.
+    */
+    const detected = toggles.slick;
     set("slick-fill", detected);
     set("slick-line", detected);
     set("slick-axis", detected);

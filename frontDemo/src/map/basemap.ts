@@ -608,6 +608,17 @@ export const DEFAULT_TOGGLES: LayerToggles = {
   forecast: true,
   hindcast: true,
   labels: true,
-  release: true,
+  /*
+    Off by default.
+
+    The release cloud is the brightest layer on the map and it is drawn on top
+    of the origin field, so with both on, the first thing a viewer sees is the
+    oil rather than the reconstruction the console exists to explain -- and
+    before the pass the hindcast is deliberately held down to a haze precisely
+    so the oil can sit over it. Starting with the release off means the panel
+    opens on the origin field at full weight, which is the subject, and the oil
+    is one click away for anyone who wants to watch it accumulate.
+  */
+  release: false,
   darkVessel: true,
 };

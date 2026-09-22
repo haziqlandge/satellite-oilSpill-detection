@@ -16,7 +16,13 @@
  * demo has no reason to.
  */
 
-import { advect, fieldProbabilityAt, runDrift, runRelease } from "./drift";
+import {
+  advect,
+  fieldProbabilityAt,
+  runDrift,
+  runRelease,
+  type ReleaseShapeName,
+} from "./drift";
 import { makeForcing, type FieldConfig, type Forcing } from "./field";
 import { bearingDeg, centroid, circleRing, destination, distanceKm } from "./geo";
 import { makeRng, seedFrom } from "./rng";
@@ -101,6 +107,14 @@ export interface ScenarioSpec {
   field: FieldConfig;
   /** Where the oil entered the water, before any drift. */
   release: LngLat;
+  /**
+   * How the discharge rate varies across its window. Authored (C10).
+   *
+   * Omitted means `steady`, which is what every scenario was before these were
+   * assigned -- a perfectly constant tap, giving every scene the same straight
+   * accumulation line at a different length.
+   */
+  releaseShape?: ReleaseShapeName;
   /**
    * Hours the release has been running, or for a finished one, how long ago it
    * stopped. Authored (C10).
@@ -221,6 +235,9 @@ const AUTHORED_SPECS: Record<ScenarioId, ScenarioSpec> = {
       windDirDeg: 148,
       windRotateDegPerHour: 0.35,
     },
+    // A valve open while the vessel is underway; the window is 1.3 h, too
+    // short for a pump to do anything interesting in.
+    releaseShape: "steady",
     release: GOM_CASE_2,
     releaseAgeHours: 4,
     ongoing: false,
@@ -303,6 +320,9 @@ const AUTHORED_SPECS: Record<ScenarioId, ScenarioSpec> = {
       windDirDeg: 22,
       windRotateDegPerHour: -0.28,
     },
+    // Moored 53 h and discharging on pump cycles, which is what a berthed
+    // vessel emptying slops actually does.
+    releaseShape: "pulsed",
     release: GOM_CASE_3,
     releaseAgeHours: 16,
     ongoing: true,
@@ -459,6 +479,9 @@ const AUTHORED_SPECS: Record<ScenarioId, ScenarioSpec> = {
       windDirDeg: 65,
       windRotateDegPerHour: 0.2,
     },
+    // A fixed installation with a fault that worsens: nothing, then a
+    // rising rate. This is the one whose slick genuinely starts tiny.
+    releaseShape: "building",
     release: GOM_CASE_1,
     releaseAgeHours: 15,
     ongoing: true,
@@ -630,6 +653,9 @@ const AUTHORED_SPECS: Record<ScenarioId, ScenarioSpec> = {
       windDirDeg: 305,
       windRotateDegPerHour: 0.4,
     },
+    // A tank emptied fast and then trailing off -- the reason to run dark
+    // is to be finished before anyone looks.
+    releaseShape: "tapering",
     release: KUTCH,
     releaseAgeHours: 18,
     ongoing: true,
@@ -1310,6 +1336,7 @@ function assemble(id: ScenarioId, variant: DriftVariant): Run {
   const release = runRelease(
     {
       source: spec.release,
+      shape: spec.releaseShape,
       sourceAt: movingSource,
       forcing,
       acquiredAt,
