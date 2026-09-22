@@ -190,7 +190,7 @@ const GOM_CASE_2_MID: LngLat = [-89.1755, 28.4407];
 const KUTCH: LngLat = [69.42, 22.46];
 const MUMBAI_HIGH: LngLat = [71.62, 19.48];
 
-const SPECS: Record<ScenarioId, ScenarioSpec> = {
+const AUTHORED_SPECS: Record<ScenarioId, ScenarioSpec> = {
   ...SAMPLE_SPECS,
   "gom-moving": {
     meta: {
@@ -249,8 +249,12 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
         { from: [-89.7, 28.9], to: [-88.7, 27.9], widthKm: 6 },
         { from: [-89.9, 28.2], to: [-88.6, 28.55], widthKm: 5 },
         // Start nudged south off the delta edge; the old [-89.15, 29.1] put the
-        // scatter around the first few per cent of this lane on land.
-        { from: [-89.13, 29.05], to: [-89.45, 27.7], widthKm: 4 },
+        // scatter around the first few per cent of this lane on land. Nudged a
+        // further 1.0 km west on 2026-09-22, this time measured rather than by
+        // eye: against the land mask the authored start still ran 0.5% of the
+        // lane ashore once the full 4 km scatter is sampled, and [-89.14, 29.05]
+        // is the nearest start that is clean. See scripts/check-corridors.ts.
+        { from: [-89.14, 29.05], to: [-89.45, 27.7], widthKm: 4 },
       ],
     },
     infrastructure: [
@@ -355,12 +359,13 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
       name: "Platform leak",
       region: "gulf-of-mexico",
       provenance:
-        "Acquisition time, slick length and suspected-source coordinate from Zhao et al. 2025 Case 1. Drift field, AIS traffic and all scores are simulated, and the traffic here deliberately departs from the published case: that case reported no vessel track within 5 km, and this one runs a lane straight over the slick so that the platform has to win against vessels rather than by default.",
+        "SIM · Acquisition time and slick geometry from Zhao et al. 2025 Case 1; the POSITION is not the published one. The whole scene is displaced 85 km south-south-west of the Case 1 coordinate, out of the Mississippi bird's-foot and into the open Gulf, because a credible region bounded by marsh on three sides describes the delta rather than the oil. Relative geometry is preserved exactly, so every measured property below still holds. Drift field, AIS traffic and all scores are simulated, and the traffic deliberately departs from the published case: that case reported no vessel track within 5 km, and this one runs a lane straight over the slick so the platform has to win against vessels rather than by default.",
       acquiredAtIso: "2023-04-09T00:02:00Z",
       centre: [-89.62, 29.06],
       zoom: 10.4,
       sceneId: "S1A_IW_GRDH_1SDV_20230409T000200_GoM",
-      place: "the South Pass lease blocks",
+      // Displaced out of the South Pass lease blocks; see DISPLACEMENTS.
+      place: "the open Gulf south-west of South Pass",
       summary:
         "A 5.5 km banded slick with its northern tip on a platform group, lying directly under a transit lane. Seventeen vessel tracks are admitted alongside the two installations, every one of them passing within 200 m of the slick and ten reporting a position inside the detection polygon itself.",
       /*
@@ -536,12 +541,13 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
       name: "Dark vessel",
       region: "indian-waters",
       provenance:
-        "Authored scenario. Ground truth is written by us, never derived from an anomaly detector, and the AIS is synthetic because free real AIS covers US waters only.",
+        "SIM · Authored scenario, displaced 139 km west of the Gulf of Kutch into the open Arabian Sea so the scene is not pressed against a coast on both sides. Ground truth is written by us, never derived from an anomaly detector, and the AIS is synthetic because free real AIS covers US waters only.",
       acquiredAtIso: "2024-02-18T00:41:00Z",
       centre: [69.4, 22.42],
       zoom: 10.2,
       sceneId: "S1A_IW_GRDH_1SDV_20240218T004100_KUTCH",
-      place: "the Gulf of Kutch",
+      // Displaced out of the gulf itself; see DISPLACEMENTS.
+      place: "the Arabian Sea west of the Gulf of Kutch",
       summary:
         "A 9 km trail in the approaches to the Gulf of Kutch. A radar bright target sits at the head of it, in a working lane, carrying no AIS report of its own.",
       tests: "A candidate with no identity is ranked and never named.",
@@ -816,6 +822,93 @@ const SPECS: Record<ScenarioId, ScenarioSpec> = {
     source: { type: "none" },
   },
 };
+
+/* ------------------------------------------------------------------ *
+ * Presentation displacement
+ * ------------------------------------------------------------------ */
+
+/**
+ * Two scenes are moved bodily out to open water, 2026-09-22.
+ *
+ * `gom-platform` was centred in the West Bay side of the Mississippi bird's-foot
+ * and `kutch-dark` inside the Gulf of Kutch, which is 31% land inside the
+ * masked box. Both are real places for the events they depict, and the land
+ * mask now keeps parcels and contours off the shore correctly -- but the result
+ * still reads as a spill pressed up against a coastline, and a hindcast whose
+ * credible region is bounded by a marsh on three sides is telling the operator
+ * more about the geography than about the oil.
+ *
+ * The displacement is a rigid translation of the whole scene: release, forcing
+ * centres, every shipping lane, every installation. That is deliberate and it
+ * is the only transform that is safe here. Each of these scenarios is tuned
+ * against measured properties -- which vessel passes how close, the corridor
+ * ORDER that `buildTraffic` consumes round-robin, the rank-1 margin and the
+ * separability floor -- and every one of those is a statement about relative
+ * geometry. A translation leaves all of them exactly as authored. Moving the
+ * release alone, or nudging lanes individually, would quietly invalidate the
+ * numbers recorded in the comments above.
+ *
+ * The authored coordinates stay in `AUTHORED_SPECS` above rather than being
+ * overwritten, so the published case positions remain readable in source and
+ * the offset applied to them is visible rather than baked in.
+ *
+ * WHAT THIS COSTS, stated plainly: `gom-platform` draws its release from
+ * `GOM_CASE_1`, the suspected-source coordinate published in Zhao et al. 2025
+ * Case 1. Displaced, the scene is no longer at that coordinate, so `provenance`
+ * no longer claims it is -- it says the geometry is the published case's and
+ * the position is not. Presenting a moved scene as being at a published
+ * position would be the one kind of error this project cannot afford.
+ */
+const DISPLACEMENTS: Partial<Record<ScenarioId, LngLat>> = {
+  // West Bay to the open Gulf, 85 km south-south-west. Clearance from the
+  // nearest land, measured over the whole scene including its shipping lanes,
+  // goes from ashore to 24 km.
+  "gom-platform": [-0.15, -0.75],
+  // Gulf of Kutch to the Arabian Sea west of Dwarka, 139 km west. Clearance
+  // 22 km on the same measure.
+  "kutch-dark": [-1.35, 0.1],
+};
+
+const shift = (p: LngLat, by: LngLat): LngLat => [p[0] + by[0], p[1] + by[1]];
+
+/** Every coordinate-bearing field of a spec, translated together. */
+function displace(spec: ScenarioSpec, by: LngLat): ScenarioSpec {
+  return {
+    ...spec,
+    meta: { ...spec.meta, centre: shift(spec.meta.centre, by) },
+    field: {
+      ...spec.field,
+      eddy: { ...spec.field.eddy, centre: shift(spec.field.eddy.centre, by) },
+      convergence: {
+        ...spec.field.convergence,
+        centre: shift(spec.field.convergence.centre, by),
+      },
+    },
+    release: shift(spec.release, by),
+    traffic: {
+      ...spec.traffic,
+      corridors: spec.traffic.corridors.map((c) => ({
+        ...c,
+        from: shift(c.from, by),
+        to: shift(c.to, by),
+      })),
+    },
+    infrastructure: spec.infrastructure.map((i) => ({
+      ...i,
+      position: shift(i.position, by),
+    })),
+  };
+}
+
+const SPECS: Record<ScenarioId, ScenarioSpec> = Object.fromEntries(
+  Object.entries(AUTHORED_SPECS).map(([id, spec]) => {
+    const by = DISPLACEMENTS[id as ScenarioId];
+    return [id, by ? displace(spec, by) : spec];
+  }),
+) as Record<ScenarioId, ScenarioSpec>;
+
+/** Exposed for scripts/check-corridors.ts, which validates lanes against the land mask. */
+export const SPEC_FOR_CHECK = SPECS;
 
 /* ------------------------------------------------------------------ *
  * The forcing, sampled

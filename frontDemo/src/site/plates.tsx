@@ -25,7 +25,6 @@ import { createTimeline, stagger, svg, utils } from "animejs";
 import { useAnimeScope } from "../lib/motion";
 import { formatHour, relHour } from "../lib/format";
 import { checkpointsFor } from "../lib/playback";
-import { reconstructionRun } from "../lib/reconstruction";
 import {
   forecastHours,
   fieldProjection,
@@ -524,7 +523,7 @@ function StackReadout({
  * nobody asked.
  */
 export function OriginFieldPlate({ run }: { run: Run }) {
-  const display = reconstructionRun(run);
+  const display = run;
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const hours = useMemo(() => [-run.drift.backwardHours, -Math.round(run.drift.backwardHours * 0.66), -Math.round(run.drift.backwardHours * 0.33), ...[-run.drift.backwardHours, -Math.round(run.drift.backwardHours / 2), ...forecastHours(run, 7)]], [run]);
   /**
@@ -828,7 +827,7 @@ export function OriginFieldPlate({ run }: { run: Run }) {
  * figures can be read against each other hour for hour.
  */
 export function ForecastSpreadPlate({ run }: { run: Run }) {
-  const display = reconstructionRun(run);
+  const display = run;
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
   const CW = 920;
   // Matched to the origin-field plate beside it. The two sit on one row and a

@@ -14,6 +14,7 @@
  */
 
 import { KM_PER_DEG_LAT, kmPerDegLon } from "./geo";
+import { isLand } from "./landmask";
 import type { LngLat } from "./types";
 
 export interface FieldConfig {
@@ -177,11 +178,39 @@ export function densityGrid(
   boxBlur(values, nx, ny, 3);
   boxBlur(values, nx, ny, 3);
   boxBlur(values, nx, ny, 2);
+  dropLand(values, { minLon, minLat, dLon, dLat, nx, ny });
 
   const midLat = minLat + ((ny - 1) * dLat) / 2;
   const cellAreaKm2 = dLon * kmPerDegLon(midLat) * dLat * KM_PER_DEG_LAT;
 
   return { values, nx, ny, minLon, minLat, dLon, dLat, cellAreaKm2 };
+}
+
+/**
+ * Zero every cell that is dry ground, after the blur rather than before it.
+ *
+ * The integrator already refuses to step a parcel onto land, so no particle is
+ * ever deposited there -- but the blur that follows deposition is what put
+ * density ashore, and the contour is traced on the blurred field. That is why
+ * the 50% and 90% rings used to sit on Venice and Grand Bay while every parcel
+ * behind them was in the water.
+ *
+ * Masking after the blur leaves a hard edge at the coast, which is the right
+ * shape: the contour then follows the shoreline instead of crossing it. The
+ * mass levels are taken from what survives, so the rings enclose half and nine
+ * tenths of the probability that is actually in the water.
+ */
+function dropLand(
+  values: Float64Array,
+  spec: { minLon: number; minLat: number; dLon: number; dLat: number; nx: number; ny: number },
+) {
+  const { minLon, minLat, dLon, dLat, nx, ny } = spec;
+  for (let y = 0; y < ny; y++) {
+    const lat = minLat + y * dLat;
+    for (let x = 0; x < nx; x++) {
+      if (isLand(minLon + x * dLon, lat)) values[y * nx + x] = 0;
+    }
+  }
 }
 
 /**
@@ -217,6 +246,7 @@ export function densityGridOn(
 
   boxBlur(values, nx, ny, 2);
   boxBlur(values, nx, ny, 2);
+  dropLand(values, { minLon, minLat, dLon, dLat, nx, ny });
 
   const midLat = minLat + ((ny - 1) * dLat) / 2;
   const cellAreaKm2 = dLon * kmPerDegLon(midLat) * dLat * KM_PER_DEG_LAT;

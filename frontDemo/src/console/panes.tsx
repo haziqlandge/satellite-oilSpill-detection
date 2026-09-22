@@ -1,4 +1,3 @@
-import { reconstructionRun } from "../lib/reconstruction";
 /**
  * The three live panes: 01 DETECT, 02 DRIFT, 03 TRAFFIC.
  *
@@ -260,7 +259,7 @@ export function Detect({ run }: { run: Run }) {
  * ================================================================== */
 
 export function Drift({
-  run: sourceRun,
+  run,
   hour,
   variant,
   setVariant,
@@ -270,7 +269,6 @@ export function Drift({
   variant: DriftVariant;
   setVariant: (v: DriftVariant) => void;
 }) {
-  const run = useMemo(() => reconstructionRun(sourceRun), [sourceRun]);
   const d = run.drift;
   const age = ageStatement(d);
   const rounded = Math.round(hour);
@@ -348,12 +346,14 @@ export function Drift({
               max
             </Btn>
           </div>
-          <Note label="hindcast reconstruction + forecast">
-            Before T0, the illustrated reconstruction moves from a separate origin
-            into the T0 field, with growth and recession varying by case.
-            The map, scope and area plots share these same
-            frames. After T0, the original forecast is shown. Attribution and
-            age estimates still use the underlying backward probability field.
+          <Note label="backward ensemble + forecast">
+            Before T0 these are the ensemble's own backward frames: the same
+            members, integrated with the time step negated. The cloud widens
+            going back because diffusion is irreversible, and it changes shape
+            and bearing because the members disagree — it is not the T0 field
+            rescaled. The map, scope and area plots share these frames, and
+            attribution and age read the same probability field. After T0 the
+            forecast is shown.
           </Note>
         </Block>
 

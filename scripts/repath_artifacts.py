@@ -56,7 +56,7 @@ from backend.config import REPO_ROOT
 ANCHOR = "oilspil2l16/oilspil2l/"
 
 
-class Abort(RuntimeError):
+class RepathError(RuntimeError):
     """A rewrite could not be made safely. Nothing further is written."""
 
 
@@ -81,7 +81,7 @@ def _must_exist(relative: str, source: Path) -> None:
     if relative in _RESOLVED:
         return
     if not (REPO_ROOT / relative).exists():
-        raise Abort(f"{source}: rewritten reference does not resolve: {relative}")
+        raise RepathError(f"{source}: rewritten reference does not resolve: {relative}")
     _RESOLVED.add(relative)
 
 
@@ -117,7 +117,7 @@ def fix_split_list(path: Path, *, apply: bool) -> int:
         out.append(rewritten)
         changed += 1
     if changed and _identities(out) != before:
-        raise Abort(f"{path}: rewrite changed the split contents; refusing")
+        raise RepathError(f"{path}: rewrite changed the split contents; refusing")
     if changed:
         _write(path, "\n".join(out) + "\n", apply=apply)
     return changed

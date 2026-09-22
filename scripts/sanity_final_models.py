@@ -3,7 +3,6 @@
 import argparse
 import json
 import math
-from pathlib import Path
 
 import numpy as np
 import torch
@@ -103,7 +102,13 @@ def main():
     checkpoint_name = "best-fp32.pt" if args.fp32_release else "best.pt"
     loaded = YOLO(str(OUT / run_name / "weights" / checkpoint_name), task="segment")
     predictions = loaded.predict(
-        [r["path"] for r in chosen["val"]], imgsz=1024, batch=4, device=0, conf=0.01, verbose=False
+        # Repo-relative rows; anchor them or predict resolves against the cwd.
+        [str(ROOT / r["path"]) for r in chosen["val"]],
+        imgsz=1024,
+        batch=4,
+        device=0,
+        conf=0.01,
+        verbose=False,
     )
     for pred in predictions:
         xy = pred.boxes.xyxy

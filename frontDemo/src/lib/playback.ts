@@ -23,7 +23,6 @@ import { distanceKm, pointInPolygon } from "../sim/geo";
 import { positionAt } from "../sim/ais";
 import type { ReleaseFrame } from "../sim/drift";
 import type { LngLat, Run, Vessel } from "../sim/types";
-import { reconstructionRun } from "./reconstruction";
 
 export type EventPhase =
   | "pre"
@@ -131,7 +130,7 @@ export function momentAt(
         run.release[run.release.length - 1] ??
         null);
 
-  const displayFrame = reconstructionRun(run).drift.frames.find(f => f.hour === rounded);
+  const displayFrame = run.drift.frames.find(f => f.hour === rounded);
   const extent = displayFrame?.contour90 ?? release?.extent ?? [];
   const candidateIds = new Set(run.suspects.map((s) => s.id));
   const contacts: Contact[] = [];
@@ -233,7 +232,7 @@ export function checkpointsFor(run: Run): number[] {
  * four-design study. There are two surfaces now and only one of them draws it.)
  */
 export function growthCurve(run: Run): { hour: number; areaKm2: number; released: number }[] {
-  return reconstructionRun(run).drift.frames.map((f) => ({
+  return run.drift.frames.map((f) => ({
     hour: f.hour,
     areaKm2: f.area90Km2,
     released: run.release.find(r => r.hour === f.hour)?.releasedFraction ?? 0,

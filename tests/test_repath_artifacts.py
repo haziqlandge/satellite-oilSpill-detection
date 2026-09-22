@@ -79,7 +79,7 @@ def test_split_rewrite_refuses_a_reference_that_does_not_resolve(tmp_path, monke
         "C:/Users/someone/Downloads/oilSpil2l16/oilSpil2l"
         "/data/processed/dataset/oos/images/train/missing.png\n"
     )
-    with pytest.raises(repath.Abort, match="does not resolve"):
+    with pytest.raises(repath.RepathError, match="does not resolve"):
         repath.fix_split_list(listing, apply=True)
 
 

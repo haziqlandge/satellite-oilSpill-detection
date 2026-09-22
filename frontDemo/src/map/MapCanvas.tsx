@@ -1,4 +1,3 @@
-import { reconstructionRun } from "../lib/reconstruction";
 /**
  * The map. MapLibre GL JS, driven from the simulation.
  *
@@ -154,7 +153,7 @@ function isDarkGround(colour: string): boolean {
 }
 
 export function MapCanvas({
-  run: sourceRun,
+  run,
   paint,
   hour,
   direction = "both",
@@ -168,7 +167,6 @@ export function MapCanvas({
   camera = null,
   onMap,
 }: Props) {
-  const run = useMemo(() => reconstructionRun(sourceRun), [sourceRun]);
   const holder = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const overlayRef = useRef<ParticleOverlay | null>(null);

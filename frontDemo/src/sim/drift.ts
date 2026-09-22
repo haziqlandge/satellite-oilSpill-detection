@@ -39,6 +39,7 @@ import {
   type Forcing,
   type MassTable,
 } from "./field";
+import { isLand } from "./landmask";
 import type { Rng } from "./rng";
 import type { AgeMethod, DriftFrame, DriftRun, LngLat, TemporalState } from "./types";
 
@@ -235,8 +236,20 @@ function integrateHour(
         const eastM = sign * u * dt + rng.normal() * sigmaM;
         const northM = sign * v * dt + rng.normal() * sigmaM;
 
-        state[k] += eastM / 1000 / kmPerDegLon(p[1]);
-        state[k + 1] += northM / 1000 / KM_PER_DEG_LAT;
+        const lon = p[0] + eastM / 1000 / kmPerDegLon(p[1]);
+        const lat = p[1] + northM / 1000 / KM_PER_DEG_LAT;
+
+        // A step onto land is refused and the parcel holds its position --
+        // OpenDrift's `previous` coastline action, and the reason the mask
+        // exists at all. Going forward this is stranding at the shore. Going
+        // backward it is the stronger statement: the parcel cannot have come
+        // from dry ground, so the reconstructed origin stops at the coast
+        // instead of continuing inland. Without it the backward field spread
+        // across the Mississippi delta and the Saurashtra peninsula, which is
+        // not a weak origin estimate but a wrong one.
+        if (isLand(lon, lat)) continue;
+        state[k] = lon;
+        state[k + 1] = lat;
       }
     }
   }

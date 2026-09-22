@@ -1,4 +1,3 @@
-import { reconstructionRun } from "../lib/reconstruction";
 /**
  * The operational timeline.
  *
@@ -98,7 +97,7 @@ export function Timeline({
    */
   const spread = useMemo(
     () =>
-      reconstructionRun(run).drift.frames
+      run.drift.frames
         .map((f) => ({ hour: f.hour, area: f.area90Km2 })),
     [run],
   );

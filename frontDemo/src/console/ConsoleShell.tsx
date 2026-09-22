@@ -24,7 +24,6 @@ import { hrefFor } from "../lib/hash";
 import { stamp } from "../lib/format";
 import { momentAt } from "../lib/playback";
 import { useSpill } from "../lib/spill";
-import { reconstructionRun } from "../lib/reconstruction";
 import { DEFAULT_TOGGLES, type LayerToggles } from "../map/basemap";
 import { REPO_URL } from "../theme";
 import { usePaint } from "../lib/palette";
@@ -102,8 +101,7 @@ export default function ConsoleShell() {
   const [toggles, setToggles] = useState<LayerToggles>(DEFAULT_TOGGLES);
   const narrow = useNarrow();
   const [booting, setBooting] = useState(true);
-  const sourceRun = activeDemoRun ?? run;
-  const activeRun = useMemo(() => sourceRun ? reconstructionRun(sourceRun) : null, [sourceRun]);
+  const activeRun = activeDemoRun ?? run;
 
   useEffect(() => {
     if (!activeDemoPreset) {
