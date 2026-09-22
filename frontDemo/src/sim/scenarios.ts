@@ -36,6 +36,7 @@ import {
 import { score, type DriftVariant } from "./scoring";
 import { buildSlick, characterise, seedPoints, windGate, type SlickGeometry } from "./slick";
 import { SAMPLE_SPECS, SAMPLE_LISTINGS } from "./samples";
+import { hasRealTraffic, publishedVesselId, realVessels } from "./realAis";
 import type {
   Environment,
   LngLat,
@@ -60,7 +61,7 @@ export const SCENARIOS: ScenarioListing[] = [
   {
     id: "gom-moving",
     name: "Moving discharge",
-    short: "Underway tanker, 19 km trail",
+    short: "Southbound tanker, 19 km trail, real AIS",
     region: "gulf-of-mexico",
     tests:
       "The straightforward case. Drift and proximity both put the true vessel first. Parity does not, because it measures the whole nearby transit rather than the stretch that was discharging.",
@@ -68,15 +69,15 @@ export const SCENARIOS: ScenarioListing[] = [
   {
     id: "gom-berthed",
     name: "Berthed discharge",
-    short: "Vessel moored two days, still discharging",
+    short: "Vessel moored three days, real AIS",
     region: "gulf-of-mexico",
     tests:
-      "The adversarial case. Parity fails on a vessel that never moved, and every passing track in the channel outscores it on that term.",
+      "The adversarial case. Parity is weak for a vessel that never moved, and passing real traffic beats it on that term; it has to win on drift, proximity and timing instead.",
   },
   {
     id: "gom-platform",
     name: "Platform leak",
-    short: "Fixed installation, traffic straight over the slick",
+    short: "Fixed installation among real traffic",
     region: "gulf-of-mexico",
     tests: "Infrastructure has to outrank vessels without a special case.",
   },
@@ -149,7 +150,11 @@ export interface ScenarioSpec {
     diffusivity: number;
     diffuseThresholdKm2: number;
   };
-  traffic: { corridors: Corridor[]; vesselCount: number };
+  /**
+   * Background traffic. `real` scenes draw theirs from marinecadastre AIS
+   * (`sim/realAis.ts`) and ignore the corridors; the rest are simulated.
+   */
+  traffic: { corridors: Corridor[]; vesselCount: number; real?: boolean };
   infrastructure: { id: string; label: string; position: LngLat }[];
   infrastructureCoverage: "complete" | "partial";
   /** How the true source appears in the data, if at all. */
@@ -177,9 +182,33 @@ const GOM_CASE_2: LngLat = [
   DEG_MIN_SEC(28, 21, 31.968),
 ];
 
-/** P004 Case 3, 23:57:19 UTC 5 Dec 2023. Northern peak at the suspected source. */
+/**
+ * Where the Case 2 discharge began, read off the named vessel's real AIS.
+ *
+ * The published case gives the tip, a 19 km length and the vessel; it does not
+ * give the direction the vessel was going. This scene used to assume north,
+ * at 17 degrees, with the discharge over four hours before the pass. The real
+ * track says otherwise, measured from marinecadastre 2023-05-14/15: over the
+ * 1.28 h a 19 km trail takes at 8 kn, the vessel ran 18.44 km on 179.3 degrees
+ * at a mean 7.78 kn, and at 00:02:21 -- the pass -- it was 104 m from the
+ * published tip. Southbound, and still laying oil when the satellite went
+ * over. This is its reported position at T-1.28 h.
+ */
+const GOM_CASE_2_START: LngLat = [-89.22823, 28.52485];
+
+/**
+ * P004 Case 3, 23:57:19 UTC 5 Dec 2023. Northern peak at the suspected source.
+ *
+ * CORRECTED 2026-09-22 from 89 degrees 58' W to 88 degrees 58' W. The real AIS
+ * of the vessel the case names puts it moored at (-88.96927, 28.93729) from
+ * before 00:01 on 3 December until 23:45 on the 5th -- 0.07 km from
+ * 88 58' 07.356" W and 97 km from the 89 58' this constant used to hold. The
+ * minutes, seconds and latitude agree to the metre; only the degree differs,
+ * which is a transcription error, not a different place. The whole scene moved
+ * one degree east with it.
+ */
 const GOM_CASE_3: LngLat = [
-  -DEG_MIN_SEC(89, 58, 7.356),
+  -DEG_MIN_SEC(88, 58, 7.356),
   DEG_MIN_SEC(28, 56, 12.876),
 ];
 
@@ -201,6 +230,16 @@ const GOM_CASE_1: LngLat = [
  */
 const GOM_CASE_2_MID: LngLat = [-89.1755, 28.4407];
 
+/**
+ * The coordinates the publication gives for the two named vessels, for
+ * `check:realais`, which asserts each vessel's real track actually reaches its
+ * published point. That check is what caught the Case 3 degree error.
+ */
+export const PUBLISHED_SOURCES: Partial<Record<ScenarioId, LngLat>> = {
+  "gom-moving": GOM_CASE_2,
+  "gom-berthed": GOM_CASE_3,
+};
+
 const KUTCH: LngLat = [69.42, 22.46];
 const MUMBAI_HIGH: LngLat = [71.62, 19.48];
 
@@ -216,14 +255,14 @@ const AUTHORED_SPECS: Record<Exclude<ScenarioId, "upload">, ScenarioSpec> = {
       name: "Moving discharge",
       region: "gulf-of-mexico",
       provenance:
-        "Acquisition time, slick length and suspected-source coordinate from Zhao et al. 2025 Case 2. Drift field, AIS traffic and all scores are simulated.",
+        "AIS · REAL: every vessel track, including the vessel Zhao et al. 2025 name for Case 2, is marinecadastre.gov AIS for 13-15 May 2023, simplified to within 100 m and with identities withheld. Acquisition time, slick length and suspected-source coordinate are the paper's; the discharge's direction and timing are read off the named vessel's real track. SIM: the slick outline, the drift field and every score are simulated, so a real vessel's rank here demonstrates the gate on real traffic and is not a finding about that vessel.",
       acquiredAtIso: "2023-05-15T00:02:00Z",
       centre: [-89.28, 28.28],
       zoom: 9.6,
       sceneId: "S1A_IW_GRDH_1SDV_20230515T000200_GoM",
       place: "the Port of South Louisiana",
       summary:
-        "A 19 km ribbon trailing south of the Mississippi Delta, laid in under two hours by a vessel underway and then carried downstream for the four hours before the pass.",
+        "A 19 km ribbon south of the Mississippi Delta, laid behind a tanker running south at 7.8 kn that was still at its southern tip, still discharging, when the satellite passed.",
       tests:
         "The straightforward case. Drift and proximity both put the true vessel first. Parity does not, because it measures the whole nearby transit rather than the stretch that was discharging.",
       expectedTop1: "The vessel that laid the trail",
@@ -240,13 +279,15 @@ const AUTHORED_SPECS: Record<Exclude<ScenarioId, "upload">, ScenarioSpec> = {
       windRotateDegPerHour: 0.35,
     },
     // A valve open while the vessel is underway; the window is 1.3 h, too
-    // short for a pump to do anything interesting in.
+    // short for a pump to do anything interesting in. It ends AT the pass:
+    // the real track has the vessel at the tip at 00:02, so the head of the
+    // slick is the vessel and the ribbon runs back north along its wake.
     releaseShape: "steady",
-    release: GOM_CASE_2,
-    releaseAgeHours: 4,
-    ongoing: false,
+    release: GOM_CASE_2_START,
+    releaseAgeHours: 0,
+    ongoing: true,
     slick: {
-      axisDeg: 197,
+      axisDeg: 359,
       lengthKm: 19,
       headWidthM: 220,
       tailWidthM: 640,
@@ -264,20 +305,9 @@ const AUTHORED_SPECS: Record<Exclude<ScenarioId, "upload">, ScenarioSpec> = {
       diffusivity: 1.6,
       diffuseThresholdKm2: 420,
     },
-    traffic: {
-      vesselCount: 190,
-      corridors: [
-        { from: [-89.7, 28.9], to: [-88.7, 27.9], widthKm: 6 },
-        { from: [-89.9, 28.2], to: [-88.6, 28.55], widthKm: 5 },
-        // Start nudged south off the delta edge; the old [-89.15, 29.1] put the
-        // scatter around the first few per cent of this lane on land. Nudged a
-        // further 1.0 km west on 2026-09-22, this time measured rather than by
-        // eye: against the land mask the authored start still ran 0.5% of the
-        // lane ashore once the full 4 km scatter is sampled, and [-89.14, 29.05]
-        // is the nearest start that is clean. See scripts/check-corridors.ts.
-        { from: [-89.14, 29.05], to: [-89.45, 27.7], widthKm: 4 },
-      ],
-    },
+    // Real marinecadastre AIS; see `sim/realAis.ts`. The corridors that used
+    // to be here were synthetic lanes and are gone with the traffic they drew.
+    traffic: { real: true, vesselCount: 0, corridors: [] },
     infrastructure: [
       { id: "infra-mp-311", label: "Platform group MP-311", position: [-89.44, 28.46] },
       { id: "infra-sp-89", label: "Platform group SP-89", position: [-89.05, 28.62] },
@@ -285,13 +315,13 @@ const AUTHORED_SPECS: Record<Exclude<ScenarioId, "upload">, ScenarioSpec> = {
     infrastructureCoverage: "complete",
     source: {
       type: "moving",
-      // Northbound. The discharge therefore trails away to the south, which is
-      // the orientation the published case reports.
-      courseDeg: 17,
-      sogKn: 8.0,
+      // Southbound, measured -- see GOM_CASE_2_START. The oil is laid along the
+      // vessel's own reported track, so these three only time the release.
+      courseDeg: 179.3,
+      sogKn: 7.8,
       durationHours: 19 / (8.0 * 1.852),
-      kind: "Product tanker",
-      lengthM: 183,
+      kind: "Tanker",
+      lengthM: 180,
     },
   },
 
@@ -301,22 +331,23 @@ const AUTHORED_SPECS: Record<Exclude<ScenarioId, "upload">, ScenarioSpec> = {
       name: "Berthed discharge",
       region: "gulf-of-mexico",
       provenance:
-        "Acquisition time, slick length and suspected-source coordinate from Zhao et al. 2025 Case 3, where the vessel had been moored for two days. Drift field, AIS traffic and all scores are simulated.",
+        "AIS · REAL: every vessel track, including the vessel Zhao et al. 2025 name for Case 3, is marinecadastre.gov AIS for 4-5 December 2023, simplified to within 100 m and with identities withheld; there is no AIS after 23:59 on the 5th on this machine, so the forecast hours carry none. The published coordinate is corrected by one degree of longitude to where that vessel's AIS puts its berth (see GOM_CASE_3). Acquisition time and slick length are the paper's. SIM: the slick outline, the drift field and every score are simulated, so a real vessel's rank here demonstrates the gate on real traffic and is not a finding about that vessel.",
       acquiredAtIso: "2023-12-05T23:57:19Z",
-      centre: [-89.96, 28.9],
+      centre: [-88.96, 28.9],
       zoom: 10.6,
       sceneId: "S1A_IW_GRDH_1SDV_20231205T235719_GoM",
       place: "the Port of South Louisiana",
       summary:
-        "A 5 km band running south from a mooring. The vessel at the head of it has not moved since the third of December, so its track parallels nothing.",
+        "A 5 km band running south from a berth. The vessel at its head had been moored there since before the third of December and slipped twelve minutes before the pass, so for almost the whole window its track parallels nothing.",
       tests:
-        "The adversarial case. Parity fails on a vessel that never moved, and every passing track in the channel outscores it on that term.",
+        "The adversarial case. Parity is weak for a vessel that never moved, and passing real traffic beats it on that term; it has to win on drift, proximity and timing instead.",
       expectedTop1: "The moored vessel",
     },
     field: {
       meanU: -0.02,
       meanV: -0.085,
-      eddy: { centre: [-90.1, 28.78], radiusKm: 18, strengthMs: 0.05 },
+      // One degree east with the corrected berth, like everything in this scene.
+      eddy: { centre: [-89.1, 28.78], radiusKm: 18, strengthMs: 0.05 },
       convergence: { centre: GOM_CASE_3, radiusKm: 11, strengthMs: 0.05 },
       tideMs: 0.04,
       tidePhaseHours: 5.1,
@@ -324,8 +355,8 @@ const AUTHORED_SPECS: Record<Exclude<ScenarioId, "upload">, ScenarioSpec> = {
       windDirDeg: 22,
       windRotateDegPerHour: -0.28,
     },
-    // Moored 53 h and discharging on pump cycles, which is what a berthed
-    // vessel emptying slops actually does.
+    // Moored and discharging on pump cycles, which is what a berthed vessel
+    // emptying slops actually does.
     releaseShape: "pulsed",
     release: GOM_CASE_3,
     releaseAgeHours: 16,
@@ -349,49 +380,30 @@ const AUTHORED_SPECS: Record<Exclude<ScenarioId, "upload">, ScenarioSpec> = {
       diffusivity: 3.2,
       diffuseThresholdKm2: 420,
     },
-    traffic: {
-      vesselCount: 260,
-      corridors: [
-        // Start pulled off the marsh at [-90.25, 29.1], which put the first few
-        // per cent of this lane -- and the scatter around it -- on land.
-        { from: [-90.2, 29.05], to: [-89.6, 28.6], widthKm: 4 },
-        { from: [-90.15, 28.7], to: [-89.55, 29.05], widthKm: 3.5 },
-        // The berth sits on a working channel. Traffic passes within a few
-        // hundred metres of it constantly, which is what makes this case a
-        // filtering problem rather than a lookup.
-        { from: [-89.985, 29.06], to: [-89.955, 28.72], widthKm: 1.1 },
-        { from: [-90.06, 28.905], to: [-89.87, 28.965], widthKm: 0.9 },
-      ],
-    },
+    // Real marinecadastre AIS; see `sim/realAis.ts`. The four synthetic lanes
+    // that used to be here were placed around the wrong berth, 97 km west.
+    traffic: { real: true, vesselCount: 0, corridors: [] },
     infrastructure: [
-      { id: "infra-wd-73", label: "Platform group WD-73", position: [-90.09, 28.99] },
+      // Moved east with the berth, and renamed: "WD" was West Delta, which is
+      // where the uncorrected coordinate put it and this is not.
+      { id: "infra-p-73", label: "Platform group P-73", position: [-89.09, 28.99] },
     ],
     infrastructureCoverage: "partial",
     source: {
       type: "berthed",
       /*
-        The vessel arrives from the east-south-east, 2026-09-22.
-
-        It used to arrive from 228 degrees. That is not a causality error --
-        the inbound leg runs from T-108h to T-53h and is correctly drawn as
-        history -- but the forecast lobe leaves the slick on a bearing of 195,
-        so the approach track lay along the very water the oil drifts into
-        after the pass. On screen, at T-36h, that reads as the console drawing
-        a candidate down the oil's future path, which is the single most
-        misleading thing this view could imply.
-
-        105 degrees is close to perpendicular to the drift axis: 90 off the
-        forecast bearing and 81 off the backward field's 24, so the track
-        crosses both lobes briefly instead of running down one of them. The
-        vessel still moors at the same berth at the same time, so what the
-        scenario tests is unchanged -- and it is measured, not assumed, by
-        scripts/check-scenarios.ts.
+        The vessel's track is its real AIS, so the approach and mooring below
+        drive nothing in this scene; they are what that AIS shows, kept so the
+        spec does not describe a different voyage. Measured from marinecadastre
+        3-5 December 2023: already moored at 00:01 on the 3rd (so at least 72 h
+        before the pass -- the 53 h this used to state was authored, not read),
+        slipped at 23:45 on the 5th, twelve minutes before it, and 78 m long.
       */
       approachBearingDeg: 105,
       approachKm: 26,
-      mooredHoursBefore: 53,
+      mooredHoursBefore: 72,
       kind: "Offshore supply",
-      lengthM: 64,
+      lengthM: 78,
     },
   },
 
@@ -401,7 +413,7 @@ const AUTHORED_SPECS: Record<Exclude<ScenarioId, "upload">, ScenarioSpec> = {
       name: "Platform leak",
       region: "gulf-of-mexico",
       provenance:
-        "SIM · Acquisition time and slick geometry from Zhao et al. 2025 Case 1; the POSITION is not the published one. The whole scene is displaced 85 km south-south-west of the Case 1 coordinate, out of the Mississippi bird's-foot and into the open Gulf, because a credible region bounded by marsh on three sides describes the delta rather than the oil. Relative geometry is preserved exactly, so every measured property below still holds. Drift field, AIS traffic and all scores are simulated, and the traffic deliberately departs from the published case: that case reported no vessel track within 5 km, and this one runs a lane straight over the slick so the platform has to win against vessels rather than by default.",
+        "AIS · REAL: every vessel track is marinecadastre.gov AIS for 7-9 April 2023, at this scene's position, simplified to within 100 m and with identities withheld. Acquisition time and slick geometry are Zhao et al. 2025 Case 1's; the POSITION is not the published one. The whole scene is displaced 85 km south-south-west of the Case 1 coordinate, out of the Mississippi bird's-foot and into the open Gulf, because a credible region bounded by marsh on three sides describes the delta rather than the oil. The published case reports no vessel within 5 km of its platform; this displaced scene makes no such claim -- whatever real traffic passed here is what the platform has to outrank. SIM: the slick outline, the drift field and every score are simulated.",
       acquiredAtIso: "2023-04-09T00:02:00Z",
       centre: [-89.62, 29.06],
       zoom: 10.4,
@@ -409,65 +421,17 @@ const AUTHORED_SPECS: Record<Exclude<ScenarioId, "upload">, ScenarioSpec> = {
       // Displaced out of the South Pass lease blocks; see DISPLACEMENTS.
       place: "the open Gulf south-west of South Pass",
       summary:
-        "A 5.5 km banded slick with its northern tip on a platform group, lying directly under a transit lane. Seventeen vessel tracks are admitted alongside the two installations, every one of them passing within 200 m of the slick and ten reporting a position inside the detection polygon itself.",
+        "A 5.5 km banded slick with its northern tip on a platform group, in the real traffic that passed this position over the two days before the pass.",
       /*
-        WHAT THIS SCENARIO NOW ACTUALLY TESTS, and how that was measured.
+        WHAT THIS SCENARIO TESTS, now that its traffic is real.
 
-        For three sessions this scenario stated a collation property it did not
-        exercise. The traffic had been pushed 13.3 km clear of the release to
-        protect a "no vessel within 5 km" claim, and the side effect was that
-        the spatiotemporal gate admitted **zero** of 180 tracks: `run.suspects`
-        held two rows, both infrastructure, and there was no vessel in the
-        ranking for a platform to outrank. The scenario proved nothing.
-
-        The director resolved it in the opposite direction to the one the
-        previous note assumed. Rather than restoring a lane just inside the
-        origin field -- which would have admitted vessels while keeping them
-        politely distant -- the lane now runs **over the slick**, and the
-        published case's empty 5 km is described as a fact about the paper
-        rather than claimed for this scene. `provenance` says so explicitly.
-        That makes the test harder, not softer: the vessels the platform has to
-        beat are the ones with the best possible proximity evidence.
-
-        Measured on the built run, both drift variants, after the change:
-
-          gate                17 admitted of 178 considered. 178 rather than
-                              the 180 of `vesselCount` because `buildTraffic`
-                              drops any vessel whose transit leaves fewer than
-                              four fixes inside the window
-          suspects            19 rows -- 17 vessels, 2 installations
-          tracks crossing T0  ALL 17 candidates pass within 163 m of the
-                              slick's medial axis; the median is 25 m. Ten of
-                              them report a fix inside the detection polygon
-          the other seven     are an AIS sampling artefact, not a miss. Fix
-                              spacing on these tracks is 474-936 m (median 643)
-                              against a ribbon 170 m wide at the head and 520 m
-                              at the tail, so a vessel can and does step over
-                              the polygon between two reports. `crossing` is
-                              therefore a floor, and the honest statement of
-                              closeness is the 163 m above
-          nearest AIS fix     0.04 km from the release; 40 of the 178 vessels
-                              pass within 5 km of it
-          rank 1              infra-sp-52, under BOTH `integral` and `max`
-          rank 2              a vessel, at 0.4735 (integral) / 0.5588 (max)
-                              against the platform's 0.6787
-          separability        0.2052 (integral) / 0.1199 (max), against the
-                              0.015 floor below which the run refuses
-
-        The margin is what makes this worth keeping: the platform wins on
-        `S_drift` and dwell inside the origin field, which a vessel crossing the
-        slick once cannot match however close it passes. That is the "without a
-        special case" part of `tests`, and it is now a claim with a number
-        behind it rather than an assertion about an empty ranking.
-
-        Robustness, checked rather than assumed: the corridor array's ORDER
-        changes the result, because `buildTraffic` assigns vessels round-robin
-        (`corridors[i % n]`) off one shared RNG stream, so moving a lane
-        re-rolls every vessel in the scene. All four positions for the new lane
-        were run. All four keep the platform at rank 1 under both variants; the
-        one shipped here (index 1) has the widest `max`-variant separability of
-        the four, 0.1199 against 0.0523-0.0952 for the others. A configuration
-        that only passed in one slot would have been a coincidence, not a test.
+        It used to run a synthetic lane straight over the slick so that the
+        platform had vessels to outrank, and the numbers recorded here were
+        measured against that lane. The lane is gone -- the traffic is whatever
+        real AIS passed this position on 7-9 April 2023 -- and so are those
+        numbers. The ranking the platform now earns against real traffic is
+        measured by `npm run check:scenarios` and not restated here, because a
+        figure in a comment is how this file came to disagree with itself.
       */
       tests: "Infrastructure has to outrank vessels without a special case.",
       expectedTop1: "The platform group",
@@ -508,70 +472,8 @@ const AUTHORED_SPECS: Record<Exclude<ScenarioId, "upload">, ScenarioSpec> = {
       diffusivity: 3.0,
       diffuseThresholdKm2: 420,
     },
-    traffic: {
-      vesselCount: 180,
-      corridors: [
-        /*
-          The offshore lane, 13.3 km south-west of the release and unchanged.
-
-          It used to run [-89.95, 29.35] -> [-89.2, 28.8], a centreline 0.76 km
-          from `GOM_CASE_1`, and was moved out here in an earlier pass to
-          protect a "no vessel within 5 km" claim that this scenario no longer
-          makes. It stays where it is anyway, for a reason that survives the
-          claim: it is the scene's *background* traffic. The gate has to have
-          something to reject, and a scenario where every vessel on screen ends
-          up admitted tests filtering no better than one where none does.
-
-          Measured: none of this lane's vessels is admitted. That is the point
-          of it.
-        */
-        { from: [-90.0, 29.2], to: [-89.25, 28.75], widthKm: 5 },
-        /*
-          THE TRANSIT LANE, and the reason this scenario has a ranking at all.
-
-          Added 2026-09-05 on the director's instruction: the evidence pane was
-          showing two rows, both installations, and clicking either drew nothing
-          on the map because infrastructure carries no track. The cause was
-          upstream of the map -- the gate was admitting zero vessels -- so the
-          fix is here, in the data.
-
-          The centreline passes **25 m** from the slick centroid: it runs the
-          length of the detection polygon rather than near it. 2.62 km from the
-          head, 2.71 km from the tail, 48 km end to end on a bearing of 60
-          degrees, which crosses the slick's 163-degree axis at close to a right
-          angle so the two are legible as separate things on the map.
-
-          Both endpoints were chosen against the coastline, not by eye. The
-          western end sits in open Gulf; the eastern end stops at
-          [-89.4704, 29.1640] because continuing on that bearing runs into the
-          Mississippi delta -- every earlier candidate lane that reached past
-          about longitude -89.46 at this latitude scored 0.5-8.7% land. Checked
-          the way PART 5 of the session notes describes: Esri `World_Ocean_Base`
-          at z=10, classified on `blue - red` with a +12 threshold, calibrated
-          against open Gulf (+64) and New Orleans (-20). **909 samples over the
-          full three-sigma envelope: 0% land.**
-
-          Width 3 km, so sigma is 1.5 km and the lane's vessels are spread
-          +/-4.5 km at three sigma -- wide enough that they do not arrive as a
-          single file over the slick, narrow enough that most of them pass close
-          enough to be admitted.
-        */
-        { from: [-89.8979, 28.9479], to: [-89.4704, 29.1640], widthKm: 3 },
-        /*
-          Pulled clear of the delta. Running to [-89.15, 29.3] took this lane
-          across the bird's-foot: 9% land, with the centreline ashore over its
-          last tenth. The islands around [-89.30, 29.05] defeat the obvious
-          shortenings -- four variants along the old bearing still scored 4-5%
-          -- so the lane keeps its west-to-east run and passes south of them.
-          Clean to three sigma, and 34 km off the release.
-        */
-        { from: [-89.95, 28.7], to: [-88.9, 29.0], widthKm: 4 },
-        // Passing traffic to the west, 11.2 km off the release. Collation has
-        // to rank the platform above these without a rule that says so -- and
-        // now also above the transit lane above, which is the harder half.
-        { from: [-89.80, 29.30], to: [-89.66, 28.88], widthKm: 2.0 },
-      ],
-    },
+    // Real marinecadastre AIS at the displaced position; see `sim/realAis.ts`.
+    traffic: { real: true, vesselCount: 0, corridors: [] },
     infrastructure: [
       { id: "infra-sp-52", label: "Platform group SP-52", position: GOM_CASE_1 },
       { id: "infra-sp-47", label: "Platform group SP-47", position: [-89.53, 29.19] },
@@ -710,17 +612,21 @@ const AUTHORED_SPECS: Record<Exclude<ScenarioId, "upload">, ScenarioSpec> = {
 
         HOW A CORRIDOR USED TO BE CHECKED, and how it is checked now
 
-        The project now carries a land mask -- `src/sim/landmask.ts`, generated
-        by `scripts/build_landmask.py` from the very tiles described below --
-        so `npm run check:corridors` tests every lane in every scenario against
-        it automatically, centreline and full lateral scatter. Running that is
-        the answer to this question. The by-hand method is kept because it is
-        where the mask's own threshold comes from, and because it is how you
-        would check a coordinate the mask does not cover.
+        The project now carries a global land mask -- `src/sim/landmask.ts`,
+        the GSHHG shoreline OpenDrift uses, rasterised by
+        `scripts/build_landmask.py` -- so `npm run check:corridors` tests every
+        lane in every scenario against it automatically, across the full
+        lateral scatter, and asserts that no vessel on any lane is ashore.
+        Running that is the answer to this question. `buildTraffic` also
+        re-sails any voyage that touches land, from a stream of its own so the
+        rest of the scene is unchanged.
 
-        The basemap is a raster and there is no coastline geometry anywhere in
-        this codebase, so there is nothing to test a coordinate against at
-        runtime. What works is sampling the tiles themselves. Fetch
+        The by-hand method below is HISTORICAL. It is how these lanes were first
+        placed, before the project had coastline geometry, and it is kept
+        because the numbers recorded against them were measured this way. It
+        classified the basemap picture rather than a coastline, and that picture
+        disagrees with GSHHG in places -- it called Venice, Louisiana water.
+        What it did was sample the tiles themselves. Fetch
         `Ocean/World_Ocean_Base` at z=10 for the point, read the pixel, and
         classify on `blue - red`: water is blue-dominant (+36 to +54 across the
         points checked here) and land is a near-white cream (-3 to -7). The gap
@@ -735,6 +641,15 @@ const AUTHORED_SPECS: Record<Exclude<ScenarioId, "upload">, ScenarioSpec> = {
           centreline passes 2.27 km off the release, and 27 of its 36 admitted
           tracks cross the T0 detection polygon -- which is the point of it, and
           the constraint that decided the attempt described below.
+
+          HISTORICAL FIGURES. Every count and distance in this note was measured
+          against the straight-corridor generator that `voyage()` in `ais.ts`
+          replaced on 2026-09-23, when simulated ships started taking routes of
+          their own that funnel through this lane and fan out beyond it. The
+          lane's geometry and its role are unchanged; the figures describe the
+          old run, not this one. What the run does now is measured by
+          `npm run check:scenarios` -- the dark contact still ranks first under
+          `integral`.
 
           `buildTraffic` scatters each vessel laterally by
           `rng.normal() * widthKm * 0.5`, so sigma here is 1.75 km and 2.27 km
@@ -1215,22 +1130,47 @@ function assemble(id: ScenarioId, variant: DriftVariant): Run {
 
   const cadenceS = 120;
   const windowHours = spec.drift.backwardHours + 8;
-  const vessels: Vessel[] = buildTraffic(
-    {
-      corridors: spec.traffic.corridors,
-      vesselCount: spec.traffic.vesselCount,
-      cadenceS,
-      windowHours,
-      acquiredAt,
-    },
-    rng,
-  );
+  const realTraffic = spec.traffic.real === true;
+  if (realTraffic && !hasRealTraffic(id)) {
+    // Building without it would silently fall back to nothing and cache a run
+    // with no traffic. Loud is better: the caller forgot to await the load.
+    throw new Error(`${id} uses real AIS; await ensureRealTraffic("${id}") before buildRun.`);
+  }
+  const vessels: Vessel[] = realTraffic
+    ? [...realVessels(id)]
+    : buildTraffic(
+        {
+          corridors: spec.traffic.corridors,
+          vesselCount: spec.traffic.vesselCount,
+          cadenceS,
+          windowHours,
+          acquiredAt,
+        },
+        rng,
+      );
 
   let truth: Run["truth"] = null;
   let truthId: string | null = null;
+  let truthVessel: Vessel | null = null;
   const darkTargets: { id: string; position: LngLat; lengthM: number }[] = [];
 
-  if (spec.source.type === "moving") {
+  /*
+    In a real-AIS scene the vessel the publication names is already in the
+    traffic, as its own real track, and it IS the ground truth -- there is no
+    scripted stand-in to add. The answer still comes from the publication, not
+    from anything this system detected (C10).
+  */
+  if (realTraffic && (spec.source.type === "moving" || spec.source.type === "berthed")) {
+    const published = publishedVesselId(id);
+    truthVessel = vessels.find((v) => v.mmsi === published) ?? null;
+    if (!truthVessel) throw new Error(`${id}: the published vessel is missing from its real AIS`);
+    truthId = truthVessel.mmsi;
+    truth = {
+      label: truthVessel.label,
+      position: spec.release,
+      releasedAt: acquiredAt - spec.releaseAgeHours * 3600_000,
+    };
+  } else if (spec.source.type === "moving") {
     const scripted = movingDischarge(
       {
         dischargeStart: spec.release,
@@ -1255,7 +1195,7 @@ function assemble(id: ScenarioId, variant: DriftVariant): Run {
     };
   }
 
-  if (spec.source.type === "berthed") {
+  if (!realTraffic && spec.source.type === "berthed") {
     const approach = destination(
       spec.release,
       spec.source.approachBearingDeg,
@@ -1313,8 +1253,14 @@ function assemble(id: ScenarioId, variant: DriftVariant): Run {
   /* --- CFAR bright targets ---------------------------------------- */
 
   // Bright targets are what the radar sees; a target with a matching AIS report
-  // is an identified ship, and one without is a dark contact.
+  // is an identified ship, and one without is a dark contact. Only a ship that
+  // was actually there at the pass can return one: `positionAt` clamps to a
+  // track's ends, so without this a real track that ended hours earlier would
+  // put a radar target where no ship was.
+  const present = (v: Vessel) =>
+    v.points.some((p) => Math.abs(p.t - acquiredAt) <= 10 * 60_000);
   const cfarTargets = vessels
+    .filter(present)
     .filter((_, i) => i % 4 === 0)
     .slice(0, 22)
     .map((v, i) => {
@@ -1366,7 +1312,11 @@ function assemble(id: ScenarioId, variant: DriftVariant): Run {
     : -spec.releaseAgeHours;
   const releaseEndHour = moving ? -spec.releaseAgeHours : 0;
 
-  const movingSource = moving
+  // A real truth vessel lays the oil along its own reported track.
+  const movingSource = moving && truthVessel
+    ? (hour: number) =>
+        positionAt(truthVessel!, acquiredAt + hour * 3600_000) ?? spec.release
+    : moving
     ? (hour: number) =>
         destination(
           spec.release,

@@ -16,6 +16,10 @@ import assert from 'node:assert/strict';
 import { buildRun, SCENARIOS } from '../src/sim/scenarios';
 import { SAMPLE_LISTINGS } from '../src/sim/samples';
 import { isLand } from '../src/sim/landmask';
+import { useDiskTraffic } from './realAisDisk';
+
+// The Gulf scenes' traffic is real AIS; buildRun refuses them until it is loaded.
+await useDiskTraffic();
 
 const rows = [];
 const signatures = new Map<string, string>();

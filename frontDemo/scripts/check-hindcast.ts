@@ -27,6 +27,10 @@ import { momentAt, checkpointsFor, growthCurve } from '../src/lib/playback';
 import { distanceKm, KM_PER_DEG_LAT, kmPerDegLon } from '../src/sim/geo';
 import { isLand } from '../src/sim/landmask';
 import type { DriftFrame, LngLat } from '../src/sim/types';
+import { useDiskTraffic } from './realAisDisk';
+
+// The Gulf scenes' traffic is real AIS; buildRun refuses them until it is loaded.
+await useDiskTraffic();
 
 /** Distance from a land point to the nearest water, by expanding ring search. */
 function inlandKm(p: LngLat): number {

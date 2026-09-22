@@ -109,9 +109,9 @@ freshly frozen, independently labelled holdout.
 .venv/Scripts/python.exe -m ruff check . && .venv/Scripts/python.exe -m mypy ml backend scripts
 ```
 
-Baseline is **464 passed, 9 skipped** — six database tests skip because the
+Baseline is **506 passed, 9 skipped** — six database tests skip because the
 Supabase session pooler returns tenant/user not found, and the rest need
-hardware this machine lacks. A drop below 464 is a regression.
+hardware this machine lacks. A drop below 506 is a regression.
 
 Run the command and read the output. "Should pass" is not evidence.
 

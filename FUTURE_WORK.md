@@ -28,55 +28,64 @@ real renderer. A real upload path. GeoTIFF reading. And the first real OpenDrift
 runs this project has produced — three scenes, ERA5-forced, exported to
 `frontDemo/public/runs/*/drift.json`, validated by `npm run check:realdrift`.
 
-Of those three, the December scene reports **`convergence_minimum`** and returns
-an actual age triple. That is the first age this system has produced that is a
-number rather than a refusal, and it took genuine time-varying wind.
+**Correction, found later the same day:** this section used to say the
+December scene reports `convergence_minimum` and returns an age triple. The
+artifacts on disk do not. All three `drift.json` files — re-exported at
+18:52–18:56, after the backward coastline fix — report `monotonic` with a null
+triple. No present artifact supports the claim. Do not repeat it; re-export and
+look before saying any real scene yields an age.
 
-### THE NEXT JOB, and it is one job: replace the land mask with a real one
+### DONE: the land mask is real, global, and the backend's own coastline
 
-This is the top priority and the user has now raised it three times. Everything
-else is downstream of it.
+The user raised this three times. What was built, and why it differs from the
+plan that was written here:
 
-**The failure.** Uploads drift and draw AIS over land — seen on Bali and Java,
-where every shipping lane crosses the island. The cause is not a bug in the
-mask; it is that the mask barely exists. `frontDemo/src/sim/landmask.generated.ts`
-covers **three hand-drawn boxes** (Gulf of Mexico, Kutch, Mumbai) and `isLand`
-answers **water** everywhere else. The corpus is global — DATA.md §2.1 records
-scenes in the Gulf of Guinea, the Red Sea, the Mediterranean and off Borneo — so
-almost every upload lands outside every box.
+- **The frontend mask is GSHHG full resolution** — the exact polygons
+  OpenDrift's `reader_global_landmask` answers from, read out of the same
+  `roaring_landmask` package — rasterised at 1/240° (~460 m, OpenDrift's own
+  raster grid) by `scripts/build_landmask.py`. The plan said Natural Earth;
+  that would have been a *third* coastline, coarser than both the physics and
+  the basemap. Using the backend's geometry removes the disagreement instead of
+  documenting it. **GSHHG via OpenDrift is authoritative; the frontend raster
+  is it sampled at cell centres.** GSHHG is LGPL (Wessel & Smith).
+- **Global.** 896 coastal 5° tiles in 33 band files, 3.01 MB under
+  `frontDemo/public/landmask/`, fetched on demand from our own static files
+  (6–15 ms for a region, against ~2 s of third-party tiles before). All-water
+  and all-land tiles resolve synchronously from an index; the 11 coastal tiles
+  the authored scenes need are bundled (49 KB, down from 129 KB for 3 boxes).
+- **Agreement, measured:** ≥99.9% of cell centres match OpenDrift at the
+  Mississippi delta, Bali/Lombok, Java, Kutch and the Red Sea
+  (`tests/test_landmask.py`). Over the Gulf box, random points disagree 0.62%
+  against 6.02% for the old basemap classifier. The old mask called Venice,
+  Louisiana water.
+- **AIS respects land.** Uploads get lanes planned around the coast
+  (`planCorridors` in `sim/ais.ts`): bearings and offsets through the scene,
+  each lane's whole ±width band walked out until it meets land, the longest
+  distinct lanes kept after a 0.5 km-grid check. `buildTraffic` re-scatters any
+  vessel whose track touches land, off a per-vessel RNG stream, so every
+  authored ranking was bit-identical at the time (every total and margin
+  unchanged). The 2026-09-23 voyage generator (§1.6) has since re-rolled the
+  simulated scenes, and the Gulf scenes no longer use it at all.
+  `check:corridors` now asserts zero vessel points ashore at eight real coastal
+  sites, with a control — the old fixed lanes put 16.6% and 31.7% of their band
+  on Bali, and the check catches it.
+- **`overlayFrames` no longer moves real parcels.** With one coastline, the
+  raster calls 19–40% of OpenDrift's backward parcels "ashore" where OpenDrift
+  itself says 0.10–0.26%; 98–99.99% of that is within one cell of water — the
+  parcels are parked against the shore by `coastline_action="previous"`.
+  `check:realdrift` now reports "deep ashore" (land with no water in the eight
+  neighbouring cells): 0.00%, 0.03%, 0.50%.
+- **Upload panel:** refuses a scene placed on land, states the coastline
+  source, and the position picker now pans to a typed or GeoTIFF position (it
+  used to leave the pin off-screen) and shows water/land live.
+- Verified in the browser with a dataset PNG placed off Bali and the real
+  GeoTIFF `8346860/.../Oil/00586.tif` in the Malacca Strait. Upload scenes now
+  open at z9, which frames the envelope; the user views at z≈9.
 
-**What is already built toward this.** `ensureLandmask(centre, radiusKm)` in
-`frontDemo/src/sim/landmask.ts` fetches basemap tiles for an arbitrary region,
-classifies them and registers a runtime box. Verified working: 42 tiles,
-119,316 cells, 26.7% land, 1.95 s for the Persian Gulf, correctly separating the
-Saudi coast from open water. The upload path calls it before drifting.
+Open limitation, recorded as `ISSUES.md` F13: at z≥12 a contour can overlap the
+drawn coast by up to ~1 km — one land cell plus one density-grid step.
 
-**Why that is still not enough.** It is on-demand, so the first run in a new
-region waits ~2 s for tiles; it depends on a third-party raster service at
-runtime; it classifies a *picture* of a coastline rather than a coastline; and
-**nothing else uses it** — the corridor generator in `sim/ais.ts` and
-`buildTraffic` consult no mask at all, which is why lanes cross Bali.
-
-Do it properly:
-
-1. **Ship real coastline geometry.** Natural Earth 10m `land` plus
-   `minor_islands` is public domain, about 10 MB as a shapefile, and a few
-   hundred kB as simplified TopoJSON. Add a script beside
-   `scripts/build_landmask.py` that fetches it, clips to the regions in use and
-   emits it. Keep the raster mask as the fast lookup but **rasterise the
-   polygons into it** instead of sampling a basemap picture, so the classifier
-   is geometry rather than pixel colour.
-2. **Make land a constraint on AIS, not only on drift.** `buildTraffic` should
-   reject a corridor whose centreline or lateral scatter crosses land and
-   resample it. `landFraction` already exists and `npm run check:corridors`
-   already tests the authored lanes; uploads generate corridors at runtime and
-   are tested by nothing.
-3. **Keep one source of truth.** The backend uses OpenDrift's GSHHS landmask and
-   the frontend uses its own. They disagree at the shore, which is why
-   `overlayFrames` has to nudge parcels to water and report the count. If the
-   frontend moves to Natural Earth, write down which one is authoritative.
-
-### Then: the three UI defects the user named
+### THE NEXT JOB: the three UI defects the user named
 
 - **Framing.** Previews were letterboxed in white; fixed. The raster is still
   decimated to 1024 for screening, which is deliberate — speckle averaging, and
@@ -85,11 +94,22 @@ Do it properly:
   raster.
 - **Position by map pin.** Done — `console/PositionPicker.tsx` replaces the
   latitude and longitude boxes with a map, a draggable marker and a footprint
-  box, with the numeric fields kept behind a disclosure. **Not yet reviewed by
-  the user; confirm it before building on it.**
+  box, with the numeric fields kept behind a disclosure. A bug where a typed or
+  GeoTIFF position left the pin off-screen was fixed 2026-09-22, and the pin
+  now reports water/land against GSHHG. **Not yet reviewed by the user;
+  confirm it before building on it.**
 - **Wire the real runs into the console.** The artifacts and the loader
   (`sim/realDrift.ts`) exist; nothing selects them yet. That is the remaining
   half of §1.3.
+
+### DONE 2026-09-23: real AIS in the Gulf, voyages everywhere else
+
+The user's mentor said straight-line ships never happen. See §1.6 for what was
+built. Two findings from it change the Gulf scenes and must not be re-derived:
+the published **Case 3 coordinate was one degree of longitude out** (89°58′ for
+88°58′ — the named vessel's own AIS sits 0.07 km from the corrected point), and
+the authored **Case 2 ran the named tanker the wrong way** (north, finished 4 h
+before the pass; its AIS says south at 7.8 kn, at the tip, still discharging).
 
 ### The question the user asked, answered
 
@@ -147,6 +167,21 @@ training data. Say it that way from now on.
   spread in one scene, band 2 in another. Chosen by measurement, never
   hardcoded.
 - **npm 10+ ignores `--prefix` for `install`.** Use `cd frontDemo`.
+- **`await import('/src/...')` in the browser console gets a SEPARATE module
+  instance** once Vite has hot-reloaded (live modules carry `?t=`), so it shows
+  a placeholder upload, not the live one. Inspect the live map through the
+  `window.__map` dev handle (`querySourceFeatures`) instead.
+- **Screen pixels are not coordinates.** The map canvas runs under the right
+  dock and a slick is not at its frame centre; converting pixels to lon/lat by
+  the corner labels was off by ~4 km. Read geometry from `window.__map`.
+- **`landmask.generated.ts` is written last** by the build script, so the
+  console fails to load while a rebuild is running. Wait for it to finish.
+- **A Shift+F5 in the browser pane does not always reload.** Once it left the
+  previous generator's run on screen after the code had changed, and the view
+  looked like a bug that was already fixed. After reloading, check
+  `performance.timeOrigin` is seconds old before trusting a screenshot.
+- **`check:scenarios` prints the truth as "runnerUp" when the truth is not
+  first,** so a failing row shows margin 0. It is not a tie; print the suspects.
 - **`git add -A` used to sweep in 169 MB.** Check `git status` first.
 
 ### Verification
@@ -155,7 +190,8 @@ training data. Say it that way from now on.
 .venv/Scripts/python.exe -m pytest
 ```
 
-Baseline **474 passed, 9 skipped**. Then ruff, then the frontend:
+Baseline **506 passed, 9 skipped**. Then ruff (5 known errors, all in
+`frontDemo/scripts/extract-sample-geometry.py`, ISSUES X11), then the frontend:
 
 ```bash
 cd frontDemo && npm run check && npm run build
@@ -263,7 +299,62 @@ canvas; judging this by eye is how it got shipped wrong the first time.
 "Use precomputed result" on every path, including the live one. Instant, and
 labelled as precomputed.
 
----
+### 1.6 Real AIS on the map — DONE 2026-09-23
+
+> "would like to see actual ais ship data overlay and not random fake ships
+> with straight lines because that never happens in real life"
+
+Decided with the user: the published vessels' real tracks are the Gulf scenes'
+ground truth, and scenes with no real AIS get realistic simulated voyages,
+labelled SIM.
+
+**The three Gulf scenes run on real marinecadastre AIS.**
+`scripts/export_ais_traffic.py` parses the national days once into
+`data/interim/ais/*.npz` (Gulf AOI, ~15 min first run, 8 s after), cuts each
+scene's box and window, cleans with `clean_records`, simplifies with
+synchronised-distance Douglas-Peucker (every instant within 100 m — a path-only
+simplifier would drop a stop on a straight line), records reception gaps
+(>15 min) as explicit `breaks`, withholds identities (sequential ids keeping
+only the MID; no MMSI or name reaches the file), and flags the published
+vessel. 316 / 232 / 315 vessels, 1.2 MB, in `frontDemo/public/ais/`.
+`sim/realAis.ts` loads them (`useSpill` awaits it; `buildRun` refuses a real
+scene without it), resamples each continuous segment onto a global 5-minute grid
+so `behaviour()`'s cadence logic holds, and never fills a gap. The map breaks
+tracks at gaps instead of bridging them, and a vessel's position dot is drawn
+only when it reported near the playhead.
+
+**Measured, no weights touched:** every truth still ranks first — Case 2 (the
+real tanker) 0.757, margin 0.396; Case 3 (the real supply vessel) 0.744, margin
+0.186; Case 1 (the platform) 0.679, margin 0.232. Case 2's margin is partly by
+construction: the slick is laid along the named vessel's real track, as the
+publication describes. What is genuinely tested is that no other real vessel —
+232 of them — outscores it. `check:realais` asserts each named vessel's AIS
+reaches its published point (0.065 km at the pass; 0.046 km at the berth).
+
+**Everywhere else, voyages instead of rulers.** `voyage()` in `sim/ais.ts`:
+each vessel takes its own smoothed route through 2-4 waypoints, arrives from and
+leaves toward its own point beyond the lane (lanes funnel, then fan out), speed
+wanders, fishing boats trawl a ground at 2.5-4 kn, and tankers, bulkers, tugs
+and supply boats sometimes stop — at the approach end of the voyage. The first
+version stopped them mid-lane, which put a simulated tug holding station inside
+kutch-dark's origin field and it outranked the dark contact; ships wait at
+anchorages, not mid-transit, and moving stops there restored the ranking
+(margin 0.0579). That is recorded so it is not mistaken for tuning after the
+fact. The scripted truth tracks for the samples also bend now, except while
+discharging, when they hold course as the real Case 2 tanker did.
+
+**What the user saw and questioned.** The Case 2 truth draws a rectangle. It is
+the tanker's real AIS: out of the Mississippi, a box south of the delta at 8 kn,
+south along the slick to the tip at the pass, then a second box. Tankers box
+offshore waiting for orders — and clean tanks while they do. The Evidence pane
+now says "recorded AIS track" for every real vessel so a viewer is not left to
+assume the generator drew it.
+
+**Still open.** Uploads and the Indian-waters scenes remain simulated; there is
+no free AIS for them on this machine. A real-AIS feed for uploads would need a
+provider (Spire, MarineTraffic, Global Fishing Watch) and an account. The real
+OpenDrift runs (§0, "wire the real runs") would pair naturally with this real
+traffic — same three days — once they are wired into the console.
 
 ## 2. The labelling blocker
 

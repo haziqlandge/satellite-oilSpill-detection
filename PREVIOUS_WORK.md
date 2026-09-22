@@ -71,6 +71,17 @@ machine and the frontend from GitHub merged into one history. 15 conflicts: 10
 where local was a verified superset, 2 where origin held the older state, 2
 that were character-encoding damage. Tests: 464 passed, 9 skipped.
 
+**2026-09-22, later — a real, global land mask.** The frontend mask became
+GSHHG, the coastline OpenDrift itself uses, for the whole globe; upload AIS
+lanes were planned around it and every vessel track checked against it. See
+§2.13. Tests: 487 passed, 9 skipped.
+
+**2026-09-23 — real AIS.** The three Gulf scenes now run on real marinecadastre
+traffic, with the published vessels' own tracks as ground truth; the rest got
+routed, varied simulated voyages. Real AIS exposed a reversed course in Case 2
+and a one-degree coordinate error in Case 3. See §2.14. Tests: 506 passed,
+9 skipped.
+
 ### Results
 
 Screening, 12 cells at 60 epochs, mask metrics, single `slick` class:
@@ -368,6 +379,80 @@ It is what makes the labels usable at all.
   it is how three separate copy/data contradictions were found.
 - **Prove the instrument before trusting a null result.** A check that reports
   "no problem" is worthless until it has been shown to fire on a known problem.
+
+## 2.13 One coastline for the whole system
+
+**The frontend mask is OpenDrift's coastline, not a copy of it.**
+`roaring_landmask.Shapes.wkb(LandmaskProvider.Gshhg)` returns the exact GSHHG
+full-resolution polygons OpenDrift's `reader_global_landmask` tests against —
+180,496 polygons, 9.46 M vertices, all valid, none past ±180°.
+`scripts/build_landmask.py` rasterises them at 1/240°, which is also the grid
+of roaring's own raster. Natural Earth was planned and rejected: it would have
+been a third coastline, and the disagreement would have been documented rather
+than removed.
+
+**Rasterise by latitude band, not by tile.** The first attempt clipped every
+polygon per 5° tile and ran a Python varint loop; `contains`/`clip_by_rect` on
+Eurasia (over a million vertices) for every tile it touches made it crawl with
+no output. One GDAL `rasterize` per band plus a vectorised encoder does the
+globe in ~2.5 minutes.
+
+**A raster of the same coastline still "disagrees" at the shore, and that is
+rounding.** Against OpenDrift's backward parcels the raster says 19.0%, 40.0%
+and 25.6% ashore; OpenDrift says 0.10%, 0.26% and 0.14%; 98–99.99% of the gap
+is within one cell of water, because `coastline_action="previous"` parks
+parcels hard against the shore. Do not "fix" that by nudging real parcels —
+test for *deep* ashore (no water in the eight neighbouring cells) instead.
+
+**The basemap-colour mask was wrong in ways its own test enshrined.** It
+called Venice, Louisiana water, and `check-landmask` asserted it. Over the Gulf
+box it disagreed with OpenDrift at 6.02% of random points; the GSHHG raster
+disagrees at 0.62%.
+
+**A land-aware retry must not touch the shared RNG.** `buildTraffic` hands
+vessels round-robin off one stream, so a retry drawn from it re-rolls the whole
+scene. Re-placement draws from a per-vessel stream and a dropped vessel still
+consumes its main-stream draws; every authored ranking came out bit-identical.
+
+## 2.14 Real AIS, and what it said about the published cases
+
+**The named vessels are in the data, and they corrected the scenes.** Both
+ships Zhao et al. 2025 name are in the marinecadastre days on disk, under MMSIs
+the scripted stand-ins did not use. Case 2's tanker was *southbound* at 7.8 kn
+and at the slick tip at the pass (0.065-0.10 km from the published point),
+still discharging; the authored scene had it northbound, finished four hours
+earlier. Case 3's supply vessel was moored 0.046-0.07 km from 88°58′07″W — the
+transcribed 89°58′07″W (`RESEARCH/papers/P004.md:181`) is one degree out, and
+the scene had sat 97 km west of the real berth. Both are now read off the AIS.
+Real AIS is the cheapest check on a transcribed coordinate this project has.
+
+**Simplify in time, not just space.** Path-only Douglas-Peucker drops a stop on
+a straight line, because the path does not change; the gate asks where a vessel
+was at an hour, so the export uses synchronised-distance DP (TD-TR), which
+bounds the position error at every instant. `tests/test_export_ais_traffic.py`
+pins the stop case.
+
+**A simplified track cannot tell you where the gaps are.** After TD-TR a
+straight leg reported every minute keeps two points an hour apart, which looks
+exactly like an hour of silence. Reception gaps have to be recorded before
+simplifying (`breaks`), or the frontend invents them.
+
+**`behaviour()` reads the first step as the cadence.** Resampling "each report
+plus every 300 s" made a track whose first two reports were 60 s apart read
+every later step as missed reports. Resample onto one global grid.
+
+**`positionAt` clamps to a track's ends,** so a ship that left the scene was
+drawn parked at its exit and every lane end collected phantom vessels; and CFAR
+targets were generated for ships that were not there at the pass. Both now
+require a report near the instant.
+
+**Where a simulated ship stops decides a ranking.** The first voyage generator
+stopped tankers and tugs anywhere mid-lane; with lanes authored through the
+scene, a tug held station in kutch-dark's origin field and outranked the dark
+contact. The scorer was right; the generator was not — ships wait at
+anchorages at the end of a passage. Moving stops there restored the ranking.
+Recorded because the order of events (failure seen, then realism fix) is
+exactly what tuning-after-the-fact looks like, and it was not.
 
 ---
 

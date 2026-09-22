@@ -145,6 +145,10 @@ export interface Vessel {
   draftM: number;
   points: AisPoint[];
   background: boolean;
+  /** "real" for marinecadastre AIS (`sim/realAis.ts`); absent means simulated. */
+  source?: "real";
+  /** The transponder reported no length; `lengthM` is its class's typical length. */
+  lengthAssumed?: boolean;
 }
 
 export interface AnomalyFlag {

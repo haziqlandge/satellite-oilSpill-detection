@@ -11,6 +11,10 @@
  */
 import { buildRun, SCENARIOS } from '../src/sim/scenarios';
 import type { DriftVariant } from '../src/sim/scoring';
+import { useDiskTraffic } from './realAisDisk';
+
+// The Gulf scenes' traffic is real AIS; buildRun refuses them until it is loaded.
+await useDiskTraffic();
 
 const failures: string[] = [];
 const check = (ok: boolean, msg: string) => { if (!ok) failures.push(msg); };

@@ -28,6 +28,7 @@
  * be careful about.
  */
 
+import { planCorridors } from "./ais";
 import { bearingDeg, distanceKm, kmPerDegLon, KM_PER_DEG_LAT } from "./geo";
 import type { ScenarioSpec } from "./scenarios";
 import type { SlickGeometry } from "./slick";
@@ -117,6 +118,9 @@ export function buildUploadSpec(ribbon: Ribbon, a: UploadAssertions): ScenarioSp
   const dampingRatioDb = +((ribbon.meanInside - ribbon.meanOutside) * perGrey).toFixed(2);
 
   const centre = a.centre;
+  // Laid around the coast, so the land mask for this area must already be
+  // loaded -- `SampleImagePanel` awaits `ensureLandmask` before calling this.
+  const lanes = planCorridors(centre);
   const assertedPosition = a.positionSource === "operator";
   const provenance =
     "SIM · Outline, bearing, length, widths and damping ratio are MEASURED from the " +
@@ -128,7 +132,7 @@ export function buildUploadSpec(ribbon: Ribbon, a: UploadAssertions): ScenarioSp
     (assertedPosition
       ? "POSITION ASSERTED BY OPERATOR — the raster carries no georeferencing, so the map location and scale are stated, not measured. "
       : "Position read from the raster's georeferencing. ") +
-    "Drift field, AIS traffic, infrastructure and all scores are simulated.";
+    `Drift field, AIS traffic, infrastructure and all scores are simulated; ${lanes.note}.`;
 
   return {
     geometry,
@@ -139,7 +143,9 @@ export function buildUploadSpec(ribbon: Ribbon, a: UploadAssertions): ScenarioSp
       provenance,
       acquiredAtIso: new Date(a.acquiredAt).toISOString(),
       centre,
-      zoom: 10.4,
+      // z9 frames the whole envelope: the backward field and the lanes span
+      // roughly a degree either side, which z10.4 cropped to the slick alone.
+      zoom: 9,
       sceneId: a.fileName.replace(/\.[^.]+$/, "").slice(0, 48) || "UPLOAD",
       place: assertedPosition ? "an operator-asserted position" : "the raster's own position",
       summary:
@@ -186,10 +192,7 @@ export function buildUploadSpec(ribbon: Ribbon, a: UploadAssertions): ScenarioSp
     },
     traffic: {
       vesselCount: 160,
-      corridors: [
-        { from: [centre[0] - 1.1, centre[1] - 0.22], to: [centre[0] + 1.0, centre[1] + 0.2], widthKm: 8 },
-        { from: [centre[0] - 0.28, centre[1] + 0.85], to: [centre[0] + 0.12, centre[1] - 0.8], widthKm: 6 },
-      ],
+      corridors: lanes.corridors,
     },
     infrastructure: [
       { id: "upload-installation", label: "Offshore installation (sim)", position: geometry.tail },

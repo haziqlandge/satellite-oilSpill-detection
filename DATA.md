@@ -141,6 +141,34 @@ iou 0.70, max_det 1000, half false, rect true, retina_masks true`; raster
 **`runs/` is the one directory worth copying by hand** when moving machines.
 Re-deriving it costs roughly 4.5 hours of GPU time.
 
+## 5a. Land mask — `frontDemo/public/landmask/`
+
+The frontend's coastline: GSHHG full resolution, the polygons OpenDrift's
+`reader_global_landmask` uses, rasterised at 1/240° by
+`scripts/build_landmask.py` (~2.5 min, needs `roaring_landmask` from the
+`drift` extra). **Tracked**, because the app fetches it at runtime.
+
+| Artifact | Size | What |
+|---|---|---|
+| `frontDemo/public/landmask/band_00.bin` … `band_35.bin` | 3.01 MB, 33 files | Every coastal 5° tile, one file per latitude band, row 00 at the south pole. Bands with no coastal tile have no file |
+| `frontDemo/src/sim/landmask.generated.ts` | 49 KB | Kind of every tile on Earth, plus the 11 coastal tiles authored scenes need, bundled |
+
+**Authority: OpenDrift's GSHHG answer.** The raster is it sampled at cell
+centres; `tests/test_landmask.py` checks ≥99.9% agreement. The basemap drawn
+underneath is Esri's picture and can differ from both. GSHHG is LGPL
+(Wessel & Smith).
+
+## 5b. AIS — `data/raw/ais/`, `data/interim/ais/`, `frontDemo/public/ais/`
+
+| Artifact | Size | What |
+|---|---|---|
+| `data/raw/ais/2023/AIS_2023_*.zip` | 2.9 GB, 10 days | marinecadastre national days: Apr 7-9, May 13-15, Dec 2-5 2023 — the 48 h before each of the three Gulf cases. **Irreplaceable offline** (re-download from marinecadastre.gov) |
+| `data/interim/ais/AIS_*_gulf.npz` | 178 MB, 8 files (15-27 MB each) | Each day a scene window needs, cut to the Gulf AOI and cached by `scripts/export_ais_traffic.py`. Regenerable, ~90 s a day |
+| `frontDemo/public/ais/{gom-platform,gom-moving,gom-berthed}.json` | 1.2 MB | Per-scene tracks, simplified to 100 m (TD-TR), reception gaps as `breaks`, identities withheld (MID only), the published vessel flagged. **Tracked**; the app fetches them |
+
+No real MMSI or vessel name is in the tracked files; `tests/test_export_ais_traffic.py`
+asserts it.
+
 ## 6. Evaluation artifacts — `eval/`
 
 240 MB on disk. Tracked selectively:
@@ -163,6 +191,8 @@ Re-deriving it costs roughly 4.5 hours of GPU time.
 | `data/raw/sar/**` | `data/processed/sar/**` — rerun the SNAP graph, but budget 1h+ per scene |
 | `runs/**` (~4.5 GPU-hours) | `eval/**/feature_cache`, `*.npz`, `*.jsonl` |
 | `weights/L1-ciou-research.pt` | `eval/final/scenes/*.geojson` — rerun inference |
+| | `frontDemo/public/landmask/**` — `scripts/build_landmask.py` |
+| `data/raw/ais/**` (re-download) | `frontDemo/public/ais/**`, `data/interim/ais/**` — `scripts/export_ais_traffic.py` |
 
 ## 8. Credentials
 

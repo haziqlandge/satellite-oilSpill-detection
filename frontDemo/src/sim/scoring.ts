@@ -450,7 +450,9 @@ function scoreVessel(
       key: "prior",
       value: prior,
       weight: WEIGHTS.prior,
-      detail: `${vessel.kind}, ${vessel.lengthM} m, ${vessel.draftM} m draught.`,
+      detail:
+        `${vessel.kind}, ${vessel.lengthM} m${vessel.lengthAssumed ? " (length not reported; typical for the class)" : ""}` +
+        `${vessel.draftM > 0 ? `, ${vessel.draftM} m draught` : ", draught not reported"}.`,
       geometry: null,
     },
   ];
@@ -461,7 +463,10 @@ function scoreVessel(
     id: vessel.mmsi,
     kind: "ais_vessel",
     label: vessel.label,
-    detail: `${vessel.kind}, ${vessel.lengthM} m`,
+    // Says whether the track is recorded. A real track can look strange -- a
+    // tanker boxing offshore draws a rectangle -- and a reader should know it
+    // is the ship's own behaviour, not the generator's.
+    detail: `${vessel.kind}, ${vessel.lengthM} m${vessel.source === "real" ? " · recorded AIS track" : " · simulated track"}`,
     total: combine(terms, gate),
     rank: 0,
     terms,

@@ -14,6 +14,10 @@ import { SAMPLE_LISTINGS } from '../src/sim/samples';
 import { isLand } from '../src/sim/landmask';
 import { distanceKm, KM_PER_DEG_LAT, kmPerDegLon } from '../src/sim/geo';
 import type { LngLat } from '../src/sim/types';
+import { useDiskTraffic } from './realAisDisk';
+
+// The Gulf scenes' traffic is real AIS; buildRun refuses them until it is loaded.
+await useDiskTraffic();
 
 /** Distance from a water point to the nearest land, by expanding ring search. */
 function toLandKm(p: LngLat): number {

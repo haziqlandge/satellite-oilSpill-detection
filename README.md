@@ -115,7 +115,7 @@ Heavy dependencies are optional groups so they can fail independently:
 .venv/Scripts/python.exe -m ruff check . && .venv/Scripts/python.exe -m mypy ml backend scripts
 ```
 
-Baseline is **464 passed, 9 skipped**. A drop below that is a regression.
+Baseline is **506 passed, 9 skipped**. A drop below that is a regression.
 
 ---
 

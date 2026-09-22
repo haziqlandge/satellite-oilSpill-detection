@@ -37,6 +37,7 @@ import {
   type ScenarioId,
   type ScenarioListing,
 } from "../sim/scenarios";
+import { ensureRealTraffic } from "../sim/realAis";
 import type { DriftVariant } from "../sim/scoring";
 import type { Run } from "../sim/types";
 
@@ -142,15 +143,20 @@ export function useSpill(
 
     // Yielding to the browser first lets the loading state paint. Building
     // synchronously would freeze the frame for the whole run and nothing would
-    // change on screen until it finished.
-    const id = window.setTimeout(() => {
-      const built = buildRun(scenario, variant);
+    // change on screen until it finished. A Gulf scene's real AIS is fetched
+    // first; `buildRun` refuses to build one without it.
+    let id = 0;
+    void ensureRealTraffic(scenario).then(() => {
       if (cancelled) return;
-      setRun(built);
-      setHour(0);
-      setSelectedId(built.suspects[0]?.id ?? null);
-      setLoading(false);
-    }, 16);
+      id = window.setTimeout(() => {
+        const built = buildRun(scenario, variant);
+        if (cancelled) return;
+        setRun(built);
+        setHour(0);
+        setSelectedId(built.suspects[0]?.id ?? null);
+        setLoading(false);
+      }, 16);
+    });
 
     return () => {
       cancelled = true;

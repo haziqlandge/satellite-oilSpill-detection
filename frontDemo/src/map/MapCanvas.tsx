@@ -41,6 +41,7 @@ import { subscribePlayhead, syncPlayhead } from "../lib/playhead";
 import type { MapPaint } from "../theme";
 import type { LngLat, Run, Suspect } from "../sim/types";
 import { positionAt } from "../sim/ais";
+import { trackSegments } from "../sim/realAis";
 import { pointInPolygon, distanceToPathKm } from "../sim/geo";
 
 interface Props {
@@ -773,12 +774,24 @@ export function MapCanvas({
     for (const v of run.vessels) {
       const pts = v.points.filter((p) => p.t <= at);
       if (pts.length < 2) continue;
-      const coords = pts.map((p) => [p.lon, p.lat] as LngLat);
+      // Broken where reports stop. A reception gap on a real track is drawn as
+      // a gap: bridging it would be a straight line nobody observed.
+      const parts = trackSegments(pts);
+      if (!parts.length) continue;
       const isCandidate = candidateIds.has(v.mmsi);
+      // Where the vessel is NOW -- only if it reported near now. `positionAt`
+      // clamps to a track's ends, so without this a ship that left the scene
+      // hours ago is drawn parked at its exit, and every lane end collects a
+      // cluster of vessels that are not there.
+      // The estimate still drives the going-dark rendering below, which is
+      // precisely about a vessel that is NOT reporting.
+      const reporting = v.points.some((p) => Math.abs(p.t - at) <= 15 * 60_000);
       const now = positionAt(v, at);
       const nearField = now ? pointInPolygon(now, run.detection.parts) || distanceToPathKm(now, run.characterisation.medialAxis).km < 12 : false;
       const dark = isCandidate && nearField && v.points.some((p, i) => i > 0 && p.t - v.points[i - 1].t > 2700_000);
-      const feature = line(coords, { mmsi: v.mmsi });
+      const feature: GeoJSON.Feature = parts.length === 1
+        ? line(parts[0], { mmsi: v.mmsi })
+        : { type: "Feature", properties: { mmsi: v.mmsi }, geometry: { type: "MultiLineString", coordinates: parts } };
       if (isCandidate) candidates.push(feature); else traffic.push(feature);
       if (dark) for (let i = 1; i < v.points.length; i++) {
         const a=v.points[i-1], b=v.points[i], gapH=(b.t-a.t)/3600_000;
@@ -789,7 +802,7 @@ export function MapCanvas({
         trackingMarkers.push(point(pa,{kind:"tracking-off",mmsi:v.mmsi}));
         if (b.t <= at) trackingMarkers.push(point(pb,{kind:"tracking-on",mmsi:v.mmsi}));
       }
-      if (now && isCandidate) vessels.push(point(now, { kind: "vessel" }));
+      if (now && reporting && isCandidate) vessels.push(point(now, { kind: "vessel" }));
     }
 
     src(SOURCE.traffic).setData(collection(traffic));
@@ -869,11 +882,12 @@ export function MapCanvas({
     */
     const at = run.meta.acquiredAt + hour * 3600_000;
     const timed = selected ? run.vessels.find((v) => v.mmsi === selected.id) : undefined;
-    const suspectTrack = timed
-      ? timed.points.filter((p) => p.t <= at).map((p) => [p.lon, p.lat] as LngLat)
-      : selected?.track;
+    // Broken at reception gaps, like every other track.
+    const suspectParts = timed
+      ? trackSegments(timed.points.filter((p) => p.t <= at))
+      : selected?.track && selected.track.length > 1 ? [selected.track] : [];
     src(SOURCE.suspect).setData(
-      suspectTrack && suspectTrack.length > 1 ? collection([line(suspectTrack)]) : EMPTY,
+      suspectParts.length ? collection(suspectParts.map((part) => line(part))) : EMPTY,
     );
     src(SOURCE.matched).setData(
       selected?.evidence.matchedSegment
