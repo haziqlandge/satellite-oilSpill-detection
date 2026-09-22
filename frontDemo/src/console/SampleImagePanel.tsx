@@ -34,7 +34,7 @@ import { extractRibbon, parseAcquisitionTime, type Ribbon } from "../sim/ingest"
 import { decodeGeoTiff, looksLikeTiff, type GeoRaster } from "../sim/geotiff";
 import { buildUploadSpec } from "../sim/uploadSpec";
 import { registerUpload } from "../sim/scenarios";
-import { ensureLandmask } from "../sim/landmask";
+import { ensureLandmask, isLand, LANDMASK_SOURCE, type LandmaskBuild } from "../sim/landmask";
 import { PositionPicker } from "./PositionPicker";
 import type { LngLat, ScenarioId } from "../sim/types";
 
@@ -391,34 +391,39 @@ export function SampleImagePanel({ onSelect }: { onSelect: (id: ScenarioId) => v
   }, [lat, lon, acrossKm, when]);
 
   const [preparing, setPreparing] = useState("");
+  const [coastline, setCoastline] = useState<LandmaskBuild | null>(null);
 
   const run = async () => {
     if (!current.ribbon || !parsed.valid) return;
+    publish({ error: "" });
     /*
-      Fetch the coastline for wherever this scene actually is, before drifting.
+      Load the coastline for wherever this scene actually is, before drifting.
 
-      The generated land mask covers three coasts. An upload can be anywhere --
-      the corpus alone spans the Gulf of Guinea, the Red Sea, the Mediterranean
-      and Borneo -- and outside a known box everything reads as water, so the
-      hindcast reconstructs inland and the shipping lanes cross continents.
-      This pulls the basemap tiles for the region and classifies them, which
-      takes a moment and is worth saying so rather than freezing the button.
+      The mask is global (GSHHG, the coastline OpenDrift uses), but its coastal
+      tiles are fetched on demand from this project's own static files rather
+      than bundled. Open ocean and inland tiles need nothing fetched.
 
       The radius covers the whole envelope, not the slick: the backward field is
       widest at the far end of the horizon and the AIS lanes are wider still.
     */
-    setPreparing("Fetching the coastline for this area");
+    setPreparing("Loading the coastline for this area");
     try {
-      const radiusKm = Math.max(90, parsed.across * 2.5);
-      const built = await ensureLandmask(parsed.centre, radiusKm);
-      if (built.built) {
-        setPreparing(
-          `Coastline ready — ${built.tiles} tiles, ${(built.landFraction * 100).toFixed(0)}% land`,
-        );
+      // Lanes reach 110 km each way from an anchor up to 28 km off the
+      // centre, plus their own width: 160 km covers all of it.
+      const radiusKm = Math.max(160, parsed.across * 2.5);
+      const coast = await ensureLandmask(parsed.centre, radiusKm);
+      setCoastline(coast);
+      if (isLand(parsed.centre[0], parsed.centre[1])) {
+        // A slick cannot sit on dry ground. Running anyway would drift from a
+        // position the physics refuses, so say where the problem is instead.
+        setPreparing("");
+        publish({ error: "That position is on land in the GSHHG coastline. Move the marker onto water." });
+        return;
       }
     } catch {
       // A missing coastline is worth saying, not worth blocking on: the run is
       // still honest, it simply cannot strand anything.
+      setCoastline(null);
       setPreparing("Coastline unavailable — drift will not strand on land");
     }
     registerUpload(buildUploadSpec(current.ribbon, {
@@ -555,6 +560,10 @@ export function SampleImagePanel({ onSelect }: { onSelect: (id: ScenarioId) => v
         <button type="button" className="cursor-pointer border px-3 py-2 text-[11px] uppercase"
           style={{ borderColor: "var(--accent)", color: "var(--accent)" }} onClick={() => onSelect("upload")}>View the animation</button>
         <p className="text-[10px]" style={{ color: "var(--ink-faint)" }}>−36 h hindcast · +72 h forecast · drift, AIS and scores simulated</p>
+        {coastline && <p className="text-[10px]" style={{ color: "var(--ink-faint)" }} data-coastline>
+          Coastline: {LANDMASK_SOURCE.split(" (")[0]}, the shoreline OpenDrift uses · {coastline.tiles} coastal
+          tile{coastline.tiles === 1 ? "" : "s"} · {(coastline.landFraction * 100).toFixed(0)}% land nearby
+          {coastline.fetched ? ` · loaded in ${coastline.ms} ms` : ""}</p>}
       </>}
     </div>}
   </div>;

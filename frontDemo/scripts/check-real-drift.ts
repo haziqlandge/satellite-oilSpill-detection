@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { isLand } from '../src/sim/landmask';
-import type { RealDriftRun } from '../src/sim/realDrift';
+import { deepAshore, type RealDriftRun } from '../src/sim/realDrift';
 
 const ROOT = join(process.cwd(), 'public', 'runs');
 if (!existsSync(ROOT)) {
@@ -54,7 +54,13 @@ for (const scene of scenes) {
   for (let i = 1; i < hours.length; i++)
     assert.ok(hours[i] > hours[i - 1], `${scene}: frames are not in ascending hour order`);
 
-  let ashore = 0;
+  // Two counts, because they mean different things. `coastal` is a parcel in
+  // a cell whose centre is land -- mostly rounding, since backward parcels are
+  // parked hard against the shore. `deep` has no water in any neighbouring
+  // cell either, which the raster's rounding cannot explain: that would be a
+  // real disagreement with OpenDrift's coastline, which this mask is built from.
+  let coastal = 0;
+  let deep = 0;
   let parcels = 0;
   for (const frame of run.frames) {
     assert.equal(frame.particles.length % 2, 0, `${scene}: odd particle array at T${frame.hour}`);
@@ -63,7 +69,8 @@ for (const scene of scenes) {
       const lat = frame.particles[i + 1];
       assert.ok(Number.isFinite(lon) && Number.isFinite(lat), `${scene}: non-finite parcel`);
       parcels++;
-      if (isLand(lon, lat)) ashore++;
+      if (isLand(lon, lat)) coastal++;
+      if (deepAshore(lon, lat)) deep++;
     }
   }
 
@@ -73,6 +80,11 @@ for (const scene of scenes) {
   // Diffusion is irreversible: the origin field is widest furthest back.
   assert.ok(widening > 1, `${scene}: backward field did not widen (x${widening.toFixed(2)})`);
 
+  // OpenDrift itself leaves 0.10-0.26% of these parcels on its own land. More
+  // than 1% beyond the raster's rounding means the mask and the physics have
+  // stopped describing the same coastline.
+  assert.ok(deep / parcels < 0.01, `${scene}: ${(100 * deep / parcels).toFixed(2)}% of parcels are inland by more than a cell`);
+
   rows.push({
     scene: scene.slice(0, 26),
     frames: run.frames.length,
@@ -81,10 +93,11 @@ for (const scene of scenes) {
     failures: run.memberFailures.length,
     widening: +widening.toFixed(1),
     spreadAtHorizonKm: +earliest.spreadKm.toFixed(2),
-    parcelsAshorePct: +(100 * ashore / parcels).toFixed(2),
+    inCoastalCellPct: +(100 * coastal / parcels).toFixed(2),
+    deepAshorePct: +(100 * deep / parcels).toFixed(2),
     age: run.age.age_method && run.age.age_method !== 'none' ? run.age.age_method : (run.age.status ?? 'refused'),
     seconds: run.elapsedSeconds,
   });
 }
 console.table(rows);
-console.log(`PASS: ${scenes.length} real OpenDrift run(s) parse, span their horizon, and widen backward.`);
+console.log(`PASS: ${scenes.length} real OpenDrift run(s) parse, span their horizon, widen backward, and agree with the coastline.`);

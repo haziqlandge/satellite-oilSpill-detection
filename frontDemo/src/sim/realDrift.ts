@@ -16,14 +16,12 @@
  *
  * NO CURRENTS. CMEMS has no credentials (ISSUES X2), so the ensemble is
  * wind-driven over a zero current field. That is a real limitation and it shows
- * in the results, which are not uniform: of the three exported scenes two
- * report `monotonic` -- the field never stops widening, so there is no
- * convergence minimum and the age is a refusal -- and the December scene
- * reaches `convergence_minimum` and returns an actual age triple. That is the
- * first age this project has produced that is a number rather than a refusal,
- * and it took genuine time-varying wind to get it. Both outcomes are carried
- * through as they come; a refusal is a result (C1, C3) and is rendered, not
- * hidden.
+ * in the results: all three exported scenes report `monotonic` -- the field
+ * never stops widening, so there is no convergence minimum and the age is a
+ * refusal with a null triple. An earlier note here said the December scene
+ * reached `convergence_minimum`; the artifacts on disk (re-exported after the
+ * backward coastline fix) do not, and no present artifact supports that claim.
+ * A refusal is a result (C1, C3) and is rendered, not hidden.
  */
 
 import { isLand } from "./landmask";
@@ -110,64 +108,47 @@ export async function loadRealDrift(scene: string): Promise<RealDriftRun> {
 }
 
 /**
- * The frames as the particle overlay consumes them, nudged clear of the shore.
+ * The frames as the particle overlay consumes them, exactly as OpenDrift left them.
  *
- * OpenDrift holds a backward parcel at its last water position when it reaches
- * the coast -- `coastline_action="previous"`, which is the honest statement
- * that the parcel came from at least there and no further. But OpenDrift's
- * coastline is GSHHS and this project's is a 0.005 degree raster sampled from
- * the basemap, and two coastlines never agree to the metre. A parcel parked
- * exactly on the shore therefore lands on the land side of one mask and the
- * water side of the other, and the map draws oil on a beach.
+ * This used to walk every parcel the frontend mask called land to the nearest
+ * water cell, because OpenDrift tested against GSHHG and the frontend against
+ * basemap pixel colour, and the two disagreed at the shore. They no longer
+ * disagree: the frontend mask IS GSHHG, rasterised (`sim/landmask.ts`).
  *
- * Measured across the three exported scenes, that was 10.3%, 10.5% and 33.3%
- * of rendered parcels. So each one is walked to the nearest water cell inside a
- * short radius, and the count is returned rather than hidden: this is a
- * rendering correction for a disagreement between two masks, not a claim that
- * the physics put the parcel there. A parcel with no water within the radius is
- * dropped, because moving it further would be inventing a position.
+ * What remains is rounding. `coastline_action="previous"` parks a backward
+ * parcel at its last water position, hard against the shore, and a parcel
+ * fifty metres offshore can sit in a 1/240 degree cell whose centre is on land.
+ * Measured on the three exported scenes, the raster calls 19.0%, 40.0% and
+ * 25.6% of parcels ashore where OpenDrift itself calls 0.10%, 0.26% and 0.14%,
+ * and 98-99.99% of the difference is within one cell of water. Nudging those
+ * would move a real position to correct a rounding of the same coastline, so
+ * OpenDrift, which holds the polygons, is taken at its word.
  */
 export function overlayFrames(
   run: RealDriftRun,
-): { frames: { hour: number; particles: Float64Array }[]; nudged: number; dropped: number } {
-  // Eight cells, about 4.5 km: enough to cross a disagreement between two
-  // coastlines, far too short to relocate a parcel that is genuinely inland.
-  const CELL = 0.005;
-  const RINGS = 8;
-  let nudged = 0;
-  let dropped = 0;
-
-  const toWater = (lon: number, lat: number): LngLat | null => {
-    if (!isLand(lon, lat)) return [lon, lat];
-    for (let ring = 1; ring <= RINGS; ring++) {
-      for (let step = 0; step < 16; step++) {
-        const angle = (step / 16) * 2 * Math.PI;
-        const candidate: LngLat = [
-          lon + Math.cos(angle) * ring * CELL,
-          lat + Math.sin(angle) * ring * CELL,
-        ];
-        if (!isLand(candidate[0], candidate[1])) {
-          nudged++;
-          return candidate;
-        }
-      }
-    }
-    dropped++;
-    return null;
+): { frames: { hour: number; particles: Float64Array }[] } {
+  return {
+    frames: run.frames.map((frame) => ({
+      hour: frame.hour,
+      particles: Float64Array.from(frame.particles),
+    })),
   };
+}
 
-  const frames = run.frames.map((frame) => {
-    const out: number[] = [];
-    for (let i = 0; i < frame.particles.length; i += 2) {
-      const moved = toWater(frame.particles[i], frame.particles[i + 1]);
-      if (moved) {
-        out.push(moved[0]);
-        out.push(moved[1]);
-      }
+/**
+ * Whether a point is land by more than the raster's own rounding: land, with
+ * no water in any of the eight neighbouring cells. This is the test for a real
+ * disagreement with OpenDrift rather than a parcel parked against the shore.
+ */
+export function deepAshore(lon: number, lat: number): boolean {
+  if (!isLand(lon, lat)) return false;
+  const cell = 1 / 240;
+  for (const dx of [-cell, 0, cell]) {
+    for (const dy of [-cell, 0, cell]) {
+      if ((dx || dy) && !isLand(lon + dx, lat + dy)) return false;
     }
-    return { hour: frame.hour, particles: Float64Array.from(out) };
-  });
-  return { frames, nudged, dropped };
+  }
+  return true;
 }
 
 /**

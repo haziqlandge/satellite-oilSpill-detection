@@ -14,11 +14,15 @@
  * exactly how much ground the image is being claimed to cover, and it is
  * adjusted until it looks like the right amount of sea.
  *
- * The same Esri basemap as the console, so the coast here is the coast the
- * drift will be tested against; `sim/landmask.ts` classifies these very tiles.
+ * The same Esri basemap as the console. The drift itself is tested against the
+ * GSHHG coastline OpenDrift uses (`sim/landmask.ts`), not against this picture,
+ * so the line under the pin says what THAT coastline makes of the position:
+ * the run refuses a scene placed on land, and it is better to see why before
+ * pressing the button than after.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ensureLandmask, isLand } from "../sim/landmask";
 import maplibregl from "maplibre-gl";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { KM_PER_DEG_LAT, kmPerDegLon } from "../sim/geo";
@@ -60,6 +64,11 @@ export function PositionPicker({
   // The latest handler, so the map's own listener never closes over a stale one.
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  // The latest position, for the load handler, which runs after mount and
+  // would otherwise draw the footprint where the scene was when the map began.
+  const latest = useRef({ centre, acrossKm });
+  latest.current = { centre, acrossKm };
+  const [ashore, setAshore] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!holder.current || mapRef.current) return;
@@ -76,7 +85,10 @@ export function PositionPicker({
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     map.on("load", () => {
-      map.addSource("footprint", { type: "geojson", data: footprint(centre, acrossKm) });
+      map.addSource("footprint", {
+        type: "geojson",
+        data: footprint(latest.current.centre, latest.current.acrossKm),
+      });
       map.addLayer({
         id: "footprint-fill",
         type: "fill",
@@ -118,7 +130,23 @@ export function PositionPicker({
     if (!map) return;
     const source = map.getSource("footprint") as maplibregl.GeoJSONSource | undefined;
     source?.setData(footprint(centre, acrossKm));
+    // A position that arrived from outside the map -- typed, or read from a
+    // GeoTIFF -- has to be brought into view, or the pin moves off-screen and
+    // the map keeps showing somewhere else. A click is already in view, so it
+    // never pans under the operator's cursor.
+    if (!map.getBounds().contains(centre)) {
+      map.jumpTo({ center: centre, zoom: Math.max(map.getZoom(), 7) });
+    }
   }, [centre, acrossKm]);
+
+  useEffect(() => {
+    let alive = true;
+    setAshore(null);
+    ensureLandmask(centre, 1)
+      .then(() => { if (alive) setAshore(isLand(centre[0], centre[1])); })
+      .catch(() => { if (alive) setAshore(null); });
+    return () => { alive = false; };
+  }, [centre]);
 
   return (
     <div>
@@ -130,6 +158,8 @@ export function PositionPicker({
       />
       <p className="mt-1 num text-[10px]" style={{ color: "var(--ink-faint)" }}>
         {centre[1].toFixed(4)}°, {centre[0].toFixed(4)}° · {acrossKm.toFixed(1)} km across
+        {ashore !== null && <span style={{ color: ashore ? "var(--alarm)" : "var(--accent)" }} data-picker-ashore={ashore}>
+          {ashore ? " · on land — move the pin onto water" : " · water"}</span>}
       </p>
     </div>
   );
