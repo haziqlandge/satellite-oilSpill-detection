@@ -29,7 +29,9 @@ export type ScenarioId =
   | "mumbai-null"
   | "sample1"
   | "sample2"
-  | "sample3";
+  | "sample3"
+  /** A raster the operator supplied. Registered at runtime, never authored. */
+  | "upload";
 
 export type SlickClass = "oos" | "slick_unknown";
 

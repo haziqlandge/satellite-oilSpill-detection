@@ -204,7 +204,11 @@ const GOM_CASE_2_MID: LngLat = [-89.1755, 28.4407];
 const KUTCH: LngLat = [69.42, 22.46];
 const MUMBAI_HIGH: LngLat = [71.62, 19.48];
 
-const AUTHORED_SPECS: Record<ScenarioId, ScenarioSpec> = {
+/**
+ * Every scenario that is written down. `upload` is excluded by construction:
+ * it is built from a raster at runtime and there is nothing to author.
+ */
+const AUTHORED_SPECS: Record<Exclude<ScenarioId, "upload">, ScenarioSpec> = {
   ...SAMPLE_SPECS,
   "gom-moving": {
     meta: {
@@ -952,12 +956,47 @@ function displace(spec: ScenarioSpec, by: LngLat): ScenarioSpec {
   };
 }
 
-const SPECS: Record<ScenarioId, ScenarioSpec> = Object.fromEntries(
-  Object.entries(AUTHORED_SPECS).map(([id, spec]) => {
-    const by = DISPLACEMENTS[id as ScenarioId];
-    return [id, by ? displace(spec, by) : spec];
-  }),
-) as Record<ScenarioId, ScenarioSpec>;
+/**
+ * The slot an uploaded raster fills.
+ *
+ * `SPECS` is a total record over `ScenarioId`, and making it partial to admit
+ * one runtime entry would push an undefined check into every consumer for the
+ * sake of a case that is always populated before anything reads it. A neutral
+ * open-water placeholder keeps the type honest; `registerUpload` replaces it
+ * with the real thing and drops the cached runs built from whatever was there
+ * before.
+ */
+const UPLOAD_PLACEHOLDER: ScenarioSpec = {
+  ...AUTHORED_SPECS.sample1,
+  meta: {
+    ...AUTHORED_SPECS.sample1.meta,
+    id: "upload",
+    name: "Uploaded image",
+    provenance: "SIM · No raster has been uploaded yet.",
+  },
+};
+
+const SPECS: Record<ScenarioId, ScenarioSpec> = {
+  ...(Object.fromEntries(
+    Object.entries(AUTHORED_SPECS).map(([id, spec]) => {
+      const by = DISPLACEMENTS[id as ScenarioId];
+      return [id, by ? displace(spec, by) : spec];
+    }),
+  ) as Record<ScenarioId, ScenarioSpec>),
+  upload: UPLOAD_PLACEHOLDER,
+};
+
+/**
+ * Install a spec built from a real uploaded raster, and forget the last one.
+ *
+ * The run cache is keyed by id and variant, so without the eviction a second
+ * upload would silently show the first one's results under the new file's name
+ * -- which is exactly the class of bug the panel this replaces was made of.
+ */
+export function registerUpload(spec: ScenarioSpec): void {
+  SPECS.upload = spec;
+  for (const variant of ["integral", "max"]) cache.delete(`upload:${variant}`);
+}
 
 /** Exposed for scripts/check-corridors.ts, which validates lanes against the land mask. */
 export const SPEC_FOR_CHECK = SPECS;
@@ -1071,6 +1110,9 @@ export function buildRun(id: ScenarioId, variant: DriftVariant = "integral"): Ru
  * scenario that trips it is still rendered so the failure can be looked at.
  */
 function checkExpectation(id: ScenarioId, variant: DriftVariant, run: Run) {
+  // An uploaded scene has no authored ground truth -- that is the whole point
+  // of it -- so there is no expectation to contradict.
+  if (id === "upload") return;
   const halted = run.drift.insufficientEvidence !== null;
   const truthRows = run.suspects.filter((s) => s.isTruth);
   const say = (msg: string) =>
@@ -1490,8 +1532,19 @@ function refineAge(
 
 export { windGate, circleRing, distanceKm, bearingDeg, positionAt };
 
+/** The listing for a raster the operator supplied. Never in the picker. */
+const UPLOAD_LISTING: ScenarioListing = {
+  id: "upload",
+  name: "Uploaded image",
+  short: "Operator raster · screened outline",
+  region: "gulf-of-mexico",
+  tests: "The geometry is the uploaded image; everything downstream is simulated.",
+};
+
 export function scenarioListing(id: ScenarioId): ScenarioListing {
-  return [...SCENARIOS, ...SAMPLE_LISTINGS].find((s) => s.id === id) ?? SCENARIOS[0];
+  return (
+    [...SCENARIOS, ...SAMPLE_LISTINGS, UPLOAD_LISTING].find((s) => s.id === id) ?? SCENARIOS[0]
+  );
 }
 
 /** Clears the memo, used when the scoring variant changes shape. */

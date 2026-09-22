@@ -164,33 +164,46 @@ pack, `inventory.json`, the eleven `final-v*` split lists and `release.json`
 points at the training machine's home directory. The bytes are present and
 hash-verified; only the prefix is wrong. Full list in `DATA.md` §1.
 
-### 1.2 Real upload, real metadata
+### 1.2 Real upload, real metadata — DONE 2026-09-22
 
-Replace the fingerprint gate in `frontDemo/src/console/SampleImagePanel.tsx`.
+The fingerprint gate is gone. Any decodable raster is accepted, screened for
+a dark region by `frontDemo/src/sim/ingest.ts`, and its outline, bearing,
+length, widths and damping ratio are MEASURED off those pixels and become a
+scene the whole console runs. Verified on the corpus itself: a real 2048²
+tile screens in **66 ms** in the browser and ends with C3 correctly
+withholding attribution, which was not scripted.
 
-Accept a georeferenced sigma-0 dB GeoTIFF, a plain GeoTIFF, or a PNG/JPEG tile
-— including the 4,464 real 2048² SAR PNGs already under
-`data/processed/dataset/oos/images/`. Reject raw `.SAFE`: SNAP is an hour or
-more of CPU and belongs offline.
+Measured over 24 real labelled train tiles, stratified across all three
+source corpora (`scripts/export_ingest_fixtures.py`, then
+`npm run check:ingest`): **21 of 24 overlap a labelled slick**, 2 are
+refused as uniformly dark, 1 misses. Recall of the labelled region is
+typically 0.75–1.0 while IoU is often low — the screen finds the oil and
+over-covers, which is what a threshold does. The panel reports coverage so
+that is visible rather than hidden.
 
-Required from the user:
+**It is a threshold screen and the UI says so in those words.** It is not
+the trained segmenter, so an uploaded region is classed `slick_unknown`,
+never `oos`, and the `conf` readout carries the screen's contrast separation
+rather than an invented model score. The dB damping figure is real, derived
+through the corpus window, and the provenance states the window was assumed
+— which matters for Refined SOS tiles (DATA.md D6).
 
-| Input | How |
-|---|---|
-| The raster | drag-drop |
-| Acquisition time (UTC) | from GeoTIFF tags, else parsed from the Sentinel-1 filename, else asked for — without it there is no wind field, no AIS window and no honest time axis |
-| Location | from CRS and geotransform; if absent, a map pin plus a scale, and the run is stamped *location asserted by user* |
+Three things are asserted by the operator and stamped on the run: position,
+ground scale and acquisition time. The corpus tiles carry no georeferencing
+and no time in their names, so they cannot be derived; the time IS parsed
+when the file is named like a Sentinel-1 product.
 
-Everything else is derived: wind and current, AIS, bright targets, geometry,
-damping, wind gate, drift, origin field, age, candidates, scores, evidence.
+**Still open, and deliberately not claimed:**
 
-**Never send the science raster.** Split it: the float32 sigma-0 dB raster stays
-local (COG + DEFLATE, lossless, when it must move); the browser derives an 8-bit
-display raster through the project's fixed `DB_WINDOW = (-35.0, 0.0)` and emits
-WebP; metadata travels as a JSON sidecar. A 3.58 GB scene becomes roughly 200 KB
-of WebP plus 2 KB of JSON, and nothing is lost because the metadata was never in
-the pixels. Use the fixed window, not a per-image stretch — see
-`PREVIOUS_WORK.md` §2.2.
+- **GeoTIFF is not decoded.** The panel says so and asks for a PNG. Wiring
+  `geotiff.js` would give a real geotransform and CRS, which is the only
+  route to a position that is measured rather than asserted.
+- **The float32 sigma-0 path is not built.** `DB_WINDOW` is recorded in
+  `ingest.ts` as the constant that path would apply; PNG and JPEG input has
+  already been through it.
+- **Nothing is uploaded anywhere.** The raster never leaves the browser,
+  which is the right default and also why the WebP-sidecar split in the
+  original plan is not needed yet. It becomes necessary when §3's API exists.
 
 ### 1.3 Replace simulated data with real artifacts
 

@@ -153,6 +153,23 @@ export default function ConsoleShell() {
 
   const handleScenarioChange = useCallback((scenario: ScenarioId) => {
     scenarioSwitchRef.current = Date.now();
+    /*
+      An uploaded raster is held the way a sample is, not pushed through
+      `state.setScenario`.
+
+      The scenario machinery is keyed on ids that exist for the whole session
+      and it warms a cache over them; `upload` is replaced every time somebody
+      drops a file. Holding the built run here means a second upload cannot be
+      served from the first one's cache entry, which is the exact failure the
+      panel this replaced was made of.
+    */
+    if (scenario === "upload") {
+      setActiveDemoPreset(null);
+      setActiveDemoRun(buildRun("upload", state.variant));
+      setDemoMapStage("complete");
+      setHour(-36);
+      return;
+    }
     if (isSample(scenario)) {
       setActiveDemoPreset(scenario);
       setActiveDemoRun(buildRun(scenario, state.variant));

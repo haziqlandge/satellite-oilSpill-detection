@@ -13,7 +13,7 @@
  * demonstration actually wants to reach.
  */
 
-import { SCENARIOS, type ScenarioId } from "../sim/scenarios";
+import { SCENARIOS, type ScenarioId, scenarioListing } from "../sim/scenarios";
 import { SAMPLE_LISTINGS, isSample } from "../sim/samples";
 import type { DemoSampleKey } from "../site/demoData";
 import { Flag } from "./components";
@@ -33,7 +33,11 @@ export function SpillKey({
   onSampleSelect?: (id: DemoSampleKey) => void;
 }) {
   const pop = usePopover();
-  const current = [...SCENARIOS, ...SAMPLE_LISTINGS].find((s) => s.id === scenario) ?? SCENARIOS[0];
+  // Through the shared lookup, not a local copy of it: an uploaded raster is
+  // not in SCENARIOS or SAMPLE_LISTINGS, and a private `find` over those two
+  // silently fell back to the first scenario -- so the header announced
+  // "Moving discharge" over somebody else's image.
+  const current = scenarioListing(scenario);
 
   return (
     <>

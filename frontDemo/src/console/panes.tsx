@@ -15,7 +15,7 @@
 
 import { useMemo, type ReactNode } from "react";
 import { SarTile, boundsFor } from "../components/SarTile";
-import { SampleEvidenceImages } from "./SampleImagePanel";
+import { SampleEvidenceImages, UploadEvidenceImages } from "./SampleImagePanel";
 import { isSample } from "../sim/samples";
 import { distanceKm } from "../sim/geo";
 import { ageStatement, formatHour, stamp } from "../lib/format";
@@ -112,6 +112,7 @@ export function Detect({ run }: { run: Run }) {
     >
       <PaneBody>
         {isSample(run.meta.id) && <Block label="Uploaded SAR evidence"><SampleEvidenceImages sample={run.meta.id} /></Block>}
+        {run.meta.id === "upload" && <Block label="Uploaded SAR evidence"><UploadEvidenceImages /></Block>}
         <Block label="Scene">
           <Row label="scene" value={d.sceneId} />
           <Row label="acq" value={stamp(d.acquiredAt)} />

@@ -73,7 +73,6 @@ operational measures" claim is unsupported.
 
 | # | Issue |
 |---|---|
-| F1 | **Upload is theatre.** `SampleImagePanel.tsx` fingerprints uploads against six supplied JPGs and runs four hardcoded 5-second stages. |
 | F3 | **Nothing is wired to a backend.** All content comes from `src/sim/`. The shapes already mirror `PLAN/INTERFACES.md`, so this is a transport change, not a rewrite. |
 | F12 | **`kutch-dark` fails under the `max` drift variant**, and did so before 2026-09-22 rather than because of that day's changes. It now ranks the ground truth **3rd** with a margin of −0.012; with the displacement reverted it instead **refuses** with insufficient evidence although the scenario has a truth to name. Both are wrong and neither causes the other. `integral` — the variant the console uses — ranks it 1st at 0.6419 with a 0.0677 margin. This is the open `S_drift` question in `FUTURE_WORK.md` §5 (max over track points versus the integral of the track through the field) showing up as a concrete failing fixture, which is exactly what that item asked for. `frontDemo/scripts/check-scenarios.ts` lists it rather than silencing it. |
 | F5 | **Age interval is degenerate** — `[0, 0, 0]` for four of five scenarios. Presented honestly, but the `source_coincidence` estimator needs revisiting. |
