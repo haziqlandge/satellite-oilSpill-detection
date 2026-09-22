@@ -34,6 +34,8 @@ import { extractRibbon, parseAcquisitionTime, type Ribbon } from "../sim/ingest"
 import { decodeGeoTiff, looksLikeTiff, type GeoRaster } from "../sim/geotiff";
 import { buildUploadSpec } from "../sim/uploadSpec";
 import { registerUpload } from "../sim/scenarios";
+import { ensureLandmask } from "../sim/landmask";
+import { PositionPicker } from "./PositionPicker";
 import type { LngLat, ScenarioId } from "../sim/types";
 
 const MASK_CANVAS_CACHE = new Map<string, string>();
@@ -303,7 +305,8 @@ export function SampleEvidenceImages({ sample }: { sample: DemoSampleKey }) {
     {[["SAR input", preset.sampleImage], ["Cleaned image", preset.cleanImage], ["Screened boundary", mask]].map(([label, url]) =>
       <figure key={label} className="border" style={{ borderColor: "var(--line)" }}>
         <figcaption className="px-2 py-1 text-[10px] uppercase" style={{ color: "var(--ink-faint)" }}>{sample} · {label}</figcaption>
-        {url && <img src={url} alt={sample + " " + label} className="max-h-48 w-full object-contain bg-white" />}
+        {url && <img src={url} alt={sample + " " + label} className="mx-auto block max-h-56 object-contain"
+          style={{ background: "var(--ink-void, #0b0f12)" }} />}
       </figure>)}
   </div>;
 }
@@ -316,7 +319,8 @@ export function UploadEvidenceImages() {
     {[["Uploaded raster", current.sourceUrl], ["Screened boundary", current.maskUrl]].map(([label, url]) =>
       url ? <figure key={label} className="border" style={{ borderColor: "var(--line)" }}>
         <figcaption className="px-2 py-1 text-[10px] uppercase" style={{ color: "var(--ink-faint)" }}>{label}</figcaption>
-        <img src={url} alt={label ?? ""} className="max-h-48 w-full object-contain bg-white" />
+        <img src={url} alt={label ?? ""} className="mx-auto block max-h-56 object-contain"
+          style={{ background: "var(--ink-void, #0b0f12)" }} />
       </figure> : null)}
   </div>;
 }
@@ -376,11 +380,47 @@ export function SampleImagePanel({ onSelect }: { onSelect: (id: ScenarioId) => v
     const valid = Number.isFinite(centre[0]) && Number.isFinite(centre[1])
       && Math.abs(centre[1]) <= 90 && Math.abs(centre[0]) <= 180
       && across > 0.2 && across < 2000 && Number.isFinite(at);
-    return { centre, across, at, valid };
+    // The picker must always have something drawable, even mid-keystroke when
+    // a field is briefly "-" or empty. `valid` still gates the run button.
+    const validCentre: LngLat = [
+      Number.isFinite(centre[0]) && Math.abs(centre[0]) <= 180 ? centre[0] : -90.1,
+      Number.isFinite(centre[1]) && Math.abs(centre[1]) <= 90 ? centre[1] : 25.6,
+    ];
+    const validAcross = across > 0.2 && across < 2000 ? across : 20;
+    return { centre, across, at, valid, validCentre, validAcross };
   }, [lat, lon, acrossKm, when]);
 
-  const run = () => {
+  const [preparing, setPreparing] = useState("");
+
+  const run = async () => {
     if (!current.ribbon || !parsed.valid) return;
+    /*
+      Fetch the coastline for wherever this scene actually is, before drifting.
+
+      The generated land mask covers three coasts. An upload can be anywhere --
+      the corpus alone spans the Gulf of Guinea, the Red Sea, the Mediterranean
+      and Borneo -- and outside a known box everything reads as water, so the
+      hindcast reconstructs inland and the shipping lanes cross continents.
+      This pulls the basemap tiles for the region and classifies them, which
+      takes a moment and is worth saying so rather than freezing the button.
+
+      The radius covers the whole envelope, not the slick: the backward field is
+      widest at the far end of the horizon and the AIS lanes are wider still.
+    */
+    setPreparing("Fetching the coastline for this area");
+    try {
+      const radiusKm = Math.max(90, parsed.across * 2.5);
+      const built = await ensureLandmask(parsed.centre, radiusKm);
+      if (built.built) {
+        setPreparing(
+          `Coastline ready — ${built.tiles} tiles, ${(built.landFraction * 100).toFixed(0)}% land`,
+        );
+      }
+    } catch {
+      // A missing coastline is worth saying, not worth blocking on: the run is
+      // still honest, it simply cannot strand anything.
+      setPreparing("Coastline unavailable — drift will not strand on land");
+    }
     registerUpload(buildUploadSpec(current.ribbon, {
       centre: parsed.centre,
       acrossKm: parsed.across,
@@ -390,6 +430,7 @@ export function SampleImagePanel({ onSelect }: { onSelect: (id: ScenarioId) => v
       fileName: current.sourceName,
     }));
     publish({ state: "complete", completedAt: Date.now() });
+    setPreparing("");
     onSelect("upload");
   };
 
@@ -427,7 +468,8 @@ export function SampleImagePanel({ onSelect }: { onSelect: (id: ScenarioId) => v
 
       {current.maskUrl && <figure className="border" style={{ borderColor: "var(--line)" }}>
         <figcaption className="px-2 py-1 text-[10px] uppercase">Screened boundary · traced from your pixels</figcaption>
-        <img src={current.maskUrl} alt="screened detection boundary" className="max-h-48 w-full bg-white object-contain" data-mask-ready />
+        <img src={current.maskUrl} alt="screened detection boundary" className="mx-auto block max-h-56 object-contain"
+          style={{ background: "var(--ink-void, #0b0f12)" }} data-mask-ready />
       </figure>}
 
       {m && <div className="space-y-1 border p-2" style={{ borderColor: "var(--line)" }}>
@@ -459,20 +501,50 @@ export function SampleImagePanel({ onSelect }: { onSelect: (id: ScenarioId) => v
             ? "This GeoTIFF carries its own geotransform, so the position and scale below are measured, not stated. Edit them only if you know the file is wrong."
             : "This raster carries no georeferencing, so position and scale cannot be read from it. The run is stamped with the fact that you stated them."}</p>
         {current.geo && <div className="space-y-1 pb-1">
+          <Row label="band" value={current.geo.bandCount > 1 ? `${current.geo.band} of ${current.geo.bandCount}` : "single"} />
           <Row label="source range" value={`${current.geo.lowDb.toFixed(1)} to ${current.geo.highDb.toFixed(1)} dB`} />
-          <Row label="display window" value={current.geo.scaledThroughWindow ? "-35 to 0 dB (fixed)" : "already 8-bit"} />
+          <Row
+            label="mapped from"
+            value={current.geo.scaledThroughWindow
+              ? `${current.geo.mappedLow.toFixed(1)} to ${current.geo.mappedHigh.toFixed(1)} dB`
+              : "already 8-bit"}
+            tone={current.geo.windowFallback ? "var(--alarm)" : undefined} />
+          {current.geo.bandCount > 1 && <p className="text-[10px]" style={{ color: "var(--ink-faint)" }}>
+            {current.geo.bandNote}. The corpus band order is an unverified assumption
+            (DATA.md D5), so the band that carries more contrast is used rather than a fixed one.</p>}
+          {current.geo.windowFallback && <p className="text-[10px]" style={{ color: "var(--alarm)" }}>
+            This scene sits outside the corpus window of -35 to 0 dB, which would have clipped most
+            of it to black. Its own range was used instead, so greys here are NOT comparable with
+            other tiles.</p>}
         </div>}
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="centre lat"><input className={INPUT} style={{ borderColor: "var(--line)" }} value={lat} onChange={e => setLat(e.target.value)} inputMode="decimal" /></Field>
-          <Field label="centre lon"><input className={INPUT} style={{ borderColor: "var(--line)" }} value={lon} onChange={e => setLon(e.target.value)} inputMode="decimal" /></Field>
-        </div>
-        <Field label="image width (km)"><input className={INPUT} style={{ borderColor: "var(--line)" }} value={acrossKm} onChange={e => setAcrossKm(e.target.value)} inputMode="decimal" /></Field>
+        <Field label={current.geo ? "position from the raster — move only if it is wrong" : "click or drag to place the scene"}>
+          <PositionPicker
+            centre={parsed.validCentre}
+            acrossKm={parsed.validAcross}
+            onChange={([nextLon, nextLat]) => { setLon(String(nextLon)); setLat(String(nextLat)); }}
+          />
+        </Field>
+        <Field label="image width (km) — the green box is this much ground">
+          <input className={INPUT} style={{ borderColor: "var(--line)" }} value={acrossKm}
+            onChange={e => setAcrossKm(e.target.value)} inputMode="decimal" />
+        </Field>
+        <details>
+          <summary className="cursor-pointer text-[10px] uppercase" style={{ color: "var(--ink-faint)" }}>
+            type coordinates instead
+          </summary>
+          <div className="mt-1 grid grid-cols-2 gap-2">
+            <Field label="centre lat"><input className={INPUT} style={{ borderColor: "var(--line)" }} value={lat} onChange={e => setLat(e.target.value)} inputMode="decimal" /></Field>
+            <Field label="centre lon"><input className={INPUT} style={{ borderColor: "var(--line)" }} value={lon} onChange={e => setLon(e.target.value)} inputMode="decimal" /></Field>
+          </div>
+        </details>
         <Field label={`acquisition UTC${current.parsedAcquiredAt ? " · parsed from file name" : " · not in the file name"}`}>
           <input className={INPUT} style={{ borderColor: "var(--line)" }} type="datetime-local" value={when} onChange={e => setWhen(e.target.value)} />
         </Field>
-        <button type="button" disabled={!parsed.valid} onClick={run}
+        <button type="button" disabled={!parsed.valid || !!preparing} onClick={() => void run()}
           className="w-full cursor-pointer border px-3 py-2 text-[11px] uppercase disabled:cursor-not-allowed disabled:opacity-40"
-          style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>Run this image</button>
+          style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>
+          {preparing ? "Preparing…" : "Run this image"}</button>
+        {preparing && <p className="text-[10px]" style={{ color: "var(--ink-faint)" }}>{preparing}</p>}
         {current.key && <button type="button" onClick={() => onSelect(current.key!)}
           className="w-full cursor-pointer border px-3 py-2 text-[11px] uppercase"
           style={{ borderColor: "var(--line)" }}>Or open the authored {current.key} scenario</button>}

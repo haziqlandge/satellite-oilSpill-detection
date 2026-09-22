@@ -149,6 +149,7 @@ def run_ensemble(
     readers: list[Any] | None = None,
     seed: int = 0,
     time_step_s: int | None = None,
+    coastline_action: str | None = None,
 ) -> EnsembleResult:
     """Run `members` perturbed drift simulations and stack their histories.
 
@@ -201,6 +202,7 @@ def run_ensemble(
                 horizontal_diffusivity=member.horizontal_diffusivity,
                 wind_drift_factor=member.wind_drift_factor,
                 time_step_s=time_step_s or DEFAULT_TIME_STEP_S,
+                coastline_action=coastline_action,
             )
         except (DriftError, ValueError, RuntimeError) as error:
             failures.append(f"member {member.index}: {error}")

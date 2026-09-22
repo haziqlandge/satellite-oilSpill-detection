@@ -42,10 +42,43 @@ over patching per machine.
 
 | Record | Name | On disk | Contents |
 |---|---|---|---|
-| `8346860` | Part I | **53 GB** | 1,200 oil-positive images + masks. 1-band 2048², values `{0,1}`, **not georeferenced** |
+| `8346860` | Part I | **53 GB** | 1,200 oil-positive scenes + masks. The SCENES are **2-band float32 sigma-0 dB, 2048², and georeferenced EPSG:4326**; the MASKS are the 1-band `{0,1}` uint8 rasters with no transform. See §2.1 — this row described the masks and was applied to both. |
 | `13761290` | Part III | **16 GB** | 150 each of `Oil`, `Lookalike`, `No oil`, plus `Mask/` |
 | `15298010` | Refined Deep-SAR SOS | **1.4 GB** | 6,455 train + 1,615 val pairs, 3-band RGB 256², values `{0,255}` |
 | `8253899` | Part II | **not extracted** | Only two mask archives (426 KB + 417 KB). The two ~21 GB image archives were never downloaded. See `ISSUES.md` B3 |
+
+### 2.1 The source scenes ARE georeferenced — corrected 2026-09-22
+
+This document said Part I was "not georeferenced". That is true of the **mask**
+files and false of the **scenes**, and the two sit in sibling directories under
+the same file name, so the claim survived unchallenged.
+
+Measured with rasterio over a random sample of each:
+
+| | georeferenced | bands | dtype |
+|---|---|---|---|
+| `01_Train_Val_Oil_Spill_images/Oil/*.tif` | **4 of 4** | 2 | float32 |
+| `01_Train_Val_Oil_Spill_mask/Mask_oil/*.tif` | 0 of 4 | 1 | uint8 |
+| `02_Test_images_and_ground_truth/Images/Oil/*.tif` | **4 of 4** | 2 | float32 |
+
+The scenes carry EPSG:4326 and real world positions, and the corpus is global
+rather than regional: sampled south-west corners landed in the Gulf of Guinea
+(11.19, −4.78), the Red Sea (39.22, 20.24), the Mediterranean (33.07, 33.28),
+the **Gulf of Mexico** (−90.49, 26.96) and off Borneo (116.47, −3.87).
+
+**What this changes.** Anything working from the derived PNGs under
+`data/processed/dataset/` genuinely has no position — the geotransform is lost
+when the tiles are written — but anything that can read the source TIFF has a
+measured one. The console's upload path reads it
+(`frontDemo/src/sim/geotiff.ts`), which is the difference between a position an
+operator asserted and a position the file states.
+
+**Two traps that come with them.** The dB range is NOT inside the corpus window
+of −35 to 0: measured scenes span −49.5 to −20.1 dB and −39.0 to −27.3 dB, so
+mapping them through the fixed window clips most of the scene to black. And the
+band order is still the open question D5 records — measured, band 1 carries the
+wider spread in one scene (sd 3.12 against 1.82) and band 2 in another (2.20
+against 0.78), so it is not consistent and must not be hardcoded.
 
 Every record disagrees with the others on every convention that matters, and
 each disagreement is silent. The traps are documented in `PREVIOUS_WORK.md`;

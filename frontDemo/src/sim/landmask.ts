@@ -21,6 +21,7 @@
  */
 
 import { LAND_BOXES, type LandBox } from "./landmask.generated";
+import type { LngLat } from "./types";
 
 interface Decoded extends LandBox {
   bytes: Uint8Array;
@@ -48,7 +49,9 @@ function boxes(): Decoded[] {
 
 /** True when this coordinate is dry ground. */
 export function isLand(lon: number, lat: number): boolean {
-  for (const box of boxes()) {
+  // Runtime boxes first: they are built for the region actually in use, so
+  // where both cover a point the runtime one was fetched on purpose.
+  for (const box of [...runtime, ...boxes()]) {
     if (lon < box.west || lon >= box.east || lat < box.south || lat >= box.north) continue;
     const col = Math.floor((lon - box.west) / box.cell);
     const row = Math.floor((lat - box.south) / box.cell);
@@ -77,4 +80,180 @@ export function landFraction(
     if (isLand(from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t)) ashore++;
   }
   return ashore / steps;
+}
+
+/* ------------------------------------------------------------------ *
+ * Land anywhere on Earth, built on demand
+ * ------------------------------------------------------------------ */
+
+/**
+ * The generated boxes cover three coasts. An upload can be anywhere.
+ *
+ * The corpus is global -- sampled scene corners land in the Gulf of Guinea, the
+ * Red Sea, the Mediterranean, the Gulf of Mexico and off Borneo (DATA.md 2.1)
+ * -- and outside every generated box `isLand` answers "water". That is the
+ * right default for open ocean and catastrophically wrong beside a coast nobody
+ * pre-generated: drift reconstructed inland, forecasts crossing peninsulas,
+ * shipping lanes drawn over continents. All of that is this one gap.
+ *
+ * Shipping a global coastline was the obvious alternative and it is a bad
+ * trade. A dataset coarse enough to ship is too coarse for islands and deltas;
+ * one fine enough for a delta is far too large for a static page.
+ *
+ * So the mask is built for the region actually in use, from the very basemap
+ * tiles the map draws, with the same blue-minus-red classification and the same
+ * 0.005 degree cells as `scripts/build_landmask.py`. One method, and the
+ * shoreline the physics respects is the shoreline on screen.
+ *
+ * Tiles are read with `crossOrigin` so the canvas stays untainted. That was
+ * verified against the live service before any of this was written, because a
+ * tainted canvas cannot be read back and would have made the approach
+ * impossible rather than merely slow.
+ */
+
+const TILE_URL =
+  "https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile";
+const TILE_ZOOM = 10;
+const TILE_PX = 256;
+/** Documented in scenarios.ts: water runs +36..+58, land -3..-11. */
+const WATER_THRESHOLD = 12;
+const CELL_DEG = 0.005;
+
+const runtime: Decoded[] = [];
+const pending = new Map<string, Promise<void>>();
+
+const lonToTileX = (lon: number) => ((lon + 180) / 360) * 2 ** TILE_ZOOM;
+function latToTileY(lat: number): number {
+  const r = (lat * Math.PI) / 180;
+  return ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * 2 ** TILE_ZOOM;
+}
+
+async function tilePixels(x: number, y: number): Promise<Uint8ClampedArray | null> {
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image();
+      element.crossOrigin = "anonymous";
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error("tile failed"));
+      element.src = `${TILE_URL}/${TILE_ZOOM}/${y}/${x}`;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = TILE_PX;
+    canvas.height = TILE_PX;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.drawImage(image, 0, 0, TILE_PX, TILE_PX);
+    return ctx.getImageData(0, 0, TILE_PX, TILE_PX).data;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether an already-decoded box fully contains this area. */
+function covered(west: number, south: number, east: number, north: number): boolean {
+  for (const box of [...runtime, ...boxes()]) {
+    if (box.west <= west && box.south <= south && box.east >= east && box.north >= north) return true;
+  }
+  return false;
+}
+
+export interface LandmaskBuild {
+  built: boolean;
+  cells: number;
+  tiles: number;
+  landFraction: number;
+}
+
+/**
+ * Ensure land is known around `centre` out to `radiusKm`, fetching if it is not.
+ *
+ * Concurrent calls for the same area share one fetch: an upload and the drift
+ * it starts both want the answer and neither should pull the tiles twice.
+ */
+export async function ensureLandmask(centre: LngLat, radiusKm: number): Promise<LandmaskBuild> {
+  const latPad = radiusKm / 110.574;
+  const lonPad = radiusKm / Math.max(1, 111.32 * Math.cos((centre[1] * Math.PI) / 180));
+  const west = Math.max(-180, centre[0] - lonPad);
+  const east = Math.min(180, centre[0] + lonPad);
+  const south = Math.max(-85, centre[1] - latPad);
+  const north = Math.min(85, centre[1] + latPad);
+  const idle: LandmaskBuild = { built: false, cells: 0, tiles: 0, landFraction: 0 };
+  if (covered(west, south, east, north)) return idle;
+
+  const key = [west, south, east, north].map((v) => v.toFixed(3)).join(",");
+  const inFlight = pending.get(key);
+  if (inFlight) {
+    await inFlight;
+    return idle;
+  }
+
+  const work = (async (): Promise<LandmaskBuild> => {
+    const nx = Math.max(1, Math.round((east - west) / CELL_DEG));
+    const ny = Math.max(1, Math.round((north - south) / CELL_DEG));
+
+    const x0 = Math.floor(lonToTileX(west));
+    const x1 = Math.floor(lonToTileX(east));
+    const y0 = Math.floor(latToTileY(north));
+    const y1 = Math.floor(latToTileY(south));
+    const tiles = new Map<string, Uint8ClampedArray | null>();
+    const jobs: Promise<void>[] = [];
+    for (let tx = x0; tx <= x1; tx++) {
+      for (let ty = y0; ty <= y1; ty++) {
+        jobs.push(tilePixels(tx, ty).then((data) => void tiles.set(`${tx}/${ty}`, data)));
+      }
+    }
+    await Promise.all(jobs);
+
+    // Four samples per cell, majority land -- exactly as the Python does, so a
+    // single pixel of levee cannot seal a channel.
+    const bytes = new Uint8Array(Math.ceil((nx * ny) / 8));
+    let land = 0;
+    const offsets = [0.25, 0.75];
+    for (let row = 0; row < ny; row++) {
+      for (let col = 0; col < nx; col++) {
+        let votes = 0;
+        for (const fy of offsets) {
+          const lat = south + (row + fy) * CELL_DEG;
+          const tyF = latToTileY(lat);
+          const ty = Math.floor(tyF);
+          const py = Math.min(TILE_PX - 1, Math.floor((tyF - ty) * TILE_PX));
+          for (const fx of offsets) {
+            const lon = west + (col + fx) * CELL_DEG;
+            const txF = lonToTileX(lon);
+            const tx = Math.floor(txF);
+            const px = Math.min(TILE_PX - 1, Math.floor((txF - tx) * TILE_PX));
+            const data = tiles.get(`${tx}/${ty}`);
+            if (!data) continue;
+            const p = (py * TILE_PX + px) * 4;
+            if (data[p + 2] - data[p] < WATER_THRESHOLD) votes++;
+          }
+        }
+        if (votes >= 2) {
+          const index = row * nx + col;
+          bytes[index >> 3] |= 1 << (index & 7);
+          land++;
+        }
+      }
+    }
+
+    runtime.push({
+      name: `runtime:${key}`,
+      west, south, east, north, nx, ny, cell: CELL_DEG,
+      bits: "",
+      bytes,
+    });
+    return { built: true, cells: nx * ny, tiles: tiles.size, landFraction: land / (nx * ny) };
+  })();
+
+  pending.set(key, work.then(() => undefined));
+  try {
+    return await work;
+  } finally {
+    pending.delete(key);
+  }
+}
+
+/** How many regions have been fetched at runtime. For tests and reporting. */
+export function runtimeBoxCount(): number {
+  return runtime.length;
 }

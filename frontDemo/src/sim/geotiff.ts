@@ -47,6 +47,15 @@ export interface GeoRaster {
   highDb: number;
   /** Whether the source was float sigma-0 dB rather than already 8-bit. */
   scaledThroughWindow: boolean;
+  /** Which band was used, 1-based, and why. */
+  band: number;
+  bandCount: number;
+  bandNote: string;
+  /** The dB range actually mapped to 0-255. */
+  mappedLow: number;
+  mappedHigh: number;
+  /** True when the corpus window would have clipped most of the data away. */
+  windowFallback: boolean;
 }
 
 export type GeoTiffOutcome =
@@ -107,12 +116,28 @@ export async function decodeGeoTiff(file: File): Promise<GeoTiffOutcome> {
 
   const keys = image.getGeoKeys() ?? {};
   const epsg = Number(keys.ProjectedCSTypeGeoKey ?? keys.GeographicTypeGeoKey ?? 0);
-  const bbox = image.getBoundingBox();
+  // `getBoundingBox` THROWS on a TIFF with no affine transform rather than
+  // returning nothing, and an uncaught throw here surfaced as the generic
+  // "could not be decoded" -- which tells an operator nothing about why. The
+  // corpus ships masks beside its scenes under the same file name, so this is
+  // the most likely wrong file to drop and it deserves a real answer.
+  let bbox: number[] | null = null;
+  try {
+    bbox = image.getBoundingBox();
+  } catch {
+    bbox = null;
+  }
   const hasExtent =
+    bbox !== null &&
     Array.isArray(bbox) && bbox.length === 4 && bbox.every((v) => Number.isFinite(v)) &&
     bbox[2] !== bbox[0] && bbox[3] !== bbox[1];
   if (!hasExtent) {
-    return { ok: false, reason: "This TIFF carries no geotransform, so it has no position to read." };
+    return {
+      ok: false,
+      reason:
+        "This TIFF has no affine transform, so it carries no position. Corpus mask files are " +
+        "like this — use the scene from the Images directory, not the one from Mask.",
+    };
   }
   if (keys.ProjectedCSTypeGeoKey || (epsg && epsg !== 4326)) {
     return {
@@ -122,46 +147,133 @@ export async function decodeGeoTiff(file: File): Promise<GeoTiffOutcome> {
         "Reprojecting here would risk placing the scene in the wrong ocean.",
     };
   }
-  const [west, south, east, north] = bbox;
+  const [west, south, east, north] = bbox as number[];
   if (Math.abs(west) > 180 || Math.abs(east) > 180 || Math.abs(south) > 90 || Math.abs(north) > 90) {
     return { ok: false, reason: "The geotransform is not in degrees; only EPSG:4326 is read." };
   }
 
+  /*
+    Which band, decided by measurement rather than by assumption.
+
+    DATA.md D5 records that the VV/VH band order in this corpus is an
+    ASSUMPTION -- it was never read from metadata -- and that one band was found
+    to carry about 0.51 dB of contrast, which is no signal at all. Measured
+    across two real corpus scenes the order is not even consistent: band 1
+    carries the wider spread in the Part I file (sd 3.12 against 1.82) and band 2
+    in the Part III file (2.20 against 0.78).
+
+    So the band with the greater standard deviation is used. That is a
+    measurement of which band can discriminate anything, it is stated in the
+    panel, and it does not pretend to have resolved D5. Hardcoding band 2 would
+    have silently screened the Part I scene on its flattest channel.
+  */
+  const bandCount = Math.max(1, image.getSamplesPerPixel());
   let raster: ArrayLike<number>;
+  let band = 1;
+  let bandNote = "single band";
   try {
-    const bands = (await image.readRasters({ samples: [0] })) as ArrayLike<number>[];
-    raster = bands[0];
+    const candidates: { index: number; data: ArrayLike<number>; sd: number }[] = [];
+    for (let s = 0; s < Math.min(bandCount, 4); s++) {
+      const read = (await image.readRasters({ samples: [s] })) as ArrayLike<number>[];
+      const data = read[0];
+      let sum = 0;
+      let n = 0;
+      for (let i = 0; i < data.length; i += 7) {
+        const v = data[i];
+        if (Number.isFinite(v)) { sum += v; n++; }
+      }
+      const mean = n ? sum / n : 0;
+      let variance = 0;
+      for (let i = 0; i < data.length; i += 7) {
+        const v = data[i];
+        if (Number.isFinite(v)) variance += (v - mean) ** 2;
+      }
+      candidates.push({ index: s, data, sd: n ? Math.sqrt(variance / n) : 0 });
+    }
+    const best = candidates.reduce((a, b) => (b.sd > a.sd ? b : a));
+    raster = best.data;
+    band = best.index + 1;
+    if (bandCount > 1)
+      bandNote = `band ${band} of ${bandCount}, chosen for the wider spread (sd ${best.sd.toFixed(2)} dB)`;
   } catch {
     return { ok: false, reason: "The raster bands could not be read." };
   }
 
   /*
-    Float sigma-0 dB becomes 8-bit through the project's FIXED window.
+    Float sigma-0 dB becomes 8-bit, through the corpus window WHERE THAT WORKS.
 
-    Not a per-image stretch. Two tiles rendered through their own min and max
-    are on two different scales, and a grey value then means nothing between
-    them -- which is the defect DATA.md D6 records in the corpus itself. Using
-    the recorded window means an uploaded GeoTIFF is on the same scale as every
-    PNG the screen has ever seen, so one threshold is meaningful for both.
+    The fixed window exists for a good reason: two tiles stretched to their own
+    min and max are on two different scales and a grey value means nothing
+    between them, which is the defect DATA.md D6 records in the corpus itself.
+    So the recorded window is tried first.
+
+    It does not always fit. Measured on real corpus GeoTIFFs, the Part I scene
+    spans -48.5 to -21.4 dB and the Part III scene -39.0 to -27.3 dB, while the
+    window is -35 to 0. Mapping the first through it sends everything below -35
+    to pure black and compresses the rest into the bottom third of the scale;
+    the second nearly vanishes. That is not a display preference, it destroys
+    the contrast the screen then has to threshold, and a screen run on a black
+    image finds nothing.
+
+    So: if the window would clip more than a fifth of the pixels, the raster's
+    own robust range is used instead and the panel SAYS which mapping it got.
+    Comparability across tiles is the thing being traded away, and it is worth
+    naming rather than losing silently.
   */
-  const [lowDb, highDb] = DB_WINDOW;
+  const [windowLow, windowHigh] = DB_WINDOW;
   let min = Infinity;
   let max = -Infinity;
+  let finiteCount = 0;
+  let clipped = 0;
   for (let i = 0; i < raster.length; i++) {
     const v = raster[i];
     if (!Number.isFinite(v)) continue;
+    finiteCount++;
     if (v < min) min = v;
     if (v > max) max = v;
+    if (v < windowLow || v > windowHigh) clipped++;
   }
+  if (!finiteCount) return { ok: false, reason: "The raster holds no finite values." };
+
   // Already-8-bit data is passed through; only dB-scaled values are windowed.
-  const scaledThroughWindow = min < 0 || max <= 1;
-  const span = highDb - lowDb;
+  const scaledThroughWindow = min < 0;
+  const clipFraction = clipped / finiteCount;
+  const windowFallback = scaledThroughWindow && clipFraction > 0.2;
+
+  /*
+    A near-binary raster is a label mask, not an image.
+
+    The corpus ships masks beside its scenes under names that differ only by a
+    directory, so dropping one is an easy mistake, and screening a mask returns
+    a confident outline of the answer rather than of the oil. Two distinct
+    values over a 2048 square raster is not a SAR scene.
+  */
+  if (max - min <= 1.0001 && finiteCount > 1000) {
+    return {
+      ok: false,
+      reason:
+        `This raster holds only values ${min} to ${max}, which is a label mask rather than a ` +
+        "SAR image. Use the scene from the Images directory, not the one from Mask.",
+    };
+  }
+
+  let mappedLow = windowLow;
+  let mappedHigh = windowHigh;
+  if (!scaledThroughWindow) {
+    mappedLow = 0;
+    mappedHigh = 255;
+  } else if (windowFallback) {
+    mappedLow = min;
+    mappedHigh = max;
+  }
+  const span = mappedHigh - mappedLow || 1;
+
   const rgba = new Uint8ClampedArray(width * height * 4);
   for (let i = 0; i < width * height; i++) {
     const value = raster[i];
     let grey: number;
     if (!Number.isFinite(value)) grey = 0;
-    else if (scaledThroughWindow) grey = Math.round(((value - lowDb) / span) * 255);
+    else if (scaledThroughWindow) grey = Math.round(((value - mappedLow) / span) * 255);
     else grey = Math.round(value);
     const clamped = grey < 0 ? 0 : grey > 255 ? 255 : grey;
     const p = i * 4;
@@ -189,9 +301,13 @@ export async function decodeGeoTiff(file: File): Promise<GeoTiffOutcome> {
     ok: true,
     raster: {
       rgba, width, height, centre, acrossKm, acquiredAt,
-      lowDb: Number.isFinite(min) ? min : lowDb,
-      highDb: Number.isFinite(max) ? max : highDb,
+      lowDb: +min.toFixed(2),
+      highDb: +max.toFixed(2),
       scaledThroughWindow,
+      band, bandCount, bandNote,
+      mappedLow: +mappedLow.toFixed(2),
+      mappedHigh: +mappedHigh.toFixed(2),
+      windowFallback,
     },
   };
 }

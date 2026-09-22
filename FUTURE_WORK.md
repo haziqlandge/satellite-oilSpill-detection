@@ -10,150 +10,160 @@ session machine. See `CLAUDE.md` §1.
 
 ## 0. Start here — where the 2026-09-22 session stopped
 
-Read `CLAUDE.md` first, then this section, then §1. **Delete this section when
-its contents are done** — do not append a second one, or this file becomes the
-`HANDOFF.md` that was just removed.
+Read `CLAUDE.md` first, then this section. **Delete this section when its
+contents are done** — do not append a second one.
 
 ### The situation
 
-Three days to a **local** demo. The frontend must be top-tier; the backend can
-stay file-driven. After the demo, the public site goes to Cloudflare (§4). The
-user is Haziq; commit as them via the `commitskill` skill and **never add AI
-attribution** — this is an academic/competition submission and authorship
-matters.
+A **local** demo. The frontend must be top-tier; the backend can stay
+file-driven. The user is Haziq; commit as them via `commitskill` and **never add
+AI attribution** — authorship matters for this submission.
 
-### What the 2026-09-22 session did
+### What landed on 2026-09-22
 
-| Commit | What |
-|---|---|
-| `6ef8039` | Committed the training machine's uncommitted work — 238 files |
-| `7d41224` | Merged `origin/main`; the real frontend is now local |
-| `da1320f` | Tracked the weights manifest |
-| `49d03d0` | 11 handoff docs (311 KB) → 6 living docs |
-| `1496436` | Frontend README; recorded the maplibre advisory |
-| `781c815` | **Fixed the drift ensemble time anchor** — see `ISSUES.md` X9 |
-| `16d4d8d` | Continuous playhead for the particle cloud; restored the release layer |
+ERA5 unblocked (licence accepted, verified with a real fetch). Repo-relative
+paths. The faked hindcast deleted and replaced by the ensemble's own backward
+leg. A land mask. Two scenes displaced to open water. Real discharge profiles. A
+real renderer. A real upload path. GeoTIFF reading. And the first real OpenDrift
+runs this project has produced — three scenes, ERA5-forced, exported to
+`frontDemo/public/runs/*/drift.json`, validated by `npm run check:realdrift`.
 
-Baseline is **465 passed, 9 skipped**. `run.bat` is the backend menu;
-`npm run dev --prefix frontDemo` serves the UI on port 5180.
+Of those three, the December scene reports **`convergence_minimum`** and returns
+an actual age triple. That is the first age this system has produced that is a
+number rather than a refusal, and it took genuine time-varying wind.
 
-### What is in flight, and exactly how far
+### THE NEXT JOB, and it is one job: replace the land mask with a real one
 
-**The animation is half-fixed and NOT verified.** The root cause was found and
-addressed; the renderer is untouched.
+This is the top priority and the user has now raised it three times. Everything
+else is downstream of it.
 
-Found: `Timeline.tsx:249` only ever emitted whole hours, for a good reason —
-changing `hour` rebuilds every AIS track, both origin contours and the release
-extent. `ParticleOverlay` is the single consumer that interpolates, so feeding
-it integers pinned its blend factor at zero and turned a drift animation into a
-slideshow advancing once per simulated hour.
+**The failure.** Uploads drift and draw AIS over land — seen on Bali and Java,
+where every shipping lane crosses the island. The cause is not a bug in the
+mask; it is that the mask barely exists. `frontDemo/src/sim/landmask.generated.ts`
+covers **three hand-drawn boxes** (Gulf of Mexico, Kutch, Mumbai) and `isLand`
+answers **water** everywhere else. The corpus is global — DATA.md §2.1 records
+scenes in the Gulf of Guinea, the Red Sea, the Mediterranean and off Borneo — so
+almost every upload lands outside every box.
 
-Done: `lib/playhead.ts` publishes the fractional hour outside React; the canvas
-subscribes and repaints from its own rAF loop. `tsc -b` is clean and the
-production build passes.
+**What is already built toward this.** `ensureLandmask(centre, radiusKm)` in
+`frontDemo/src/sim/landmask.ts` fetches basemap tiles for an arbitrary region,
+classifies them and registers a runtime box. Verified working: 42 tiles,
+119,316 cells, 26.7% land, 1.95 s for the Persian Gulf, correctly separating the
+Saudi coast from open water. The upload path calls it before drifting.
 
-**Verified on 2026-09-22.** The cloud does move between whole hours. Method,
-so nobody has to invent it again: read the overlay canvas at full resolution
-with `getImageData`, keep every pixel whose alpha is non-zero, and take the
-alpha-weighted centroid — the sparse-stride hash the first attempt used could
-not see a haze drawn at alpha 0.16. Sample every ~90 ms at 1 simulated hour per
-second and group the samples by the `T±Nh` readout. Measured:
+**Why that is still not enough.** It is on-demand, so the first run in a new
+region waits ~2 s for tiles; it depends on a third-party raster service at
+runtime; it classifies a *picture* of a coastline rather than a coastline; and
+**nothing else uses it** — the corridor generator in `sim/ais.ts` and
+`buildTraffic` consult no mask at all, which is why lanes cross Bali.
 
-| Displayed hour | Samples | Distinct centroids | Centroid travel (px) |
-|---|---|---|---|
-| T−36h | 11 | 3 | (443.67, 483.20) → (443.27, 480.72) |
-| T−35h | 17 | 8 | (443.28, 480.08) → (442.56, 475.34) |
-| T−34h | 17 | 8 | (442.39, 474.80) → (441.78, 470.15) |
+Do it properly:
 
-Eight distinct positions inside one stationary whole hour. Before the fix that
-column was 1 by construction. Fewer distinct centroids than samples is the
-probe's own fault, not the renderer's — a full-canvas `getImageData` per sample
-starves the page's `requestAnimationFrame`.
+1. **Ship real coastline geometry.** Natural Earth 10m `land` plus
+   `minor_islands` is public domain, about 10 MB as a shapefile, and a few
+   hundred kB as simplified TopoJSON. Add a script beside
+   `scripts/build_landmask.py` that fetches it, clips to the regions in use and
+   emits it. Keep the raster mask as the fast lookup but **rasterise the
+   polygons into it** instead of sampling a basemap picture, so the classifier
+   is geometry rather than pixel colour.
+2. **Make land a constraint on AIS, not only on drift.** `buildTraffic` should
+   reject a corridor whose centreline or lateral scatter crosses land and
+   resample it. `landFraction` already exists and `npm run check:corridors`
+   already tests the authored lanes; uploads generate corridors at runtime and
+   are tested by nothing.
+3. **Keep one source of truth.** The backend uses OpenDrift's GSHHS landmask and
+   the frontend uses its own. They disagree at the shore, which is why
+   `overlayFrames` has to nudge parcels to water and report the count. If the
+   frontend moves to Natural Earth, write down which one is authoritative.
 
-**The renderer is done too, and §1.4 with it.** Pre-rendered radial stamp
-instead of `fillRect`, Catmull-Rom across four frames instead of the linear
-lerp, a fading trail instead of `clearRect`, per-parcel size and brightness.
-Position is never jittered -- that would invent the one thing the view
-claims. The first draft was far too bright and the measurement said why:
-the stamp held full opacity to 45% of its radius, so under additive
-blending **51.4% of lit pixels clipped to white**. Fading from the centre
-instead took that to **0%**. If you touch the weights, measure that number
-rather than judging by eye -- a blown-out cloud looks confident and carries
-no density at all.
+### Then: the three UI defects the user named
 
-### The thing the user noticed, and it was right
+- **Framing.** Previews were letterboxed in white; fixed. The raster is still
+  decimated to 1024 for screening, which is deliberate — speckle averaging, and
+  it is the cheap first pass PHASE-03 describes — but running locally there is
+  no reason not to raise `SCREEN_MAX` in `sim/ingest.ts` and show the full
+  raster.
+- **Position by map pin.** Done — `console/PositionPicker.tsx` replaces the
+  latitude and longitude boxes with a map, a draggable marker and a footprint
+  box, with the numeric fields kept behind a disclosure. **Not yet reviewed by
+  the user; confirm it before building on it.**
+- **Wire the real runs into the console.** The artifacts and the loader
+  (`sim/realDrift.ts`) exist; nothing selects them yet. That is the remaining
+  half of §1.3.
 
-> "animation from t negative x to t0 are just t0 but scaled down"
+### The question the user asked, answered
 
-Exactly right, and literally so: `lib/reconstruction.ts` applied a uniform
-scale about a moving centre to the T0 cloud for every negative hour. A
-similarity transform preserves shape exactly, which is why the aspect ratio
-was locked and why all eight scenarios looked alike -- one function,
-different hand-tuned constants. The area and spread readouts were derived
-from the same fake scale.
+> "is the model not trained properly, it's clearly marking empty ocean as oil"
 
-**Resolved 2026-09-22.** The module is deleted and the simulated ensemble's
-own backward leg shows through; it had been computing one all along.
-`frontDemo/scripts/check-hindcast.ts` guards the regression by asserting the
-cloud changes shape and bearing across the backward leg, both of which a
-similarity transform holds at exactly zero.
+**The trained model is not running.** It has never run in the browser. What
+marks the region is a dark-region Otsu screen in `sim/ingest.ts`, and the panel
+says so in those words. The checkpoint exists at
+`runs/final_l1_fp32_release/L1-ciou/weights/best.pt` (6.6 MB, one class), the
+ONNX exporter exists at `ml/export/export.py` and has never been run, and
+`backend/app/__init__.py` is 0 bytes — there is no API and no in-browser
+inference.
 
-### Proven feasible on this machine — do not re-derive
+The specific failure in that screenshot is a frame with **separation 0.04 and
+damping −1.25 dB** — essentially no contrast anywhere — and the screen returned
+25% of it. A threshold cannot do better on a frame with no contrast, and tuning
+one is not the fix: `ISSUES.md` F11b records that contrast separation does
+**not** cleanly divide the good cases from the bad.
 
-- **The real drift chain runs on CPU in 89 seconds.** 10 members x 200
-  particles, 72 h backward, seeded from a real detection centroid. It produces
-  a `(433, 2000)` history, a `(433, 42, 51)` origin field, contours and an age
-  estimate. OpenDrift 1.14.11, netCDF4, xarray and copernicusmarine are all
-  installed and import cleanly.
-- `eval/final/scenes/*.geojson` hold **three real full-scene detections**
-  (86 / 240 / 40 polygons, EPSG:4326) and are map-ready today. Largest-polygon
-  centroids: `-89.686, 29.609`; `-89.011, 28.954`; `-89.667, 29.614`.
-- With constant forcing the age estimate correctly returns `monotonic` /
-  `indeterminate` — there is no convergence minimum without spatially varying
-  flow. That is right behaviour rather than a bug, but it makes for a weak
-  demo. Real forcing is what gives the hindcast structure.
+**So do §4.1 and make it real:** export to fp16 ONNX (~6 MB at 2.9 M
+parameters) and run it with `onnxruntime-web` on WebGPU, WASM as the fallback.
+No backend, no server GPU, runs on the visitor's hardware — and it also answers
+§4.2, since Cloudflare cannot host custom weights. Be honest about what it
+buys: mAP50 is **.364** against a .90 target (Q1) and small-instance recall is
+**.11** (Q4). A real detector, and not a good one.
 
-### Blocked on the user
+### One correction to carry forward
 
-1. **ERA5 licence.** The CDS credentials authenticate — a 403 specifically on
-   licences proves it. The account has simply not accepted the ERA5 licence:
-   `https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels?tab=download#manage-licences`
-   One click. Until then the only available forcing is constant. The probe
-   script is in the session scratchpad as `cds_probe.py`.
-2. **`PLAN/INDEX.md` lines 100-105** still say `frontDemo/` "is owned by a
-   separate session. Do not edit it from the backend track." True when the
-   trees were split, wrong now. It is protected canon — ask before changing it.
-3. **CMEMS has no credentials at all** (`ISSUES.md` X2), so there are no real
-   currents, only wind.
+The user is right that look-alike data exists, and the "no look-alike data"
+framing that has been repeated is wrong.
+`13761290/02_Test_images_and_ground_truth/Images/` ships **150 Lookalike and 150
+No oil**, and they are already in the built corpus: **289 Lookalike and 271
+No_oil tiles**, 560 negatives against 2,577 Oil (~18%). What `ISSUES.md`
+actually says is narrower, and both parts remain true — **Part II's** additional
+~42 GB was never downloaded (B3), and only **11 named look-alike tiles** exist
+in the *test* split (Q2), which is a thin evaluation sample rather than absent
+training data. Say it that way from now on.
 
-### Traps this session hit, so the next one does not
+### Traps already paid for
 
-- **`.venv/pyvenv.cfg` pointed at the other machine's Python** and nothing ran.
-  Fixed. The same stale prefix (the training machine's home directory) is in
-  the annotation pack, `inventory.json`, every `final-v*` split list and
-  `release.json` — see `DATA.md` §1. Nothing that reads those verbatim will run.
-- **`npm install --prefix frontDemo` fails on npm 10+**; it resolves
-  `package.json` from the working directory. Use `cd frontDemo && npm install`.
-  `npm run --prefix` is unaffected.
-- **Browser probes race the map's async `load`.** Querying the DOM at three
-  seconds showed no overlay canvas and led to a wrong conclusion about
-  StrictMode being at fault. It was not. Wait until `.maplibregl-map` has a
-  bare `<canvas>` child before asserting anything about the overlay.
-- **The drift engine requires naive UTC datetimes** and dies deep inside pandas
-  on tz-aware ones (`ISSUES.md` X10). An ISO-8601 acquisition time parsed from
-  GeoTIFF metadata is naturally tz-aware, so any real ingest path hits this.
-- **`git add -A` used to sweep in 169 MB** of derived eval caches. Now
-  gitignored, but check `git status` before staging.
+- **`times` descends on a backward run.** `times[0]` is the observation.
+- **The drift engine needs naive UTC datetimes** (X10).
+- **`json.dumps` writes a bare `NaN`** that `JSON.parse` refuses. The first
+  drift export was unloadable and looked fine on disk. `check-real-drift.ts`
+  parses every artifact for exactly this reason.
+- **`coastline_action` was `none` for backward runs** while the docstring said
+  `previous`, so parcels walked inland. Fixed; it was 11.8%, 21.2% and 33.3% of
+  rendered parcels.
+- **Otsu finds the sea, not the oil,** on a real scene that is ~90% water. Now
+  re-applied inside the dark class and disclosed as "split Nx" in the panel.
+- **Corpus GeoTIFFs sit outside `DB_WINDOW`** of −35..0 dB — measured −49.5 to
+  −20.1 and −39.0 to −27.3 — so the fixed window clips them to black. The
+  decoder falls back to the raster's own range and says so.
+- **The band order is not consistent** (DATA.md D5): band 1 carries the wider
+  spread in one scene, band 2 in another. Chosen by measurement, never
+  hardcoded.
+- **npm 10+ ignores `--prefix` for `install`.** Use `cd frontDemo`.
+- **`git add -A` used to sweep in 169 MB.** Check `git status` first.
 
-### Order of work
+### Verification
 
-§1.1 paths → §1.2 upload → §1.3 real artifacts → §1.4 animation → §2 labels.
+```bash
+.venv/Scripts/python.exe -m pytest
+```
 
-The labelling route in §2 needs **no retraining**, which matters because this
-machine cannot train anything. §2.5 is written for the 4060 Ti machine and
-should be handed over as a unit.
+Baseline **474 passed, 9 skipped**. Then ruff, then the frontend:
 
----
+```bash
+cd frontDemo && npm run check && npm run build
+```
+
+`npm run check:ingest` needs fixtures first:
+`.venv/Scripts/python.exe -m scripts.export_ingest_fixtures --out <dir>`, then
+`TILE_DIR=<dir> npm run check:ingest`.
 
 ## 1. Immediate — the local demo
 

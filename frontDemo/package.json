@@ -8,13 +8,14 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "check": "npm run check:hindcast && npm run check:ingest && npm run check:release && npm run check:scenarios && npm run check:landmask && npm run check:corridors",
+    "check": "npm run check:hindcast && npm run check:realdrift && npm run check:ingest && npm run check:release && npm run check:scenarios && npm run check:landmask && npm run check:corridors",
     "check:hindcast": "tsx scripts/check-hindcast.ts",
     "check:landmask": "tsx scripts/check-landmask.ts",
     "check:corridors": "tsx scripts/check-corridors.ts",
     "check:scenarios": "tsx scripts/check-scenarios.ts",
     "check:release": "tsx scripts/check-release.ts",
     "check:ingest": "tsx scripts/check-ingest.ts",
+    "check:realdrift": "tsx scripts/check-real-drift.ts",
     "measure:land": "tsx scripts/measure-land.ts"
   },
   "dependencies": {

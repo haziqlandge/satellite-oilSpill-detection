@@ -97,4 +97,9 @@ Stated plainly so nobody has to reconstruct it under pressure:
 - The border evaluation stratum is **invalid** for source-tile boundaries — it
   tests padded tensor edges. Its zero count does not mean zero border objects.
 - Overlap quarantine is not proof of scene-independent generalisation.
-- Only 11 named look-alike test tiles exist. That is a sparse sample.
+- Only 11 named look-alike test tiles exist. That is a sparse EVALUATION
+  sample, and it is not the same thing as having no look-alike data — a
+  conflation that has been repeated more than once. Part III ships 150
+  Lookalike and 150 No oil, and the built corpus holds **289 Lookalike and
+  271 No_oil tiles**, 560 negatives against 2,577 Oil. What is missing is
+  Part II’s additional ~42 GB (B3) and a test stratum wider than 11 tiles.

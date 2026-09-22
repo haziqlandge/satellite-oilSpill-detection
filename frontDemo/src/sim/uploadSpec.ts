@@ -8,10 +8,11 @@
  *  - **the acquisition time.** Read from the file name when it is a Sentinel-1
  *    product, asked for otherwise. Without it there is no wind field, no AIS
  *    window and no honest time axis, and a guess would poison all three
- *  - **where on Earth it is.** The corpus tiles are NOT georeferenced -- DATA.md
- *    records Part I as carrying no geotransform -- so for those it cannot be
- *    derived and the operator asserts it. Every run built here is stamped with
- *    that fact
+ *  - **where on Earth it is.** The corpus PNGs under `data/processed/` carry no
+ *    geotransform, so for those the operator asserts it and the run is stamped
+ *    with that fact. The SOURCE TIFFs do carry one -- see DATA.md 2.1, which
+ *    corrects the older claim that they did not -- and `geotiff.ts` reads it,
+ *    so a scene dropped as a TIFF is positioned by measurement instead
  *
  * Everything downstream of those three is the same simulation the authored
  * scenarios use, and it says so. What is NEW is that the geometry being drifted
