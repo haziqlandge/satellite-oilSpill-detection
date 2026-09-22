@@ -82,6 +82,8 @@ for (const t of tiles) {
     labelPolys: t.polygons.length,
     coverage: +(out.ribbon.coverage * 100).toFixed(2),
     threshold: out.ribbon.threshold,
+    splits: out.ribbon.splits,
+    separation: +out.ribbon.separation.toFixed(3),
     iou: +iou.toFixed(3), recallOfLabel: +recall.toFixed(3), ms,
   });
 }

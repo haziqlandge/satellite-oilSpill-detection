@@ -64,6 +64,14 @@ export interface Ribbon {
   threshold: number;
   /** Whether the region reaches the frame edge, so its true extent is unknown. */
   touchesEdge: boolean;
+  /**
+   * How many times the cut had to be re-applied inside the dark class.
+   *
+   * Zero for a tile that is mostly slick. Non-zero means the frame was mostly
+   * water and the first cut found the sea, which is worth surfacing: the
+   * region that survived is a darker population inside the dark one.
+   */
+  splits: number;
   /** Mean grey inside the region and in the water around it, 0-255. */
   meanInside: number;
   meanOutside: number;
@@ -151,10 +159,17 @@ function decimate(
  * is the actual claim a dark-region screen makes. The result is clamped so a
  * frame with no real dark region cannot return a cut that admits half the sea.
  */
-function otsu(grey: Uint8Array): number {
+function otsu(grey: Uint8Array, ceiling = 255): number {
   const histogram = new Float64Array(256);
-  for (let i = 0; i < grey.length; i++) histogram[grey[i]]++;
-  const total = grey.length;
+  let total = 0;
+  for (let i = 0; i < grey.length; i++) {
+    // Only the population at or below `ceiling`, so the cut can be re-applied
+    // inside the dark class. See `extractRibbon`.
+    if (grey[i] > ceiling) continue;
+    histogram[grey[i]]++;
+    total++;
+  }
+  if (total === 0) return 0;
   let sum = 0;
   for (let t = 0; t < 256; t++) sum += t * histogram[t];
 
@@ -350,18 +365,46 @@ export function extractRibbon(
   height: number,
 ): IngestOutcome {
   const small = decimate(data, width, height, SCREEN_MAX);
-  const threshold = otsu(small.grey);
-  const { label, target, size, components } = largestDarkComponent(
-    small.grey,
-    small.width,
-    small.height,
-    threshold,
-  );
+  const cells = small.width * small.height;
+
+  /*
+    Otsu, then Otsu again inside the dark class, until the region is a slick
+    rather than the sea.
+
+    One pass is right for a tile that is mostly slick, which is what the corpus
+    is: those return 3-8% coverage on the first cut. It is wrong for a real
+    scene. A Sentinel-1 window over open water is ~90% water, and Otsu maximises
+    between-class variance between the two populations it can see -- which in
+    that scene are the water and the bright targets on it, not the oil and the
+    water. The first cut on a real georeferenced window came back claiming 62%
+    of the frame was one dark region, and it was: it was the sea.
+
+    So when the dark class is too big to be a slick, the same cut is applied
+    again to only that class, splitting dark water from the darker oil inside
+    it. This is multi-level Otsu by recursive splitting, and it is the standard
+    answer to exactly this failure. Three splits is the limit; past that the
+    scene has no slick-shaped population in it and saying so is the result.
+  */
+  let ceiling = 255;
+  let threshold = otsu(small.grey, ceiling);
+  let found = largestDarkComponent(small.grey, small.width, small.height, threshold);
+  let coverage = found.size / cells;
+  let splits = 0;
+  while (coverage > MAX_COVERAGE && splits < 3 && threshold > 1) {
+    ceiling = threshold - 1;
+    const next = otsu(small.grey, ceiling);
+    if (next >= threshold) break;
+    threshold = next;
+    found = largestDarkComponent(small.grey, small.width, small.height, threshold);
+    coverage = found.size / cells;
+    splits++;
+  }
+  const { label, target, size, components } = found;
+
   if (target < 0 || size === 0) {
     return { ok: false, reason: "empty", detail: "No dark region found in this frame." };
   }
 
-  const coverage = size / (small.width * small.height);
   if (coverage > MAX_COVERAGE) {
     return {
       ok: false,
@@ -420,6 +463,7 @@ export function extractRibbon(
       components,
       threshold,
       touchesEdge,
+      splits,
       meanInside: +meanInside.toFixed(1),
       meanOutside: +meanOutside.toFixed(1),
       separation: Math.max(0, Math.min(1, (meanOutside - meanInside) / 255)),

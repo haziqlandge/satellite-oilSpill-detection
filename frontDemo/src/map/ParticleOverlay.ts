@@ -148,17 +148,6 @@ export class ParticleOverlay {
    */
   private sprites = new Map<string, HTMLCanvasElement>();
 
-  /**
-   * The hour the last painted frame was at, and whether the camera moved.
-   *
-   * Together these decide whether the previous frame is faded or erased. A
-   * trail is only meaningful when the clock is running forward on a still map:
-   * scrub backward, jump to a checkpoint or pan, and the streaks behind the
-   * parcels would be describing a path nothing took.
-   */
-  private lastHour: number | null = null;
-  private clearNext = true;
-
   constructor(map: MapLibreMap, container: HTMLElement) {
     this.map = map;
     this.canvas = document.createElement("canvas");
@@ -178,9 +167,6 @@ export class ParticleOverlay {
 
   private onMove() {
     this.dirty = true;
-    // Trails are drawn in screen space. Under a moving camera the old pixels
-    // are in the wrong place, so they are dropped rather than smeared.
-    this.clearNext = true;
   }
 
   private resize() {
@@ -191,21 +177,18 @@ export class ParticleOverlay {
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
     if (this.ctx) this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.clearNext = true;
   }
 
   /** The hindcast and forecast ensemble: the origin probability field. */
   setFrames(frames: ParticleFrame[]) {
     this.frames = [...frames].sort((a, b) => a.hour - b.hour);
     this.dirty = true;
-    this.clearNext = true;
   }
 
   /** Parcels of the release itself: the oil that is actually in the water. */
   setReleaseFrames(frames: ParticleFrame[]) {
     this.releaseFrames = [...frames].sort((a, b) => a.hour - b.hour);
     this.dirty = true;
-    this.clearNext = true;
   }
 
   setReleaseColour(colour: string) {
@@ -227,20 +210,17 @@ export class ParticleOverlay {
   setVisible(visible: boolean) {
     this.fieldVisible = visible;
     this.dirty = true;
-    this.clearNext = true;
   }
 
   /** The oil. Driven by the `release` layer toggle. */
   setReleaseVisible(visible: boolean) {
     this.releaseVisible = visible;
     this.dirty = true;
-    this.clearNext = true;
   }
 
   setAdditive(additive: boolean) {
     this.additive = additive;
     this.dirty = true;
-    this.clearNext = true;
   }
 
   private loop() {
@@ -374,34 +354,27 @@ export class ParticleOverlay {
     }
 
     /*
-      Fade, or clear.
+      Always clear. There used to be a fading trail here and it flickered.
 
-      The parcels are the same marks in the same places frame after frame, and
-      wiping the canvas every time throws away the one cue that says which way
-      they are going. Leaving a little of the previous frame behind gives each
-      parcel a short wake in the direction it is actually travelling -- and
-      because the wake is the previous frames rather than anything computed, it
-      cannot disagree with the positions.
+      The fade was conditional: a small forward step in the hour left 78% of the
+      previous frame behind, and anything else -- a scrub, a jump, a pan -- wiped
+      the canvas, because a streak across those describes a path nothing took.
+      That condition is the bug. Whether a frame fades or wipes then depends on
+      how long the frame took, and during playback the frames are not evenly
+      spaced: every simulated hour React rebuilds the AIS tracks, the contours
+      and the release extent, which is long enough to push that frame's step
+      over the threshold. So the canvas wiped roughly once a simulated hour and
+      faded in between, and a wipe next to a frame carrying four accumulated
+      copies of the cloud is a visible flash.
 
-      It is only correct while the clock runs forward by a small step on a still
-      map. A scrub, a jump, a layer toggle or a pan all fall back to a full
-      clear, because a streak across those is a path nothing took.
+      Scrubbing never flickered because it always took the clear path -- which
+      is also the rendering that was wanted. Making the trail unconditional
+      would have fixed the flicker by keeping the smear through scrubs, and
+      tuning the threshold only moves the frame rate at which it returns. A
+      renderer whose output depends on frame timing is the thing to remove, not
+      to calibrate.
     */
-    const step = this.lastHour === null ? null : this.hour - this.lastHour;
-    const smooth = step !== null && step > 0 && step < 0.35;
-    if (this.clearNext || !smooth) {
-      ctx.clearRect(0, 0, w, h);
-      this.clearNext = false;
-    } else {
-      const previous = ctx.globalCompositeOperation;
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.globalAlpha = 0.22;
-      ctx.fillStyle = "#000";
-      ctx.fillRect(0, 0, w, h);
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = previous;
-    }
-    this.lastHour = this.hour;
+    ctx.clearRect(0, 0, w, h);
 
     // Overlapping parcels read as density on a dark ground; see `additive`.
     ctx.globalCompositeOperation = this.additive ? "lighter" : "source-over";

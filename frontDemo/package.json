@@ -27,6 +27,7 @@
     "@fontsource/ibm-plex-mono": "^5.1.0",
     "@phosphor-icons/react": "^2.1.7",
     "animejs": "^4.5.0",
+    "geotiff": "^3.0.5",
     "maplibre-gl": "^5.24.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

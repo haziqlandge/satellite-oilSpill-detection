@@ -31,6 +31,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { Flag, GroupHead, SCROLL } from "./components";
 import { DEMO_PRESETS, DEMO_SAMPLE_KEYS, type DemoSampleKey } from "../site/demoData";
 import { extractRibbon, parseAcquisitionTime, type Ribbon } from "../sim/ingest";
+import { decodeGeoTiff, looksLikeTiff, type GeoRaster } from "../sim/geotiff";
 import { buildUploadSpec } from "../sim/uploadSpec";
 import { registerUpload } from "../sim/scenarios";
 import type { LngLat, ScenarioId } from "../sim/types";
@@ -97,6 +98,27 @@ async function overlay(src: string, ribbon: Ribbon): Promise<string> {
   return canvas.toDataURL("image/png");
 }
 
+/**
+ * The derived 8-bit raster as a PNG data URL.
+ *
+ * A browser cannot put a TIFF in an `<img>`, so a GeoTIFF has no preview unless
+ * one is made. Making it from the very buffer the screen read means the picture
+ * and the measurement cannot disagree.
+ */
+function greyToDataUrl(rgba: Uint8ClampedArray, width: number, height: number): string {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "";
+  // Via createImageData rather than the ImageData constructor: the buffer is
+  // typed ArrayBufferLike here and the constructor demands a plain ArrayBuffer.
+  const frame = ctx.createImageData(width, height);
+  frame.data.set(rgba);
+  ctx.putImageData(frame, 0, 0);
+  return canvas.toDataURL("image/png");
+}
+
 export const SAMPLE_STAGES = [
   "Decoding raster",
   "Screening for dark regions",
@@ -112,6 +134,7 @@ export interface Measured {
   separation: number;
   components: number;
   touchesEdge: boolean;
+  splits: number;
   dampingDb: number;
   screenMs: number;
 }
@@ -133,12 +156,14 @@ export interface SampleSession {
   ribbon: Ribbon | null;
   measured: Measured | null;
   parsedAcquiredAt: number | null;
+  /** Set only when the raster carried its own position. */
+  geo: GeoRaster | null;
 }
 
 let session: SampleSession = {
   key: null, state: "idle", step: -1, startedAt: 0, completedAt: null,
   sourceName: "", sourceUrl: null, maskUrl: null, maskPresented: false, completed: [], error: "",
-  ribbon: null, measured: null, parsedAcquiredAt: null,
+  ribbon: null, measured: null, parsedAcquiredAt: null, geo: null,
 };
 const listeners = new Set<() => void>();
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
@@ -165,8 +190,11 @@ const beat = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms
 
 export async function uploadSample(file: File) {
   const sequence = ++uploadSequence;
-  if (!file.type.startsWith("image/")) {
-    publish({ error: "Choose an image file. GeoTIFF is not decoded yet; export a PNG first." });
+  const tiff = looksLikeTiff(file);
+  // A TIFF's own type string is unreliable across platforms, so the extension
+  // decides; everything else still has to declare itself an image.
+  if (!tiff && !file.type.startsWith("image/")) {
+    publish({ error: "Choose an image file, or a GeoTIFF." });
     return;
   }
   const url = URL.createObjectURL(file);
@@ -175,30 +203,58 @@ export async function uploadSample(file: File) {
   publish({
     key: namedSample(file), state: "processing", step: 0, startedAt, completedAt: null,
     sourceName: file.name, sourceUrl: url, maskUrl: null, maskPresented: false, error: "",
-    ribbon: null, measured: null, parsedAcquiredAt: parseAcquisitionTime(file.name),
+    ribbon: null, measured: null, geo: null, parsedAcquiredAt: parseAcquisitionTime(file.name),
   });
 
   try {
-    const { data, width, height } = await decode(url);
-    if (sequence !== uploadSequence) return;
+    let pixels: Uint8ClampedArray;
+    let width: number;
+    let height: number;
+    let geo: GeoRaster | null = null;
+    let previewUrl = url;
+
+    if (tiff) {
+      const decoded = await decodeGeoTiff(file);
+      if (sequence !== uploadSequence) return;
+      if (!decoded.ok) {
+        publish({ state: "idle", step: -1, error: decoded.reason });
+        return;
+      }
+      geo = decoded.raster;
+      pixels = geo.rgba;
+      width = geo.width;
+      height = geo.height;
+      // A browser cannot render a TIFF in an <img>, so the preview is the
+      // 8-bit raster this panel just derived -- which is also exactly what the
+      // screen saw, so the figure cannot disagree with the measurement.
+      previewUrl = greyToDataUrl(geo.rgba, width, height);
+      publish({ sourceUrl: previewUrl, geo, parsedAcquiredAt: geo.acquiredAt ?? session.parsedAcquiredAt });
+      URL.revokeObjectURL(url);
+    } else {
+      const decoded = await decode(url);
+      if (sequence !== uploadSequence) return;
+      pixels = decoded.data.data;
+      width = decoded.width;
+      height = decoded.height;
+    }
     publish({ step: 1 });
     await beat(160);
 
     const screenStart = performance.now();
-    const outcome = extractRibbon(data.data, width, height);
+    const outcome = extractRibbon(pixels, width, height);
     const screenMs = Math.round(performance.now() - screenStart);
     if (sequence !== uploadSequence) return;
 
     if (!outcome.ok) {
-      publish({ state: "idle", step: -1, sourceUrl: url, error: outcome.detail });
+      publish({ state: "idle", step: -1, error: outcome.detail });
       return;
     }
     publish({ step: 2 });
     await beat(160);
 
-    const preview = await overlay(url, outcome.ribbon);
+    const preview = await overlay(previewUrl, outcome.ribbon);
     if (sequence !== uploadSequence) return;
-    MASK_CANVAS_CACHE.set(url, preview);
+    MASK_CANVAS_CACHE.set(previewUrl, preview);
 
     const perGrey = 35 / 255;
     publish({
@@ -213,6 +269,7 @@ export async function uploadSample(file: File) {
         separation: outcome.ribbon.separation,
         components: outcome.ribbon.components,
         touchesEdge: outcome.ribbon.touchesEdge,
+        splits: outcome.ribbon.splits,
         dampingDb: +((outcome.ribbon.meanInside - outcome.ribbon.meanOutside) * perGrey).toFixed(2),
         screenMs,
       },
@@ -297,6 +354,15 @@ export function SampleImagePanel({ onSelect }: { onSelect: (id: ScenarioId) => v
       setWhen(new Date(current.parsedAcquiredAt).toISOString().slice(0, 16));
   }, [current.parsedAcquiredAt]);
 
+  // A georeferenced raster answers the position questions itself, so the
+  // fields follow it rather than the operator.
+  useEffect(() => {
+    if (!current.geo) return;
+    setLon(current.geo.centre[0].toFixed(4));
+    setLat(current.geo.centre[1].toFixed(4));
+    setAcrossKm(current.geo.acrossKm.toFixed(2));
+  }, [current.geo]);
+
   const upload = (files: FileList | null) => { if (files?.[0]) void uploadSample(files[0]); };
 
   const message = processing ? SAMPLE_STAGES[Math.max(0, current.step)]
@@ -320,7 +386,7 @@ export function SampleImagePanel({ onSelect }: { onSelect: (id: ScenarioId) => v
       acrossKm: parsed.across,
       acquiredAt: parsed.at,
       acquisitionSource: current.parsedAcquiredAt ? "filename" : "operator",
-      positionSource: "operator",
+      positionSource: current.geo ? "geotiff" : "operator",
       fileName: current.sourceName,
     }));
     publish({ state: "complete", completedAt: Date.now() });
@@ -336,8 +402,14 @@ export function SampleImagePanel({ onSelect }: { onSelect: (id: ScenarioId) => v
       onDragOver={event => event.preventDefault()}
       onDrop={event => { event.preventDefault(); upload(event.dataTransfer.files); }}
       onPaste={event => { if (event.clipboardData.files.length) { event.preventDefault(); upload(event.clipboardData.files); } }}>
-      <p className="text-[11px]">Drop any SAR raster — including the corpus tiles under
-        <span className="num"> data/processed/dataset/oos/images/</span>.</p>
+      <p className="text-[11px]">Drop a SAR raster. A GeoTIFF brings its own position;
+        a PNG or JPEG needs one stated.</p>
+      <p className="mt-1 text-[10px]" style={{ color: "var(--ink-faint)" }}>
+        Corpus tiles: <span className="num">data/processed/dataset/oos/images/train/</span> —
+        prefer <span className="num">train</span> over <span className="num">test</span>, which is
+        the consumed holdout. Georeferenced windows:
+        <span className="num"> data/processed/sar/windows/</span>, cut by
+        <span className="num"> scripts/cut_geotiff_window.py</span>.</p>
       <button type="button" onClick={() => input.current?.click()}
         className="mt-3 cursor-pointer border px-3 py-2 text-[11px] uppercase"
         style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>Upload image</button>
@@ -361,7 +433,10 @@ export function SampleImagePanel({ onSelect }: { onSelect: (id: ScenarioId) => v
       {m && <div className="space-y-1 border p-2" style={{ borderColor: "var(--line)" }}>
         <p className="text-[10px] uppercase" style={{ color: "var(--ink-faint)" }}>measured from this raster</p>
         <Row label="raster" value={`${m.width} × ${m.height}`} />
-        <Row label="otsu cut" value={`grey ${m.threshold}`} />
+        <Row label="otsu cut" value={`grey ${m.threshold}${m.splits ? ` · split ${m.splits}x` : ""}`} />
+        {m.splits > 0 && <p className="text-[10px]" style={{ color: "var(--ink-faint)" }}>
+          The first cut found the sea, so it was re-applied inside the dark class.
+          A real scene is mostly water; what survived is a darker population within it.</p>}
         <Row label="coverage" value={`${(m.coverage * 100).toFixed(2)} % of frame`}
           tone={m.coverage > 0.2 ? "var(--alarm)" : undefined} />
         <Row label="dark components" value={String(m.components)} />
@@ -377,10 +452,16 @@ export function SampleImagePanel({ onSelect }: { onSelect: (id: ScenarioId) => v
       </div>}
 
       {current.state === "ready" && <div className="space-y-2 border p-2" style={{ borderColor: "var(--accent)" }}>
-        <p className="text-[10px] uppercase" style={{ color: "var(--accent)" }}>asserted by you</p>
+        <p className="text-[10px] uppercase" style={{ color: "var(--accent)" }}>
+          {current.geo ? "read from the raster" : "asserted by you"}</p>
         <p className="text-[10px]" style={{ color: "var(--ink-faint)" }}>
-          This raster carries no georeferencing, so position and scale cannot be read from it.
-          The run is stamped with the fact that you stated them.</p>
+          {current.geo
+            ? "This GeoTIFF carries its own geotransform, so the position and scale below are measured, not stated. Edit them only if you know the file is wrong."
+            : "This raster carries no georeferencing, so position and scale cannot be read from it. The run is stamped with the fact that you stated them."}</p>
+        {current.geo && <div className="space-y-1 pb-1">
+          <Row label="source range" value={`${current.geo.lowDb.toFixed(1)} to ${current.geo.highDb.toFixed(1)} dB`} />
+          <Row label="display window" value={current.geo.scaledThroughWindow ? "-35 to 0 dB (fixed)" : "already 8-bit"} />
+        </div>}
         <div className="grid grid-cols-2 gap-2">
           <Field label="centre lat"><input className={INPUT} style={{ borderColor: "var(--line)" }} value={lat} onChange={e => setLat(e.target.value)} inputMode="decimal" /></Field>
           <Field label="centre lon"><input className={INPUT} style={{ borderColor: "var(--line)" }} value={lon} onChange={e => setLon(e.target.value)} inputMode="decimal" /></Field>
