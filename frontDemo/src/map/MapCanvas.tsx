@@ -849,8 +849,31 @@ export function MapCanvas({
     if (!map || !ready) return;
     const src = (id: string) => map.getSource(id) as maplibregl.GeoJSONSource;
 
+    /*
+      The selected candidate's track, clipped to the playhead like every other
+      track on the map.
+
+      It used to be drawn in full, from its own effect keyed on the selection
+      alone, while the `candidates` and `traffic` layers a few lines above were
+      already cut at `at`. The selected track is the widest, brightest line on
+      the map, so the one track that ignored the clock was also the one the eye
+      goes to: at T-36 it ran across the scene and through the water the oil
+      only reaches after T0, which reads as the console asserting that a vessel
+      was somewhere it had not yet been. A hindcast pane showing a candidate's
+      future is the wrong claim in the wrong direction.
+
+      `Suspect.id` is the vessel's MMSI, which is what makes the timed fixes
+      recoverable here -- `track` itself is bare coordinates. Infrastructure has
+      no track and no MMSI, so it falls through to the unclipped branch and
+      draws nothing, as before.
+    */
+    const at = run.meta.acquiredAt + hour * 3600_000;
+    const timed = selected ? run.vessels.find((v) => v.mmsi === selected.id) : undefined;
+    const suspectTrack = timed
+      ? timed.points.filter((p) => p.t <= at).map((p) => [p.lon, p.lat] as LngLat)
+      : selected?.track;
     src(SOURCE.suspect).setData(
-      selected?.track ? collection([line(selected.track)]) : EMPTY,
+      suspectTrack && suspectTrack.length > 1 ? collection([line(suspectTrack)]) : EMPTY,
     );
     src(SOURCE.matched).setData(
       selected?.evidence.matchedSegment
@@ -884,7 +907,8 @@ export function MapCanvas({
         ),
       ),
     );
-  }, [selected, ready, run.infrastructure]);
+    //  is a dependency now: the suspect track is cut at the playhead.
+  }, [selected, ready, run.infrastructure, run.vessels, run.meta.acquiredAt, hour]);
 
   /* --- toggles ----------------------------------------------------- */
 

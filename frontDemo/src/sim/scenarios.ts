@@ -345,7 +345,25 @@ const AUTHORED_SPECS: Record<ScenarioId, ScenarioSpec> = {
     infrastructureCoverage: "partial",
     source: {
       type: "berthed",
-      approachBearingDeg: 228,
+      /*
+        The vessel arrives from the east-south-east, 2026-09-22.
+
+        It used to arrive from 228 degrees. That is not a causality error --
+        the inbound leg runs from T-108h to T-53h and is correctly drawn as
+        history -- but the forecast lobe leaves the slick on a bearing of 195,
+        so the approach track lay along the very water the oil drifts into
+        after the pass. On screen, at T-36h, that reads as the console drawing
+        a candidate down the oil's future path, which is the single most
+        misleading thing this view could imply.
+
+        105 degrees is close to perpendicular to the drift axis: 90 off the
+        forecast bearing and 81 off the backward field's 24, so the track
+        crosses both lobes briefly instead of running down one of them. The
+        vessel still moors at the same berth at the same time, so what the
+        scenario tests is unchanged -- and it is measured, not assumed, by
+        scripts/check-scenarios.ts.
+      */
+      approachBearingDeg: 105,
       approachKm: 26,
       mooredHoursBefore: 53,
       kind: "Offshore supply",
@@ -660,7 +678,15 @@ const AUTHORED_SPECS: Record<ScenarioId, ScenarioSpec> = {
         reverted; the note on it records what that cost and why the trade is not
         available.
 
-        HOW TO CHECK A CORRIDOR, since the project carries no land data
+        HOW A CORRIDOR USED TO BE CHECKED, and how it is checked now
+
+        The project now carries a land mask -- `src/sim/landmask.ts`, generated
+        by `scripts/build_landmask.py` from the very tiles described below --
+        so `npm run check:corridors` tests every lane in every scenario against
+        it automatically, centreline and full lateral scatter. Running that is
+        the answer to this question. The by-hand method is kept because it is
+        where the mask's own threshold comes from, and because it is how you
+        would check a coordinate the mask does not cover.
 
         The basemap is a raster and there is no coastline geometry anywhere in
         this codebase, so there is nothing to test a coordinate against at
