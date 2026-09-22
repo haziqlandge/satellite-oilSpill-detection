@@ -69,8 +69,14 @@ export type TrafficLoader = (scene: string) => Promise<RealTrafficFile>;
 
 let loader: TrafficLoader = async (scene) => {
   const response = await fetch(`ais/${scene}.json`);
-  if (!response.ok) {
-    throw new Error(`No real AIS for ${scene} (${response.status}). Run scripts/export_ais_traffic.py.`);
+  // A dev server answers a missing file with its own index page and a 200, so
+  // `ok` alone cannot tell "here is the data" from "there is no data".
+  const type = response.headers.get("content-type") ?? "";
+  if (!response.ok || !type.includes("json")) {
+    throw new Error(
+      `Real AIS for ${scene} could not be loaded (ais/${scene}.json returned ${response.status} ${type || "no type"}). ` +
+        "Run scripts/export_ais_traffic.py; if the file exists, restart the dev server -- Vite can lose track of a public file that was deleted and re-created.",
+    );
   }
   return (await response.json()) as RealTrafficFile;
 };

@@ -551,6 +551,7 @@ export default function ConsoleShell() {
             booting={booting && !!activeRun && !activeDemoRun}
             onBooted={() => setBooting(false)}
           loading={loading && !activeDemoRun}
+          error={activeDemoRun ? null : state.error}
           />
         </div>
 

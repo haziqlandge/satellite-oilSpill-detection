@@ -9,7 +9,12 @@ portion excluded** (see §6). Free space on this machine at last check: 225 GB.
 
 ---
 
-## 1. The stale-path problem — read before running anything
+## 1. The stale-path problem — fixed 2026-09-22, recurs with new artifacts
+
+**Current state:** `scripts/repath_artifacts.py` rewrote every reference below to
+repo-relative form, and `python -m scripts.repath_artifacts --check` reported on
+2026-09-23 that every artifact resolves. Re-run it after copying anything new
+from the training machine. The history below is why.
 
 Artifacts produced on the training machine embed absolute paths rooted at
 

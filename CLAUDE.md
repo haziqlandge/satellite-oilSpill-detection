@@ -24,20 +24,19 @@ The frontend is authored separately and pushed straight to GitHub, so
 Check `git rev-list --left-right --count main...origin/main` before assuming
 either side is current.
 
-## 2. Paths from the other machine are stale
+## 2. Paths from the other machine — fixed, but they come back
 
 Artifacts produced on the training machine embed absolute paths rooted at
-`C:\Users\adi\Downloads\oilSpil2l16\oilSpil2l\`. That directory does not exist
-here. The bytes are all present and hash-verified — only the prefix is wrong.
+`C:\Users\adi\Downloads\oilSpil2l16\oilSpil2l\`, which does not exist here.
+`scripts/repath_artifacts.py` made every existing one repo-relative (182,476
+references: the annotation pilot, `inventory.json`, every `final-v*` split list,
+`manifest.json`, `release.json`); its `--check` confirmed on 2026-09-23 that all
+resolve. `.venv/pyvenv.cfg` was repointed on 2026-09-22.
 
-Known affected: the annotation pilot's review JSONs, `inventory.json`, every
-`data/processed/dataset/final-v*/{data.yaml,train,val,test}.txt`, and
-`runs/final_l1_fp32_release/L1-ciou/release.json`. `.venv/pyvenv.cfg` had the
-same problem and was repointed on 2026-09-22.
-
-Anything reading those verbatim fails with a confusing missing-file error rather
-than a path error. Check before running dataset tooling. Prefer making paths
-repo-relative over patching them per machine. See `DATA.md`.
+**New artifacts copied from the training machine will embed its paths again.**
+Run `.venv/Scripts/python.exe -m scripts.repath_artifacts` after copying, then
+`--check`. Symptom if you forget: a missing-file error that reads like a corrupt
+dataset rather than a path problem. See `DATA.md` §1.
 
 ## 3. Where to look
 

@@ -8,180 +8,130 @@ session machine. See `CLAUDE.md` §1.
 
 ---
 
-## 0. Start here — where the 2026-09-22 session stopped
+## 0. Start here — where the 2026-09-23 session stopped
 
-Read `CLAUDE.md` first, then this section. **Delete this section when its
+Read `CLAUDE.md` first, then this section. **Replace this section when its
 contents are done** — do not append a second one.
 
 ### The situation
 
 A **local** demo. The frontend must be top-tier; the backend can stay
 file-driven. The user is Haziq; commit as them via `commitskill` and **never add
-AI attribution** — authorship matters for this submission.
+AI attribution** — authorship matters for this submission. The user verifies in
+the browser pane and wants the same from you: reload (and confirm the reload
+happened), view the map at about **z9**, screenshot as proof, and exercise
+uploads with both a dataset PNG and a GeoTIFF.
 
-### What landed on 2026-09-22
+### State of the tree
 
-ERA5 unblocked (licence accepted, verified with a real fetch). Repo-relative
-paths. The faked hindcast deleted and replaced by the ensemble's own backward
-leg. A land mask. Two scenes displaced to open water. Real discharge profiles. A
-real renderer. A real upload path. GeoTIFF reading. And the first real OpenDrift
-runs this project has produced — three scenes, ERA5-forced, exported to
-`frontDemo/public/runs/*/drift.json`, validated by `npm run check:realdrift`.
+Everything is committed and pushed to `origin/main`; the working tree was clean
+at hand-off. The last commit is the one that wrote this paragraph: this doc
+refresh, plus a small fix so a run that cannot load shows "run failed" with the
+cause instead of hanging on "awaiting run" (`lib/spill.ts` `error`,
+`console/Workspace.tsx`, `console/ConsoleShell.tsx`; `sim/realAis.ts` rejects an
+HTML fallback). The two before it are `835d0ce` (real AIS) and `dfb6381` (land
+mask). Tests **506 passed, 9 skipped**; all 8 `npm run check` scripts pass;
+`npm run build` succeeds.
 
-**Correction, found later the same day:** this section used to say the
-December scene reports `convergence_minimum` and returns an age triple. The
-artifacts on disk do not. All three `drift.json` files — re-exported at
-18:52–18:56, after the backward coastline fix — report `monotonic` with a null
-triple. No present artifact supports the claim. Do not repeat it; re-export and
-look before saying any real scene yields an age.
+### What was done on 2026-09-22/23 (details elsewhere — do not redo)
 
-### DONE: the land mask is real, global, and the backend's own coastline
+- **Global land mask = OpenDrift's own GSHHG coastline**, rasterised at 1/240°,
+  fetched on demand from `frontDemo/public/landmask/`. Drift, contours, AIS lanes
+  and uploads are held to it. Details: `PREVIOUS_WORK.md` §2.13, `DATA.md` §5a.
+- **Real AIS in the three Gulf scenes**, with the vessels Zhao et al. 2025 name as
+  ground truth (their own real tracks); **realistic simulated voyages**
+  everywhere else, labelled SIM. Details: §1.6 below, `PREVIOUS_WORK.md` §2.14,
+  `DATA.md` §5b. All three Gulf truths rank first with no weight changes.
+- **Two authored cases were corrected from real AIS:** Case 2's tanker was
+  southbound and still discharging at the pass (the scene had it northbound,
+  finished 4 h earlier); Case 3's coordinate is 88°58′W, not the transcribed
+  89°58′W (`ISSUES.md` X7; `RESEARCH/papers/P004.md:181` still holds the old
+  value and is canon — left unedited).
+- **The Case 2 truth draws a rectangle, and that is real.** The user questioned
+  it ("snake game"). It is the tanker's recorded AIS: out of the Mississippi, a
+  box south of the delta, south along the slick at the pass. Tankers box
+  offshore waiting for orders. The Evidence pane labels every real track
+  "recorded AIS track"; do not "fix" the shape.
+- **Correction carried forward:** no real OpenDrift run yields an age. All three
+  `drift.json` report `monotonic` with a null triple; an older note claiming
+  December reached `convergence_minimum` was wrong.
 
-The user raised this three times. What was built, and why it differs from the
-plan that was written here:
+### THE NEXT JOBS, in order
 
-- **The frontend mask is GSHHG full resolution** — the exact polygons
-  OpenDrift's `reader_global_landmask` answers from, read out of the same
-  `roaring_landmask` package — rasterised at 1/240° (~460 m, OpenDrift's own
-  raster grid) by `scripts/build_landmask.py`. The plan said Natural Earth;
-  that would have been a *third* coastline, coarser than both the physics and
-  the basemap. Using the backend's geometry removes the disagreement instead of
-  documenting it. **GSHHG via OpenDrift is authoritative; the frontend raster
-  is it sampled at cell centres.** GSHHG is LGPL (Wessel & Smith).
-- **Global.** 896 coastal 5° tiles in 33 band files, 3.01 MB under
-  `frontDemo/public/landmask/`, fetched on demand from our own static files
-  (6–15 ms for a region, against ~2 s of third-party tiles before). All-water
-  and all-land tiles resolve synchronously from an index; the 11 coastal tiles
-  the authored scenes need are bundled (49 KB, down from 129 KB for 3 boxes).
-- **Agreement, measured:** ≥99.9% of cell centres match OpenDrift at the
-  Mississippi delta, Bali/Lombok, Java, Kutch and the Red Sea
-  (`tests/test_landmask.py`). Over the Gulf box, random points disagree 0.62%
-  against 6.02% for the old basemap classifier. The old mask called Venice,
-  Louisiana water.
-- **AIS respects land.** Uploads get lanes planned around the coast
-  (`planCorridors` in `sim/ais.ts`): bearings and offsets through the scene,
-  each lane's whole ±width band walked out until it meets land, the longest
-  distinct lanes kept after a 0.5 km-grid check. `buildTraffic` re-scatters any
-  vessel whose track touches land, off a per-vessel RNG stream, so every
-  authored ranking was bit-identical at the time (every total and margin
-  unchanged). The 2026-09-23 voyage generator (§1.6) has since re-rolled the
-  simulated scenes, and the Gulf scenes no longer use it at all.
-  `check:corridors` now asserts zero vessel points ashore at eight real coastal
-  sites, with a control — the old fixed lanes put 16.6% and 31.7% of their band
-  on Bali, and the check catches it.
-- **`overlayFrames` no longer moves real parcels.** With one coastline, the
-  raster calls 19–40% of OpenDrift's backward parcels "ashore" where OpenDrift
-  itself says 0.10–0.26%; 98–99.99% of that is within one cell of water — the
-  parcels are parked against the shore by `coastline_action="previous"`.
-  `check:realdrift` now reports "deep ashore" (land with no water in the eight
-  neighbouring cells): 0.00%, 0.03%, 0.50%.
-- **Upload panel:** refuses a scene placed on land, states the coastline
-  source, and the position picker now pans to a typed or GeoTIFF position (it
-  used to leave the pin off-screen) and shows water/land live.
-- Verified in the browser with a dataset PNG placed off Bali and the real
-  GeoTIFF `8346860/.../Oil/00586.tif` in the Malacca Strait. Upload scenes now
-  open at z9, which frames the envelope; the user views at z≈9.
+1. **Wire the real OpenDrift runs into the console** — the remaining half of
+   §1.3. Artifacts (`public/runs/*/drift.json`) and the loader
+   (`sim/realDrift.ts`, `overlayFrames` now passes parcels through untouched)
+   exist; nothing selects them. They are the same three days as the real AIS,
+   so a real-run view can pair real drift with real traffic. Watch X7: the local
+   December scene is `20231205T000214`, while the Gulf AIS export for Case 3 is
+   windowed on 23:57:19 — a real-run view of the local scene needs its own AIS
+   window (Dec 3-5 are on disk; add a `Scene` in `scripts/export_ais_traffic.py`).
+2. **§4.1: run the trained detector in the browser.** The user asked why "empty
+   ocean" is marked as oil: the trained model has never run in the browser —
+   the upload path is a dark-region Otsu screen (`sim/ingest.ts`) and says so.
+   Export `runs/final_l1_fp32_release/L1-ciou/weights/best.pt` with
+   `ml/export/export.py` (never run yet) to fp16 ONNX (~6 MB), run it with
+   `onnxruntime-web` (WebGPU, WASM fallback). Be honest about what it buys:
+   mAP50 .364 against a .90 target (Q1), small-instance recall .11 (Q4).
+3. **Framing:** raise `SCREEN_MAX` in `sim/ingest.ts` so the full raster is shown
+   when running locally (the 1024 decimation for screening is deliberate).
 
-Open limitation, recorded as `ISSUES.md` F13: at z≥12 a contour can overlap the
-drawn coast by up to ~1 km — one land cell plus one density-grid step.
+### Waiting on the user
 
-### THE NEXT JOB: the three UI defects the user named
+- **Review `console/PositionPicker.tsx`** (map pin, footprint box, live
+  water/land) before building on it.
+- Whether rejected traffic should be drawn brighter. It is dim by design (the
+  selected track must stand out) and the Colour Attributes panel can change it;
+  do not change the palette unasked.
+- Real AIS for non-US scenes and uploads needs a paid provider (Spire,
+  MarineTraffic, Global Fishing Watch); ask before pursuing.
 
-- **Framing.** Previews were letterboxed in white; fixed. The raster is still
-  decimated to 1024 for screening, which is deliberate — speckle averaging, and
-  it is the cheap first pass PHASE-03 describes — but running locally there is
-  no reason not to raise `SCREEN_MAX` in `sim/ingest.ts` and show the full
-  raster.
-- **Position by map pin.** Done — `console/PositionPicker.tsx` replaces the
-  latitude and longitude boxes with a map, a draggable marker and a footprint
-  box, with the numeric fields kept behind a disclosure. A bug where a typed or
-  GeoTIFF position left the pin off-screen was fixed 2026-09-22, and the pin
-  now reports water/land against GSHHG. **Not yet reviewed by the user;
-  confirm it before building on it.**
-- **Wire the real runs into the console.** The artifacts and the loader
-  (`sim/realDrift.ts`) exist; nothing selects them yet. That is the remaining
-  half of §1.3.
+### Open limitations worth knowing (in `ISSUES.md`)
 
-### DONE 2026-09-23: real AIS in the Gulf, voyages everywhere else
+F12 kutch-dark under `max` ranks the truth 3rd-4th (the open `S_drift` question,
+§5); F13 contours can overlap the drawn coast by ~1 km at z≥12; F14 non-US
+traffic is simulated; F15 the T0 button sometimes does not move the playhead
+(unverified); X7 Case 3 acquisition mismatch.
 
-The user's mentor said straight-line ships never happen. See §1.6 for what was
-built. Two findings from it change the Gulf scenes and must not be re-derived:
-the published **Case 3 coordinate was one degree of longitude out** (89°58′ for
-88°58′ — the named vessel's own AIS sits 0.07 km from the corrected point), and
-the authored **Case 2 ran the named tanker the wrong way** (north, finished 4 h
-before the pass; its AIS says south at 7.8 kn, at the tip, still discharging).
+### A correction to carry forward
 
-### The question the user asked, answered
-
-> "is the model not trained properly, it's clearly marking empty ocean as oil"
-
-**The trained model is not running.** It has never run in the browser. What
-marks the region is a dark-region Otsu screen in `sim/ingest.ts`, and the panel
-says so in those words. The checkpoint exists at
-`runs/final_l1_fp32_release/L1-ciou/weights/best.pt` (6.6 MB, one class), the
-ONNX exporter exists at `ml/export/export.py` and has never been run, and
-`backend/app/__init__.py` is 0 bytes — there is no API and no in-browser
-inference.
-
-The specific failure in that screenshot is a frame with **separation 0.04 and
-damping −1.25 dB** — essentially no contrast anywhere — and the screen returned
-25% of it. A threshold cannot do better on a frame with no contrast, and tuning
-one is not the fix: `ISSUES.md` F11b records that contrast separation does
-**not** cleanly divide the good cases from the bad.
-
-**So do §4.1 and make it real:** export to fp16 ONNX (~6 MB at 2.9 M
-parameters) and run it with `onnxruntime-web` on WebGPU, WASM as the fallback.
-No backend, no server GPU, runs on the visitor's hardware — and it also answers
-§4.2, since Cloudflare cannot host custom weights. Be honest about what it
-buys: mAP50 is **.364** against a .90 target (Q1) and small-instance recall is
-**.11** (Q4). A real detector, and not a good one.
-
-### One correction to carry forward
-
-The user is right that look-alike data exists, and the "no look-alike data"
-framing that has been repeated is wrong.
-`13761290/02_Test_images_and_ground_truth/Images/` ships **150 Lookalike and 150
-No oil**, and they are already in the built corpus: **289 Lookalike and 271
-No_oil tiles**, 560 negatives against 2,577 Oil (~18%). What `ISSUES.md`
-actually says is narrower, and both parts remain true — **Part II's** additional
-~42 GB was never downloaded (B3), and only **11 named look-alike tiles** exist
-in the *test* split (Q2), which is a thin evaluation sample rather than absent
-training data. Say it that way from now on.
+Look-alike data exists: Part III ships 150 Lookalike and 150 No oil, and the
+built corpus holds 289 Lookalike and 271 No_oil tiles. What is missing is Part
+II's ~42 GB (B3) and a test stratum wider than 11 named look-alike tiles (Q2).
+Say it that way.
 
 ### Traps already paid for
 
 - **`times` descends on a backward run.** `times[0]` is the observation.
 - **The drift engine needs naive UTC datetimes** (X10).
-- **`json.dumps` writes a bare `NaN`** that `JSON.parse` refuses. The first
-  drift export was unloadable and looked fine on disk. `check-real-drift.ts`
-  parses every artifact for exactly this reason.
-- **`coastline_action` was `none` for backward runs** while the docstring said
-  `previous`, so parcels walked inland. Fixed; it was 11.8%, 21.2% and 33.3% of
-  rendered parcels.
-- **Otsu finds the sea, not the oil,** on a real scene that is ~90% water. Now
-  re-applied inside the dark class and disclosed as "split Nx" in the panel.
-- **Corpus GeoTIFFs sit outside `DB_WINDOW`** of −35..0 dB — measured −49.5 to
-  −20.1 and −39.0 to −27.3 — so the fixed window clips them to black. The
-  decoder falls back to the raster's own range and says so.
-- **The band order is not consistent** (DATA.md D5): band 1 carries the wider
-  spread in one scene, band 2 in another. Chosen by measurement, never
-  hardcoded.
+- **`json.dumps` writes a bare `NaN`** that `JSON.parse` refuses;
+  `check-real-drift.ts` parses every artifact for that reason.
+- **Otsu finds the sea, not the oil,** on a real scene; re-applied inside the
+  dark class and disclosed as "split Nx".
+- **Corpus GeoTIFFs sit outside `DB_WINDOW`** (−35..0 dB); the decoder falls back
+  to the raster's own range and says so. **Band order is not consistent** (D5).
 - **npm 10+ ignores `--prefix` for `install`.** Use `cd frontDemo`.
-- **`await import('/src/...')` in the browser console gets a SEPARATE module
-  instance** once Vite has hot-reloaded (live modules carry `?t=`), so it shows
-  a placeholder upload, not the live one. Inspect the live map through the
-  `window.__map` dev handle (`querySourceFeatures`) instead.
-- **Screen pixels are not coordinates.** The map canvas runs under the right
-  dock and a slick is not at its frame centre; converting pixels to lon/lat by
-  the corner labels was off by ~4 km. Read geometry from `window.__map`.
-- **`landmask.generated.ts` is written last** by the build script, so the
-  console fails to load while a rebuild is running. Wait for it to finish.
-- **A Shift+F5 in the browser pane does not always reload.** Once it left the
-  previous generator's run on screen after the code had changed, and the view
-  looked like a bug that was already fixed. After reloading, check
-  `performance.timeOrigin` is seconds old before trusting a screenshot.
+- **`buildRun` refuses a Gulf scene until its real AIS is loaded.** The browser
+  path awaits `ensureRealTraffic` in `lib/spill.ts`; Node checks call
+  `useDiskTraffic()` (`scripts/realAisDisk.ts`) and, for coastal tiles outside
+  the bundle, `useDiskLandmask()` then `await ensureLandmask(...)`.
+- **The AIS export is slow once, fast after:** ~12 min to parse the 8 national
+  days into `data/interim/ais/*.npz`, then 8 s. A simplified track cannot tell
+  you where reception gaps are — the export records them as `breaks`.
+- **Browser-pane verification traps:** a Shift+F5 once did not reload (check
+  `performance.timeOrigin` is seconds old, or use `location.reload()`);
+  `await import('/src/...')` gets a separate module instance after HMR —
+  inspect the live map via `window.__map` (`querySourceFeatures`); screen pixels
+  are not coordinates (the canvas runs under the right dock).
 - **`check:scenarios` prints the truth as "runnerUp" when the truth is not
-  first,** so a failing row shows margin 0. It is not a tie; print the suspects.
+  first,** so a failing row shows margin 0. Print the suspects.
+- **`landmask.generated.ts` is written last** by `build_landmask.py`; the console
+  fails to load while a rebuild runs.
+- **Never stash or delete `frontDemo/public/` while the dev server runs.** Vite
+  keeps a list of public files; when `public/ais/` was stashed and restored, it
+  kept answering `ais/*.json` with `index.html` (200, `text/html`) and the
+  console hung on "awaiting run". Restart the dev server (`preview_stop` then
+  `preview_start`). The console now says "run failed" with this cause.
 - **`git add -A` used to sweep in 169 MB.** Check `git status` first.
 
 ### Verification
@@ -191,7 +141,8 @@ training data. Say it that way from now on.
 ```
 
 Baseline **506 passed, 9 skipped**. Then ruff (5 known errors, all in
-`frontDemo/scripts/extract-sample-geometry.py`, ISSUES X11), then the frontend:
+`frontDemo/scripts/extract-sample-geometry.py`, ISSUES X11; mypy needs
+`--explicit-package-bases` for single files), then the frontend:
 
 ```bash
 cd frontDemo && npm run check && npm run build
@@ -203,12 +154,12 @@ cd frontDemo && npm run check && npm run build
 
 ## 1. Immediate — the local demo
 
-### 1.1 Make the paths repo-relative
+### 1.1 Make the paths repo-relative — DONE 2026-09-22
 
-Blocks everything else in this section. Every absolute path in the annotation
-pack, `inventory.json`, the eleven `final-v*` split lists and `release.json`
-points at the training machine's home directory. The bytes are present and
-hash-verified; only the prefix is wrong. Full list in `DATA.md` §1.
+`scripts/repath_artifacts.py` rewrote every reference (commit `467c456`);
+`python -m scripts.repath_artifacts --check` reported on 2026-09-23 that every
+artifact resolves from the repository. Re-run it after copying anything new from
+the training machine, which will embed that machine's paths again.
 
 ### 1.2 Real upload, real metadata — DONE 2026-09-22
 

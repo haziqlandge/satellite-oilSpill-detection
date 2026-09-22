@@ -322,6 +322,7 @@ export function Workspace({
   booting,
   onBooted,
   loading,
+  error = null,
 }: {
   run: Run | null;
   paint: MapPaint;
@@ -332,6 +333,8 @@ export function Workspace({
   booting: boolean;
   onBooted: () => void;
   loading: boolean;
+  /** Why the run failed to build; shown instead of a spinner that never ends. */
+  error?: string | null;
 }) {
   const [handle, setHandle] = useState<MapHandle | null>(null);
   const view = useMapView(handle);
@@ -488,10 +491,19 @@ export function Workspace({
             onMap={(m) => setHandle((m as unknown as MapHandle) ?? null)}
           />
         ) : (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-[11px] tracking-[0.3em] uppercase" style={{ color: "var(--ink-faint)" }}>
-              awaiting run <Caret />
-            </p>
+          <div className="flex h-full items-center justify-center px-6">
+            {error ? (
+              <div role="alert" className="max-w-md text-center">
+                <p className="text-[11px] tracking-[0.3em] uppercase" style={{ color: "var(--alarm)" }}>
+                  run failed
+                </p>
+                <p className="mt-2 text-[11px] leading-[1.6]" style={{ color: "var(--ink-dim)" }}>{error}</p>
+              </div>
+            ) : (
+              <p className="text-[11px] tracking-[0.3em] uppercase" style={{ color: "var(--ink-faint)" }}>
+                awaiting run <Caret />
+              </p>
+            )}
           </div>
         )}
 

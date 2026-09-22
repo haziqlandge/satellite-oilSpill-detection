@@ -44,6 +44,8 @@ import type { Run } from "../sim/types";
 export interface SpillState {
   run: Run | null;
   loading: boolean;
+  /** Why the run could not be built, if it could not. Never left as a silent spinner. */
+  error: string | null;
   scenario: ScenarioId;
   setScenario: (id: ScenarioId) => void;
   listing: ScenarioListing;
@@ -100,6 +102,7 @@ export function useSpill(
   const [variant, setVariant] = useState<DriftVariant>("integral");
   const [run, setRun] = useState<Run | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [hour, setHour] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [ablated, setAblated] = useState(false);
@@ -145,18 +148,31 @@ export function useSpill(
     // synchronously would freeze the frame for the whole run and nothing would
     // change on screen until it finished. A Gulf scene's real AIS is fetched
     // first; `buildRun` refuses to build one without it.
+    // A failure is reported, not left spinning: a missing data file used to
+    // hold the console on "awaiting run" forever with the cause only in the
+    // devtools console.
+    setError(null);
+    const fail = (err: unknown) => {
+      if (cancelled) return;
+      setError(err instanceof Error ? err.message : String(err));
+      setLoading(false);
+    };
     let id = 0;
-    void ensureRealTraffic(scenario).then(() => {
+    ensureRealTraffic(scenario).then(() => {
       if (cancelled) return;
       id = window.setTimeout(() => {
-        const built = buildRun(scenario, variant);
-        if (cancelled) return;
-        setRun(built);
-        setHour(0);
-        setSelectedId(built.suspects[0]?.id ?? null);
-        setLoading(false);
+        try {
+          const built = buildRun(scenario, variant);
+          if (cancelled) return;
+          setRun(built);
+          setHour(0);
+          setSelectedId(built.suspects[0]?.id ?? null);
+          setLoading(false);
+        } catch (err) {
+          fail(err);
+        }
       }, 16);
-    });
+    }, fail);
 
     return () => {
       cancelled = true;
@@ -191,6 +207,7 @@ export function useSpill(
     () => ({
       run,
       loading,
+      error,
       scenario,
       setScenario,
       listing: scenarioListing(scenario),
@@ -209,6 +226,7 @@ export function useSpill(
     [
       run,
       loading,
+      error,
       scenario,
       setScenario,
       next,
