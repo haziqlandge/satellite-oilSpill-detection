@@ -52,15 +52,27 @@ Done: `lib/playhead.ts` publishes the fractional hour outside React; the canvas
 subscribes and repaints from its own rAF loop. `tsc -b` is clean and the
 production build passes.
 
+**Verified on 2026-09-22.** The cloud does move between whole hours. Method,
+so nobody has to invent it again: read the overlay canvas at full resolution
+with `getImageData`, keep every pixel whose alpha is non-zero, and take the
+alpha-weighted centroid — the sparse-stride hash the first attempt used could
+not see a haze drawn at alpha 0.16. Sample every ~90 ms at 1 simulated hour per
+second and group the samples by the `T±Nh` readout. Measured:
+
+| Displayed hour | Samples | Distinct centroids | Centroid travel (px) |
+|---|---|---|---|
+| T−36h | 11 | 3 | (443.67, 483.20) → (443.27, 480.72) |
+| T−35h | 17 | 8 | (443.28, 480.08) → (442.56, 475.34) |
+| T−34h | 17 | 8 | (442.39, 474.80) → (441.78, 470.15) |
+
+Eight distinct positions inside one stationary whole hour. Before the fix that
+column was 1 by construction. Fewer distinct centroids than samples is the
+probe's own fault, not the renderer's — a full-canvas `getImageData` per sample
+starves the page's `requestAnimationFrame`.
+
 **Not done, and the next thing to do:**
 
-1. **Verify it actually moves.** Sampling the overlay canvas mid-playback was
-   inconclusive — the hindcast haze draws at alpha 0.16 and only about 25
-   pixels registered under the sampling stride. Use a finer stride over the
-   alpha channel, or temporarily raise the alpha, or count non-zero pixels
-   rather than hashing a sparse sample. **Do not claim this works until you
-   have seen the cloud move between whole hours.**
-2. **Then improve the renderer** in `frontDemo/src/map/ParticleOverlay.ts`: a
+1. **Improve the renderer** in `frontDemo/src/map/ParticleOverlay.ts`: a
    pre-rendered soft radial sprite drawn with `drawImage` instead of
    `ctx.fillRect`; Catmull-Rom across four frames instead of the linear lerp in
    `sample()`; a fading trail buffer instead of `clearRect` every frame;

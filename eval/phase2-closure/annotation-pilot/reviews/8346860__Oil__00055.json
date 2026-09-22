@@ -3264,7 +3264,7 @@
   ],
   "image_sha256": "2a65b8f671026cb4580764e874aa6694cebfd394ebf12ff0e9cee779b1f6bf80",
   "mask_sha256": "58d0609f44c92969b188f85eabc46f619037af3dbececec611796652694eca2e",
-  "original_image": "C:\\Users\\adi\\Downloads\\oilSpil2l16\\oilSpil2l\\data\\interim\\datasets\\zenodo\\8346860\\01_Train_Val_Oil_Spill_images\\Oil\\00055.tif",
-  "original_mask": "C:\\Users\\adi\\Downloads\\oilSpil2l16\\oilSpil2l\\data\\interim\\datasets\\zenodo\\8346860\\01_Train_Val_Oil_Spill_mask\\Mask_oil\\00055.tif",
+  "original_image": "data/interim/datasets/zenodo/8346860/01_Train_Val_Oil_Spill_images/Oil/00055.tif",
+  "original_mask": "data/interim/datasets/zenodo/8346860/01_Train_Val_Oil_Spill_mask/Mask_oil/00055.tif",
   "split": "val"
 }

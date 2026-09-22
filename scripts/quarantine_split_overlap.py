@@ -6,6 +6,8 @@ from pathlib import Path
 
 import yaml
 
+from backend.config import REPO_ROOT
+
 
 def main():
     p = argparse.ArgumentParser()
@@ -40,12 +42,20 @@ def main():
     dest.mkdir()
     for split in ["train", "val", "test"]:
         (dest / f"{split}.txt").write_text(
-            "".join(r["path"].replace("\\", "/") + "\n" for r in retained if r["split"] == split)
+            # See scripts/prepare_final_dataset.py for why this is relative and
+            # why the leading "./" matters.
+            "".join(
+                "./"
+                + (REPO_ROOT / r["path"]).relative_to(dest.resolve(), walk_up=True).as_posix()
+                + "\n"
+                for r in retained
+                if r["split"] == split
+            )
         )
     (dest / "data.yaml").write_text(
+        # No `path:` key; the dataset root falls back to this file's directory.
         yaml.safe_dump(
             dict(
-                path=dest.resolve().as_posix(),
                 train="train.txt",
                 val="val.txt",
                 test="test.txt",

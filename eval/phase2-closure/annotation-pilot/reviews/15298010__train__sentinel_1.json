@@ -40,7 +40,7 @@
   ],
   "image_sha256": "7f79b832741fa4a884a31a14250a1039abbe3f2d6f53cca3927d74c4d8785342",
   "mask_sha256": "9c63c0194a240eadfd6506fe8ec44256d2091c9c948a53fe7ce88e3a098761cb",
-  "original_image": "C:\\Users\\adi\\Downloads\\oilSpil2l16\\oilSpil2l\\data\\interim\\datasets\\zenodo\\15298010\\images\\images\\train\\sentinel_1.png",
-  "original_mask": "C:\\Users\\adi\\Downloads\\oilSpil2l16\\oilSpil2l\\data\\interim\\datasets\\zenodo\\15298010\\masks\\masks\\train\\sentinel_1.png",
+  "original_image": "data/interim/datasets/zenodo/15298010/images/images/train/sentinel_1.png",
+  "original_mask": "data/interim/datasets/zenodo/15298010/masks/masks/train/sentinel_1.png",
   "split": "val"
 }

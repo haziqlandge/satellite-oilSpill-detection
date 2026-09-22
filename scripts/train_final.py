@@ -61,15 +61,21 @@ def digest(path):
 
 def verify_data():
     manifest = json.loads((DATA / "manifest.json").read_text(encoding="utf-8"))
+    # Manifest rows are repo-relative and split lines are relative to the list
+    # file itself; both forms resolve against their own anchor, and an absolute
+    # value left over from an older generation still wins on the right of `/`,
+    # so this reads either. See scripts/repath_artifacts.py.
     for split in ("train", "val", "test"):
         expected = [
-            Path(row["path"]).resolve() for row in manifest["retained"] if row["split"] == split
+            (ROOT / row["path"]).resolve() for row in manifest["retained"] if row["split"] == split
         ]
-        actual = [Path(line).resolve() for line in (DATA / f"{split}.txt").read_text().splitlines()]
+        actual = [
+            (DATA / line).resolve() for line in (DATA / f"{split}.txt").read_text().splitlines()
+        ]
         if actual != expected or len(actual) != manifest["counts"][split]:
             raise RuntimeError(f"Frozen split list does not match manifest: {split}")
     for row in manifest["retained"]:
-        image = Path(row["path"])
+        image = ROOT / row["path"]
         label = image.parent.parent.parent / "labels" / image.parent.name / (image.stem + ".txt")
         if digest(image) != row["image_sha256"] or digest(label) != row["label_sha256"]:
             raise RuntimeError(f"Frozen source changed: {image}")
@@ -88,7 +94,10 @@ def verify_data():
 def prepare():
     manifest = verify_data()
     overlap = json.loads(OVERLAP.read_text())
-    if overlap["pairs"] or Path(overlap["manifest"]).resolve() != DATA / "manifest.json":
+    # Anchored at ROOT, not at the working directory: the recorded value is
+    # repo-relative, so `Path(...).resolve()` alone would only agree when this
+    # happened to be run from the repository root.
+    if overlap["pairs"] or (ROOT / overlap["manifest"]).resolve() != DATA / "manifest.json":
         raise RuntimeError("Dataset overlap preflight has not passed for this manifest")
     if not torch.cuda.is_available():
         raise RuntimeError("CUDA unavailable")

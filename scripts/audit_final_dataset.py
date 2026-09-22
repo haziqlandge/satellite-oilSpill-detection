@@ -9,6 +9,7 @@ import numpy as np
 from PIL import Image
 from skimage.metrics import structural_similarity
 
+from backend.config import REPO_ROOT
 from scripts.prepare_final_dataset import DEST, SOURCE
 
 OUT = Path("eval/final_preflight")
@@ -16,7 +17,8 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 
 def read(row):
-    p = Path(row["path"])
+    # Manifest rows are repo-relative; see scripts/repath_artifacts.py.
+    p = REPO_ROOT / row["path"]
     with Image.open(p) as im:
         im.verify()
     with Image.open(p) as im:

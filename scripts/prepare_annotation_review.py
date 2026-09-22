@@ -11,6 +11,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 from skimage.measure import label
 
+from backend.config import REPO_ROOT
 from backend.ingest.datasets.relabel import binarise, export_review, propose_all
 from ml.datasets.oos_dataset import _read_mask
 from scripts.build_dataset import _collect
@@ -26,15 +27,22 @@ def main():
     if args.out.exists():
         raise FileExistsError(f"Refusing to overwrite {args.out}")
     sources = {source.identity: source for source in _collect(("sentinel",))}
-    frozen = Path("data/processed/dataset/final-v11")
+    frozen = REPO_ROOT / "data/processed/dataset/final-v11"
     inventory = []
     for split in ("train", "val"):
         for line in (frozen / f"{split}.txt").read_text().splitlines():
-            image = Path(line)
+            # Split lines are relative to the list file, not to the working
+            # directory. See scripts/repath_artifacts.py.
+            image = (frozen / line).resolve()
             annotation = image.parents[2] / "labels" / split / f"{image.stem}.txt"
             count = len(annotation.read_text().splitlines())
             inventory.append(
-                dict(identity=image.stem, split=split, image=str(image), instances=count)
+                dict(
+                    identity=image.stem,
+                    split=split,
+                    image=image.relative_to(REPO_ROOT).as_posix(),
+                    instances=count,
+                )
             )
     # Alternate source/split groups so a small pilot does not cover just one corpus.
     groups = {}
@@ -61,12 +69,15 @@ def main():
         document.update(
             image_sha256=hashlib.sha256(source.image.read_bytes()).hexdigest(),
             mask_sha256=hashlib.sha256(source.mask.read_bytes()).hexdigest(),
-            original_image=str(source.image.resolve()),
-            original_mask=str(source.mask.resolve()),
+            # Repo-relative. `.resolve()` here is what rooted every earlier
+            # review pack in the training machine's home directory, so the pack
+            # only opened on the machine that built it.
+            original_image=source.image.resolve().relative_to(REPO_ROOT).as_posix(),
+            original_mask=source.mask.resolve().relative_to(REPO_ROOT).as_posix(),
             split=row["split"],
         )
         review.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
-        with Image.open(row["image"]) as opened:
+        with Image.open(REPO_ROOT / row["image"]) as opened:
             picture = opened.convert("RGB")
         components = label(binarise(mask), connectivity=2)
         height, width = components.shape

@@ -381,7 +381,7 @@
   ],
   "image_sha256": "c51c8027903b7fe743cf3e0c407daf3599bab59e9d3892c693380c32c5213dab",
   "mask_sha256": "4800750a46b1b49d55c634a8bb4dbdd20e5e4d25a56da582828f31d67f44c6f1",
-  "original_image": "C:\\Users\\adi\\Downloads\\oilSpil2l16\\oilSpil2l\\data\\interim\\datasets\\zenodo\\13761290\\02_Test_images_and_ground_truth\\Images\\Oil\\00022.tif",
-  "original_mask": "C:\\Users\\adi\\Downloads\\oilSpil2l16\\oilSpil2l\\data\\interim\\datasets\\zenodo\\13761290\\02_Test_images_and_ground_truth\\Mask\\Oil\\00022_segmentation.tif",
+  "original_image": "data/interim/datasets/zenodo/13761290/02_Test_images_and_ground_truth/Images/Oil/00022.tif",
+  "original_mask": "data/interim/datasets/zenodo/13761290/02_Test_images_and_ground_truth/Mask/Oil/00022_segmentation.tif",
   "split": "val"
 }

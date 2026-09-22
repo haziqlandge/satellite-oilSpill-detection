@@ -55,7 +55,10 @@ def write_release_record() -> None:
         raise RuntimeError(f"Release artifacts missing: {missing}")
     payload = {
         "selected_model": CELL.name,
-        "selection_report": str(ROOT / "eval/final/REVIEW.md"),
+        # Repo-relative: an absolute path here records the training machine's
+        # home directory into the release provenance, where it is wrong
+        # everywhere else. See scripts/repath_artifacts.py.
+        "selection_report": "eval/final/REVIEW.md",
         "reason": (
             "L1 leads both comparable validation evaluations and the completed final-v11 "
             "100-epoch curves on mask AP; it also leads recall, Dice, boundary F1, small-object "

@@ -19,7 +19,9 @@ def inspect(path):
         rgb = im.convert("RGB")
         content = hashlib.sha256(str(rgb.size).encode() + rgb.tobytes()).hexdigest()
     return dict(
-        path=str(path),
+        # Repo-relative, so the manifest travels between machines. An absolute
+        # path here is what stranded every earlier generation.
+        path=path.resolve().relative_to(ROOT).as_posix(),
         split=path.parent.name,
         name=path.name,
         source=path.name.split("__")[0],
@@ -63,13 +65,23 @@ def main():
     DEST.mkdir(parents=True)
     for split in ["train", "val", "test"]:
         (DEST / f"{split}.txt").write_text(
-            "".join(r["path"].replace("\\", "/") + "\n" for r in chosen if r["split"] == split),
+            # Relative to this list file, and the leading "./" is load-bearing:
+            # Ultralytics rewrites exactly that prefix to the list's own
+            # directory and passes any other line straight through. An absolute
+            # path here is what stranded every earlier generation on the machine
+            # that wrote it. See scripts/repath_artifacts.py.
+            "".join(
+                "./" + (ROOT / r["path"]).relative_to(DEST, walk_up=True).as_posix() + "\n"
+                for r in chosen
+                if r["split"] == split
+            ),
             encoding="utf-8",
         )
     (DEST / "data.yaml").write_text(
+        # No `path:` key: it falls back to this file's own directory, which is
+        # the only root correct on every machine.
         yaml.safe_dump(
             dict(
-                path=DEST.as_posix(),
                 train="train.txt",
                 val="val.txt",
                 test="test.txt",

@@ -41,17 +41,23 @@ def main():
                 for r in manifest["retained"]:
                     if r["split"] != split or r["source"] != source:
                         continue
-                    p = Path(r["path"])
+                    # Manifest rows are repo-relative; see
+                    # scripts/repath_artifacts.py.
+                    p = ROOT / r["path"]
                     label = p.parent.parent.parent / "labels" / split / (p.stem + ".txt")
                     if (not label.read_text().strip()) == negative:
                         pool.append(r)
                 rows.extend(sorted(pool, key=lambda r: r["name"])[:each])
         chosen[split] = rows
-        (ds / f"{split}.txt").write_text("".join(r["path"].replace("\\", "/") + "\n" for r in rows))
-    (ds / "data.yaml").write_text(
-        yaml.safe_dump(
-            dict(path=ds.as_posix(), train="train.txt", val="val.txt", nc=1, names={0: "slick"})
+        (ds / f"{split}.txt").write_text(
+            "".join(
+                "./" + (ROOT / r["path"]).relative_to(ds.resolve(), walk_up=True).as_posix() + "\n"
+                for r in rows
+            )
         )
+    (ds / "data.yaml").write_text(
+        # No `path:`; the dataset root falls back to this file's own directory.
+        yaml.safe_dump(dict(train="train.txt", val="val.txt", nc=1, names={0: "slick"}))
     )
     register_lsk()
     cap_gpu_memory(fraction=1.0)
