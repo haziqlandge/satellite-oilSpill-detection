@@ -70,29 +70,33 @@ column was 1 by construction. Fewer distinct centroids than samples is the
 probe's own fault, not the renderer's — a full-canvas `getImageData` per sample
 starves the page's `requestAnimationFrame`.
 
-**Not done, and the next thing to do:**
+**The renderer is done too, and §1.4 with it.** Pre-rendered radial stamp
+instead of `fillRect`, Catmull-Rom across four frames instead of the linear
+lerp, a fading trail instead of `clearRect`, per-parcel size and brightness.
+Position is never jittered -- that would invent the one thing the view
+claims. The first draft was far too bright and the measurement said why:
+the stamp held full opacity to 45% of its radius, so under additive
+blending **51.4% of lit pixels clipped to white**. Fading from the centre
+instead took that to **0%**. If you touch the weights, measure that number
+rather than judging by eye -- a blown-out cloud looks confident and carries
+no density at all.
 
-1. **Improve the renderer** in `frontDemo/src/map/ParticleOverlay.ts`: a
-   pre-rendered soft radial sprite drawn with `drawImage` instead of
-   `ctx.fillRect`; Catmull-Rom across four frames instead of the linear lerp in
-   `sample()`; a fading trail buffer instead of `clearRect` every frame;
-   per-particle phase and size jitter. Keep the existing weighting logic —
-   release bright, hindcast a faint haze before the pass, full weight after.
-   That reasoning is sound and hard-won.
-
-### The thing the user noticed, and it is correct
+### The thing the user noticed, and it was right
 
 > "animation from t negative x to t0 are just t0 but scaled down"
 
-Exactly right, and worth understanding before touching anything.
-`frontDemo/src/lib/reconstruction.ts` takes the **T0 particle cloud** and
-applies a uniform scale about a moving centre for every negative hour — see its
-`project()` helper. The per-scene constants (`offsetKm`, `start`, `pulse`,
-`peak`) are hand-tuned by eye. **Nothing before the pass is physics.**
+Exactly right, and literally so: `lib/reconstruction.ts` applied a uniform
+scale about a moving centre to the T0 cloud for every negative hour. A
+similarity transform preserves shape exactly, which is why the aspect ratio
+was locked and why all eight scenarios looked alike -- one function,
+different hand-tuned constants. The area and spread readouts were derived
+from the same fake scale.
 
-Do not try to improve that function. Delete it, and feed the map real backward
-frames from the OpenDrift ensemble (§1.3). `frontDemo/scripts/check-reconstruction.ts`
-must then be rewritten to validate the exported artifacts instead.
+**Resolved 2026-09-22.** The module is deleted and the simulated ensemble's
+own backward leg shows through; it had been computing one all along.
+`frontDemo/scripts/check-hindcast.ts` guards the regression by asserting the
+cloud changes shape and bearing across the backward leg, both of which a
+similarity transform holds at exactly zero.
 
 ### Proven feasible on this machine — do not re-derive
 
@@ -205,23 +209,31 @@ to validate the exported artifacts instead.
 
 Watch the sign convention: `times` **descends** on a backward run.
 
-### 1.4 Make the animation fluid
+### 1.4 Make the animation fluid — DONE 2026-09-22
 
-Causes are specific and all in `frontDemo/src/map/ParticleOverlay.ts`:
+All of it, in `frontDemo/src/map/ParticleOverlay.ts`: pre-rendered radial
+stamp via `drawImage`, Catmull-Rom across four frames, a fading trail buffer
+instead of `clearRect`, per-parcel size and brightness, and a continuous rAF
+already driven by the fractional playhead. The existing weighting logic is
+kept — release bright, backward ensemble a faint haze before the pass, full
+weight after — with the forecast thinned further, because the 50/90 contours
+are drawn over it and are what it is read from.
 
-| Cause | Fix |
-|---|---|
-| square `fillRect` particles | pre-rendered soft radial sprite via `drawImage` |
-| linear interpolation between whole-hour frames | Catmull-Rom across four frames, and export at OpenDrift's native 10-minute step |
-| `clearRect` every frame | fading trail buffer so parcels leave streaklets |
-| every particle moves identically | per-particle phase offset and size jitter |
-| redraw only when `dirty` | continuous rAF driven by a time clock during playback |
+Two things deliberately NOT done, and why:
 
-Keep the existing weighting logic — release cloud bright, backward ensemble a
-faint haze before the pass, full weight after. That reasoning is sound.
+- **Position is never jittered.** Size and brightness vary per parcel; where
+  a parcel *is* does not. The whole claim of this view is that these are the
+  ensemble's own positions.
+- **The 10-minute native step belongs to §1.3**, not here. Interpolating
+  between stored timesteps is interpolation whatever the step, and the
+  interface says so; exporting finer frames is a change to what is stored.
 
-The particles are the real ensemble; interpolation between stored timesteps is
-interpolation, and the UI should say so.
+**If you change the weights, measure the saturated fraction.** Additive
+blending clips, and a clipped cloud looks confident while carrying no
+density information: the first draft of the stamp held full opacity to 45%
+of its radius and put **51.4%** of lit pixels at full white. Fading from the
+centre took it to **0%**. Count pixels with alpha >= 250 on the overlay
+canvas; judging this by eye is how it got shipped wrong the first time.
 
 ### 1.5 A skip button, always visible
 
