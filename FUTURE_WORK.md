@@ -24,14 +24,39 @@ uploads with both a dataset PNG and a GeoTIFF.
 
 ### State of the tree
 
-The upload-path work below (the later 2026-09-23 session) is committed in the
-commit that wrote this paragraph, on top of `c4de9f5`. Tests **510 passed, 9
-skipped** (the 506 baseline plus `tests/test_onnx_export.py`); **`ruff check .`
-and `mypy ml backend scripts` are clean for the first time** (X11); all 10
-`npm run check` scripts pass, including the new `check:geotiff` and
-`check:segmenter`.
-`frontDemo/public/models/L1-ciou-research.onnx` is gitignored (`*.onnx`) and must
-be regenerated on a fresh clone: `.venv/Scripts/python.exe -m ml.export.onnx_export`.
+The upload-path work below (the later 2026-09-23 session) is committed and
+pushed as `3c0798c`; this section's closing notes were added after it. Tests
+**510 passed, 9 skipped** (the 506 baseline plus `tests/test_onnx_export.py`);
+**`ruff check .` and `mypy ml backend scripts` are clean for the first time**
+(X11); all 10 `npm run check` scripts pass, including the new `check:geotiff`
+and `check:segmenter`; `npm run build` succeeds and ships the model and the
+onnxruntime WASM.
+
+**The model file is not in git — generate it on every other machine.**
+`frontDemo/public/models/L1-ciou-research.onnx` is gitignored (`*.onnx`, like
+every weight file); only its manifest beside it is tracked. On a fresh clone,
+or on the training machine, run once:
+`.venv/Scripts/python.exe -m ml.export.onnx_export`. It checks the export
+against PyTorch before writing it. Without it, uploads report that the
+segmenter could not be loaded, and `check:segmenter` skips.
+
+### Progress against this plan (counted 2026-09-23)
+
+**5 of the 27 work items in this file are done — about 19%.**
+
+| Section | Items | Done |
+|---|---|---|
+| §1 Immediate — the local demo | 6 | 4: §1.1, §1.2, §1.4, §1.6 |
+| §2 The labelling blocker | 6 | 0 |
+| §3 The live local pipeline | 6 | 0 |
+| §4 Deployment | 3 | 1: §4.1 |
+| §5 Remaining phases | 6 | 0 (phase 07 partly covered by §1 and §3) |
+
+The later 2026-09-23 session finished §4.1. Its other fixes — LZW decoding,
+band choice, no-data handling, the WebGPU deadlock, ruff and mypy — were bugs,
+not items in this plan, and are not counted. Of what remains, §2.5 needs the
+training machine, §2.6 needs the user to confirm a delete list, and phase 08
+needs a freshly frozen holdout.
 
 ### What the later 2026-09-23 session did (do not redo)
 
@@ -111,6 +136,10 @@ be regenerated on a fresh clone: `.venv/Scripts/python.exe -m ml.export.onnx_exp
 followed it are **done**; see above.
 
 ### Waiting on the user
+
+- **Delete or remount `site/sections/SampleAnimationLab.tsx`** (`ISSUES.md`
+  F17). Nothing imports it since the showcase was overhauled; its
+  cleaned-image references are already gone.
 
 - **Review `console/PositionPicker.tsx`** (map pin, footprint box, live
   water/land) before building on it.

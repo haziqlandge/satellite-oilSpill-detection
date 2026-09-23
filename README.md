@@ -66,6 +66,18 @@ npm run dev --prefix frontDemo
 
 Opens on port 5180. `http://127.0.0.1:5180/#/console` is the operations console.
 
+**Uploads need the model file, which is not in git.** The console runs the
+trained segmenter in the browser from `frontDemo/public/models/L1-ciou-research.onnx`,
+and `*.onnx` is gitignored like every other weight file. On a fresh clone, or
+on the training machine, generate it once from `weights/L1-ciou-research.pt`:
+
+```bash
+.venv/Scripts/python.exe -m ml.export.onnx_export
+```
+
+It checks the export against PyTorch before writing it. Without it, an upload
+says the segmenter could not be loaded rather than falling back to anything.
+
 `npm install --prefix frontDemo` does **not** work on npm 10+ — it resolves
 `package.json` from the current directory, not the prefix, and fails at the
 repository root. `npm run --prefix` is unaffected.
