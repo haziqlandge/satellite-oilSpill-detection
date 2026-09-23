@@ -112,8 +112,12 @@ Baseline is **510 passed, 9 skipped** — six database tests skip because the
 Supabase session pooler returns tenant/user not found, and the rest need
 hardware this machine lacks. A drop below 510 is a regression. ruff and mypy
 are both clean as of 2026-09-23; keep them that way. For the frontend,
-`cd frontDemo && npx tsc -b && npm run check` (10 scripts; the corpus checks
-skip on a machine without the Zenodo data or the exported model).
+`cd frontDemo && npx tsc -b && npm run check` (11 scripts; the corpus and
+real-run checks skip on a machine without their data or the exported model).
+
+**Use the trained model for every slick outline** (`frontDemo/src/sim/segmenter.ts`).
+When its output looks wrong, the input is wrong — compare against
+`backend/detect/yolo_lsk/infer.py` pixel for pixel before touching the model.
 
 Run the command and read the output. "Should pass" is not evidence.
 

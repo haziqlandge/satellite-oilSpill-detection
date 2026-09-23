@@ -20,7 +20,7 @@ import { animate } from "animejs";
 import { MapCanvas } from "../map/MapCanvas";
 import type { LayerToggles } from "../map/basemap";
 import { useAnimeScope, useReducedMotion } from "../lib/motion";
-import { ageStatement, stamp } from "../lib/format";
+import { ageStatement, provenanceFlag, refusalLabel, stamp } from "../lib/format";
 import { WEIGHTS_VERSION } from "../sim/scoring";
 import type { MapPaint } from "../theme";
 import type { Run, Suspect } from "../sim/types";
@@ -629,8 +629,8 @@ export function Workspace({
             background: "color-mix(in oklab, var(--base) 72%, transparent)",
           }}
         >
-          <Flag tone="warn" title="Simulated. No model trained. Identities masked.">
-            sim
+          <Flag tone={provenanceFlag(run).tone} title={provenanceFlag(run).title}>
+            {provenanceFlag(run).label}
           </Flag>
           {scale && (
             <div className="flex items-end gap-1.5">
@@ -667,10 +667,11 @@ export function Workspace({
         {/* --- refusal ---------------------------------------------- */}
         {halt && !booting && (
           <div className="absolute inset-x-0 top-0 z-20 p-2 sm:p-3">
-            <Alarm code="E-C3" title="attribution withheld · insufficient evidence" compact>
+            <Alarm code={refusalLabel(halt).code} title={`attribution withheld · ${refusalLabel(halt).title}`} compact>
               <p>
-                90% origin contour {halt.area90Km2.toFixed(0)} km². {halt.reason} No candidate is
-                ranked from this field, and the list in pane 04 is suppressed rather than emptied.
+                {refusalLabel(halt).areaIsReason && <>90% origin contour {halt.area90Km2.toFixed(0)} km². </>}
+                {halt.reason} No candidate is ranked from this field, and the list in pane 04 is
+                suppressed rather than emptied.
               </p>
             </Alarm>
           </div>

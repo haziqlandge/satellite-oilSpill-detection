@@ -106,6 +106,65 @@ SCENES: dict[str, Scene] = {
 }
 
 
+RUNS = REPO_ROOT / "frontDemo" / "public" / "runs"
+REAL_RUN_BACKWARD_MAX_H = 72
+# Beyond the drift's own reach: the console's 10 km contact radius, plus room.
+REAL_RUN_MARGIN_KM = 15.0
+
+
+def _day_on_disk(day: datetime) -> bool:
+    return (RAW / f"AIS_{day:%Y_%m_%d}.zip").exists() or (CACHE / f"AIS_{day:%Y_%m_%d}_gulf.npz").exists()
+
+
+def real_run_scenes() -> dict[str, Scene]:
+    """One scene per exported real OpenDrift run, derived from the run itself.
+
+    The real-run views pair OpenDrift's backward field with the traffic that
+    was actually around it, so the box is centred on the run's own seed (the
+    model's largest detection in the full scene) and the acquisition time is
+    the run's. The backward window reaches as far as the AIS days on disk allow
+    and no further: 48 h for April and May, 72 h for December. The drift reaches
+    72 h back in all three, and the interface says where the traffic stops.
+
+    Nobody is named and nothing is ranked in these views -- the fields never
+    converge -- so there is no published vessel to flag.
+
+    The box is the drift's own reach -- every 90% contour over the whole
+    hindcast -- plus `REAL_RUN_MARGIN_KM`, not the authored scenes' fixed
+    1.7 x 1.3 degrees: around the Mississippi mouth that fixed box holds over a
+    thousand vessels, nearly all of them nowhere near the oil.
+    """
+    scenes: dict[str, Scene] = {}
+    for path in sorted(RUNS.glob("*/drift.json")):
+        run = json.loads(path.read_text(encoding="utf-8"))
+        acquired = datetime.fromisoformat(run["acquiredAtIso"].replace("Z", "+00:00")).replace(tzinfo=None)
+        cx, cy = float(run["seed"][0]), float(run["seed"][1])
+        xs = [p[0] for frame in run["frames"] for ring in frame["contour90"] for p in ring] or [cx]
+        ys = [p[1] for frame in run["frames"] for ring in frame["contour90"] for p in ring] or [cy]
+        km_lon = 111.32 * math.cos(math.radians(cy))
+        earliest = datetime(acquired.year, acquired.month, acquired.day)
+        while _day_on_disk(earliest - timedelta(days=1)):
+            earliest -= timedelta(days=1)
+        if not _day_on_disk(earliest):
+            continue
+        available_h = int((acquired - earliest).total_seconds() // 3600)
+        scenes[f"real-{acquired:%Y%m%d}"] = Scene(
+            acquired=acquired,
+            centre=(cx, cy),
+            half_width_deg=round(max(cx - min(xs), max(xs) - cx) + REAL_RUN_MARGIN_KM / km_lon, 3),
+            half_height_deg=round(max(cy - min(ys), max(ys) - cy) + REAL_RUN_MARGIN_KM / KM_PER_DEG_LAT, 3),
+            backward_h=min(REAL_RUN_BACKWARD_MAX_H, available_h),
+            published_mmsi=None,
+            note=(
+                "Real run: the traffic around the model's largest detection in the full scene. "
+                "Context only; no vessel is ranked, because the backward field never converges."
+            ),
+            before_h=0,
+            after_h=2,
+        )
+    return scenes
+
+
 # AIS ship-type codes (ITU-R M.1371) to the classes the scorer knows. Codes
 # 90-99 are "other" and in the Gulf are mostly offshore supply and crew boats,
 # but the code does not say so, so they stay "Other" rather than being guessed.
@@ -239,7 +298,7 @@ def export_scene(name: str, scene: Scene) -> dict[str, object]:
     days = []
     day = datetime(start.year, start.month, start.day)
     while day <= end:
-        if (RAW / f"AIS_{day:%Y_%m_%d}.zip").exists() or (CACHE / f"AIS_{day:%Y_%m_%d}_gulf.npz").exists():
+        if _day_on_disk(day):
             days.append(day)
         elif day < scene.acquired:
             # The backward window is what the gate reads; a hole in it is a
@@ -361,11 +420,18 @@ def export_scene(name: str, scene: Scene) -> dict[str, object]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--only", choices=sorted(SCENES), help="export one scene")
+    parser.add_argument("--only", help="export one scene")
+    parser.add_argument(
+        "--real-runs", action="store_true",
+        help="export the traffic around each real OpenDrift run in frontDemo/public/runs instead",
+    )
     args = parser.parse_args()
 
+    scenes = real_run_scenes() if args.real_runs else SCENES
+    if args.only and args.only not in scenes:
+        parser.error(f"--only {args.only}: choose from {', '.join(sorted(scenes))}")
     OUT.mkdir(parents=True, exist_ok=True)
-    for name, scene in SCENES.items():
+    for name, scene in scenes.items():
         if args.only and name != args.only:
             continue
         started = time.monotonic()

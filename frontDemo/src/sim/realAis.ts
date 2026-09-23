@@ -59,6 +59,13 @@ export interface RealTrafficFile {
 /** The scenes whose traffic is real. Their runs cannot be built without it. */
 export const REAL_AIS_SCENES: ReadonlySet<string> = new Set(["gom-platform", "gom-moving", "gom-berthed"]);
 
+/**
+ * The real-run views' traffic: the same export, cut around each real OpenDrift
+ * run's seed (`export_ais_traffic.py --real-runs`). Kept apart from
+ * `REAL_AIS_SCENES`, whose members are authored scenarios with a published case.
+ */
+export const REAL_RUN_AIS_SCENES: ReadonlySet<string> = new Set(["real-20230409", "real-20230515", "real-20231205"]);
+
 /** Resampling cadence inside a continuous segment. */
 export const REAL_CADENCE_S = 300;
 
@@ -96,7 +103,7 @@ export function realTrafficFile(scene: string): RealTrafficFile | undefined {
 
 /** Load a scene's real traffic if it has any. Concurrent calls share one fetch. */
 export async function ensureRealTraffic(scene: string): Promise<void> {
-  if (!REAL_AIS_SCENES.has(scene) || files.has(scene)) return;
+  if (!(REAL_AIS_SCENES.has(scene) || REAL_RUN_AIS_SCENES.has(scene)) || files.has(scene)) return;
   const inFlight = pending.get(scene);
   if (inFlight) return inFlight;
   const work = loader(scene).then((file) => {

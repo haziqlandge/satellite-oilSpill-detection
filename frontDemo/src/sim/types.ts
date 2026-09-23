@@ -31,7 +31,15 @@ export type ScenarioId =
   | "sample2"
   | "sample3"
   /** A raster the operator supplied. Registered at runtime, never authored. */
-  | "upload";
+  | "upload"
+  /**
+   * A real OpenDrift run over a real Sentinel-1 scene (`sim/realRun.ts`):
+   * real detections, real drift, real AIS. Loaded from static files, never
+   * authored and never scored.
+   */
+  | "real-20230409"
+  | "real-20230515"
+  | "real-20231205";
 
 export type SlickClass = "oos" | "slick_unknown";
 
@@ -42,7 +50,12 @@ export type TemporalState = "ongoing" | "recent" | "legacy" | "indeterminate";
 export type AgeMethod =
   | "drift_convergence"
   | "source_coincidence"
-  | "beyond_horizon";
+  | "beyond_horizon"
+  /**
+   * The backward field never re-focused, so convergence yields no age. The
+   * triple still travels (C1) and says nothing more than the horizon it spans.
+   */
+  | "no_convergence";
 
 /** INTERFACES.md section 2 -- Detection. */
 export interface Detection {
@@ -110,8 +123,17 @@ export interface DriftRun {
   ageHours: [low: number, best: number, high: number];
   ageMethod: AgeMethod;
   temporalState: TemporalState;
-  /** Set when the field is too diffuse to discriminate (C3). */
-  insufficientEvidence: { area90Km2: number; reason: string } | null;
+  /**
+   * Set when attribution is withheld. Usually because the field is too diffuse
+   * to discriminate (C3); `kind` says when it is for another reason, so the
+   * interface does not call a tight field diffuse.
+   */
+  insufficientEvidence: {
+    area90Km2: number;
+    reason: string;
+    /** Absent means the C3 diffuse test. */
+    kind?: "no_age";
+  } | null;
   /**
    * The area the origin contour must come inside for the run to discriminate.
    *

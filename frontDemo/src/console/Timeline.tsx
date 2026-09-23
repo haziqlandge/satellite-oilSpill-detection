@@ -409,7 +409,9 @@ export function Timeline({
           {moment && (
             <>
               <span className="num text-[10.5px] whitespace-nowrap" style={{ color: "var(--ink-faint)" }}>
-                discharged {(moment.releasedFraction * 100).toFixed(0)}%
+                {/* A run with no release to play does not know how much was
+                    discharged; 0% would read as a measurement. */}
+                {run.release.length ? `discharged ${(moment.releasedFraction * 100).toFixed(0)}%` : "release unknown"}
               </span>
               <span className="num text-[10.5px] whitespace-nowrap" style={{ color: "var(--ink-faint)" }}>
                 surface {moment.areaKm2.toFixed(2)} km2

@@ -37,6 +37,7 @@ import { score, type DriftVariant } from "./scoring";
 import { buildSlick, characterise, seedPoints, windGate, type SlickGeometry } from "./slick";
 import { SAMPLE_SPECS, SAMPLE_LISTINGS } from "./samples";
 import { hasRealTraffic, publishedVesselId, realVessels } from "./realAis";
+import { buildRealRun, isRealRun, REAL_RUN_LISTINGS, type RealRunId } from "./realRun";
 import type {
   Environment,
   LngLat,
@@ -247,7 +248,7 @@ const MUMBAI_HIGH: LngLat = [71.62, 19.48];
  * Every scenario that is written down. `upload` is excluded by construction:
  * it is built from a raster at runtime and there is nothing to author.
  */
-const AUTHORED_SPECS: Record<Exclude<ScenarioId, "upload">, ScenarioSpec> = {
+const AUTHORED_SPECS: Record<Exclude<ScenarioId, "upload" | RealRunId>, ScenarioSpec> = {
   ...SAMPLE_SPECS,
   "gom-moving": {
     meta: {
@@ -891,13 +892,13 @@ const UPLOAD_PLACEHOLDER: ScenarioSpec = {
   },
 };
 
-const SPECS: Record<ScenarioId, ScenarioSpec> = {
+const SPECS: Record<Exclude<ScenarioId, RealRunId>, ScenarioSpec> = {
   ...(Object.fromEntries(
     Object.entries(AUTHORED_SPECS).map(([id, spec]) => {
       const by = DISPLACEMENTS[id as ScenarioId];
       return [id, by ? displace(spec, by) : spec];
     }),
-  ) as Record<ScenarioId, ScenarioSpec>),
+  ) as Record<Exclude<ScenarioId, RealRunId>, ScenarioSpec>),
   upload: UPLOAD_PLACEHOLDER,
 };
 
@@ -991,7 +992,9 @@ export function buildRun(id: ScenarioId, variant: DriftVariant = "integral"): Ru
   const hit = cache.get(key);
   if (hit) return hit;
 
-  const run = assemble(id, variant);
+  // A real run is read, not simulated: no variant changes it, and nothing in
+  // it is scored.
+  const run = isRealRun(id) ? buildRealRun(id) : assemble(id, variant);
   cache.set(key, run);
   // Cast rather than pulling in `vite/client`: those ambient types also declare
   // every asset import in the project, and widening global type resolution to
@@ -1033,7 +1036,7 @@ function checkExpectation(id: ScenarioId, variant: DriftVariant, run: Run) {
   const say = (msg: string) =>
     console.warn(
       `[scenario] ${id}/${variant} contradicts meta.expectedTop1 ` +
-        `(${JSON.stringify(SPECS[id].meta.expectedTop1)}): ${msg}`,
+        `(${JSON.stringify(run.meta.expectedTop1)}): ${msg}`,
     );
 
   if (run.truth === null) {
@@ -1060,7 +1063,7 @@ function checkExpectation(id: ScenarioId, variant: DriftVariant, run: Run) {
   }
 }
 
-function assemble(id: ScenarioId, variant: DriftVariant): Run {
+function assemble(id: Exclude<ScenarioId, RealRunId>, variant: DriftVariant): Run {
   const spec = SPECS[id];
   const rng = makeRng(seedFrom(id));
   const acquiredAt = Date.parse(spec.meta.acquiredAtIso);
@@ -1486,14 +1489,14 @@ export { windGate, circleRing, distanceKm, bearingDeg, positionAt };
 const UPLOAD_LISTING: ScenarioListing = {
   id: "upload",
   name: "Uploaded image",
-  short: "Operator raster · screened outline",
+  short: "Operator raster · segmented outline",
   region: "gulf-of-mexico",
   tests: "The geometry is the uploaded image; everything downstream is simulated.",
 };
 
 export function scenarioListing(id: ScenarioId): ScenarioListing {
   return (
-    [...SCENARIOS, ...SAMPLE_LISTINGS, UPLOAD_LISTING].find((s) => s.id === id) ?? SCENARIOS[0]
+    [...SCENARIOS, ...SAMPLE_LISTINGS, ...REAL_RUN_LISTINGS, UPLOAD_LISTING].find((s) => s.id === id) ?? SCENARIOS[0]
   );
 }
 

@@ -17,8 +17,8 @@ import { useMemo, type ReactNode } from "react";
 import { SarTile, boundsFor } from "../components/SarTile";
 import { SampleEvidenceImages, UploadEvidenceImages } from "./SampleImagePanel";
 import { isSample } from "../sim/samples";
-import { distanceKm } from "../sim/geo";
-import { ageStatement, formatHour, stamp } from "../lib/format";
+import { distanceKm, polygonsOf } from "../sim/geo";
+import { ageStatement, formatHour, refusalLabel, stamp } from "../lib/format";
 import { CONTACT_RADIUS_KM, PHASE_LABEL, type Moment } from "../lib/playback";
 import type { DriftVariant } from "../sim/scoring";
 import type { Run } from "../sim/types";
@@ -174,7 +174,7 @@ export function Detect({ run }: { run: Run }) {
         </Block>
 
         <Block label="Damping">
-          <Row label="ratio" value={`${c.dampingRatioDb.toFixed(1)} dB`} />
+          <Row label="ratio" value={Number.isFinite(c.dampingRatioDb) ? `${c.dampingRatioDb.toFixed(1)} dB` : "not measured"} />
           <Row label="confidence" value={c.dampingConfidence} tone="warn" />
           <Note tone="warn" label="not a thickness">
             A relative backscatter contrast index between the slick and the water
@@ -204,7 +204,10 @@ export function Detect({ run }: { run: Run }) {
           </Split>
         </Block>
 
-        <Block label="Radar tile" right="synthesised">
+        {/* Generated from the damping ratio, so a run that measured none -- a
+            real scene -- has nothing to generate it from, and a synthetic
+            picture beside real data would read as the scene. */}
+        {Number.isFinite(c.dampingRatioDb) && <Block label="Radar tile" right="synthesised">
           <Split
             figure={
               /* `data-fig` and `--fig-w` sit on the frame rather than on the
@@ -249,7 +252,7 @@ export function Detect({ run }: { run: Run }) {
             a photograph of the sea.
           </Note>
           </Split>
-        </Block>
+        </Block>}
       </PaneBody>
     </Pane>
   );
@@ -274,6 +277,8 @@ export function Drift({
   const age = ageStatement(d);
   const rounded = Math.round(hour);
   const frame = d.frames.find((f) => f.hour === rounded) ?? null;
+  // Separate regions, not rings: a hole is part of the region around it.
+  const lobes = useMemo(() => (frame ? polygonsOf(frame.contour90).length : null), [frame]);
   // The complete event record, including the compact hindcast ramp into T0 and the forecast after acquisition.
   const forward = useMemo(() => d.frames, [d.frames]);
   const first = forward[0] ?? null;
@@ -310,14 +315,19 @@ export function Drift({
       title="Drift"
       right={
         <Flag tone={d.insufficientEvidence ? "alarm" : "ok"}>
-          {d.insufficientEvidence ? "diffuse" : "converged"}
+          {d.insufficientEvidence ? refusalLabel(d.insufficientEvidence).short : "converged"}
         </Flag>
       }
     >
       <PaneBody>
         {d.insufficientEvidence && (
           <div className="mb-3">
-            <Alarm code="E-C3" title="field too diffuse to discriminate" compact>
+            <Alarm
+              code={refusalLabel(d.insufficientEvidence).code}
+              title={d.insufficientEvidence.kind === "no_age"
+                ? refusalLabel(d.insufficientEvidence).title
+                : "field too diffuse to discriminate"}
+              compact>
               <p>
                 90% contour {d.insufficientEvidence.area90Km2.toFixed(0)} km².{" "}
                 {d.insufficientEvidence.reason}
@@ -385,8 +395,8 @@ export function Drift({
               />
               <Row
                 label="lobes"
-                value={frame ? frame.contour90.length : "--"}
-                tone={frame && frame.contour90.length > 1 ? "warn" : "ink"}
+                value={lobes ?? "--"}
+                tone={lobes !== null && lobes > 1 ? "warn" : "ink"}
               />
               {/*
                 How fast the region is opening up right now, which is the one

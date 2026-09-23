@@ -489,6 +489,50 @@ band medians were 0 dB and the model was handed band 1 (`DATA.md` §2.1). With
 the input prepared exactly as `infer_scene` prepares it, the browser matched
 Python pixel for pixel on every scene compared, including the zero-filled one.
 
+## 2.16 Real runs: what can honestly be shown, and traps met on the way
+
+Recorded 2026-09-23 while wiring the three real OpenDrift runs into the console
+(`sim/realRun.ts`; state in `FUTURE_WORK.md` §0).
+
+- **The real seeds are not the authored slicks.** Each run is seeded from the
+  model's largest full-scene detection, 30-150 km from the authored Gulf
+  scenarios' slicks. Real drift cannot be overlaid on an authored scenario;
+  each real run is its own view.
+- **No ranking, by physics, not by omission.** All three fields are
+  `monotonic` (no convergence minimum → no age, C1) and wind-only (no currents,
+  X2). Their contours are tight (5-253 km²), so the C3 "diffuse" label would be
+  false; the refusal carries `kind: "no_age"` and is named E-C1 everywhere
+  (`refusalLabel`).
+- **The authored AIS boxes are wrong for real seeds.** They reach ~29.0°N; the
+  seeds sit at 29.3-29.6°N. A fixed 1.7° × 1.3° box at the delta holds ~1,000
+  vessels; sizing it to the drift's reach halves that.
+- **`Math.min(...spread)` over every AIS report overflows the stack** (tens of
+  thousands of points). Use a loop.
+- **onnxruntime-web's WebGPU session deadlocks on overlapping `run` calls** and
+  freezes the page; `segment()` queues per session. Never call `session.run`
+  elsewhere.
+- **The exported contours are cell boxes, one per 0.01° cell, on purpose**
+  (`contour_geojson`: an iso-line would claim more precision than the grid
+  holds). Drawn box by box, each cell got its own dashed outline and the
+  hindcast read as a checkerboard (1,590 boxes on the April map). `dissolveCells`
+  (`sim/geo.ts`) merges them into the outline of the same cells — still stepped
+  at the grid, 5,870 boxes → 311 rings on April — and `polygonsOf` fills rings
+  by nesting, because the regions have holes (98 / 35 / 76 across the three
+  runs) and a hole drawn as its own polygon is painted twice instead of left
+  empty. `check:realruns` proves every exported cell centre is inside the
+  outline and every uncovered neighbour outside; its separate-region counts
+  (25 / 16 / 24 at most) match shapely's `unary_union` independently. The drift
+  pane's "lobes" had been counting rings, i.e. every cell.
+- **The real runs are seeded from whole-tile look-alike blocks** (`ISSUES.md`
+  Q5). "The largest detection" is a 1024-px tile the model filled entirely;
+  December's is on GSHHG land. Measured and recorded, not yet changed: which
+  detection to hindcast is the user's call.
+- **Three provenance badges had drifted apart.** The header still said
+  "Simulated. No model trained" (false since the model runs in the browser) and
+  wore SIM on real runs; the map strip said "simulated traffic" on the Gulf
+  scenes, which run on real AIS. All three now come from `provenanceFlag`
+  (`lib/format.ts`).
+
 ## Where the detailed evidence lives
 
 | Artifact | Contents |

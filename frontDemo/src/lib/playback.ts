@@ -25,6 +25,8 @@ import type { ReleaseFrame } from "../sim/drift";
 import type { LngLat, Run, Vessel } from "../sim/types";
 
 export type EventPhase =
+  /** Before the pass, in a run whose release time is unknown (a real scene). */
+  | "reconstruction"
   | "pre"
   | "discharging"
   | "adrift"
@@ -72,14 +74,18 @@ export const CONTACT_RADIUS_KM = 12;
  * water" on the hours after it had stopped.
  */
 export function phaseAt(run: Run, hour: number): EventPhase {
-  if (hour < run.releaseStartHour) return "pre";
   if (hour > 0.5) return "forecast";
   if (hour >= -0.5) return "acquisition";
+  // A run with no release to play -- a real scene -- does not know when the oil
+  // entered the water, so it cannot say "before", "discharging" or "adrift".
+  if (!run.release.length) return "reconstruction";
+  if (hour < run.releaseStartHour) return "pre";
   if (hour <= run.releaseEndHour) return "discharging";
   return "adrift";
 }
 
 export const PHASE_LABEL: Record<EventPhase, string> = {
+  reconstruction: "Hindcast reconstruction · release time unknown",
   pre: "Before the release",
   discharging: "Oil entering the water",
   adrift: "Adrift, no longer discharging",

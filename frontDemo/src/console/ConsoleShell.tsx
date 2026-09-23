@@ -21,7 +21,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { hrefFor } from "../lib/hash";
-import { stamp } from "../lib/format";
+import { provenanceFlag, refusalLabel, stamp } from "../lib/format";
 import { momentAt } from "../lib/playback";
 import { useSpill } from "../lib/spill";
 import { DEFAULT_TOGGLES, type LayerToggles } from "../map/basemap";
@@ -293,7 +293,7 @@ export default function ConsoleShell() {
           </p>
 
           {activeRun && (
-            <GroupHead right={<Flag tone="warn">sim</Flag>}>case</GroupHead>
+            <GroupHead right={<Flag tone={provenanceFlag(activeRun).tone} title={provenanceFlag(activeRun).title}>{provenanceFlag(activeRun).label}</Flag>}>case</GroupHead>
           )}
           {activeRun && (
             <div className="mt-1.5 px-2">
@@ -500,7 +500,7 @@ export default function ConsoleShell() {
             <Flag
               tone="alarm"
               filled
-              title="Attribution withheld: insufficient evidence"
+              title={`Attribution withheld: ${refusalLabel(halt).title}`}
             >
               halt
             </Flag>
@@ -512,15 +512,15 @@ export default function ConsoleShell() {
             header has no room to spend on a badge once the case key, the link
             state and the two exits have wrapped.
 
-            The `sim` disclosure is not lost with it. It is on the `case` group
-            in the control-attributes panel, and the detect pane opens with the
-            provenance note that says in full which parts of this run are
-            simulated -- both of which a narrow viewport reaches through the
+            The `sim`/`real` disclosure is not lost with it. It is on the `case`
+            group in the control-attributes panel, and the detect pane opens
+            with the provenance note that says in full which parts of this run
+            are simulated -- both of which a narrow viewport reaches through the
             panel reader.
           */}
           {!narrow && (
-            <Flag tone="warn" title="Simulated. No model trained. Identities masked.">
-              sim
+            <Flag tone={provenanceFlag(activeRun).tone} title={provenanceFlag(activeRun).title}>
+              {provenanceFlag(activeRun).label}
             </Flag>
           )}
 

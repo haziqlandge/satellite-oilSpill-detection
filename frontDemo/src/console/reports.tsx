@@ -23,6 +23,7 @@ import {
   TERM_ORDER,
   TERM_SHORT,
   formatHour,
+  refusalLabel,
   stamp,
 } from "../lib/format";
 import { CONTACT_RADIUS_KM, eventSpan } from "../lib/playback";
@@ -293,7 +294,7 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
       <PaneBody>
         {halt && (
           <div className="mb-3">
-            <Alarm code="E-C3" title="attribution withheld">
+            <Alarm code={refusalLabel(halt).code} title="attribution withheld">
               <p>{halt.reason}</p>
               {haveOrigin && (
                 <p className="mt-2" style={{ color: "var(--ink-dim)" }}>

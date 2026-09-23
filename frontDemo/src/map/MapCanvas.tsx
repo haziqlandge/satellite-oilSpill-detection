@@ -42,7 +42,7 @@ import type { MapPaint } from "../theme";
 import type { LngLat, Run, Suspect } from "../sim/types";
 import { positionAt } from "../sim/ais";
 import { trackSegments } from "../sim/realAis";
-import { pointInPolygon, distanceToPathKm } from "../sim/geo";
+import { pointInPolygon, distanceToPathKm, polygonsOf } from "../sim/geo";
 
 interface Props {
   run: Run;
@@ -650,9 +650,9 @@ export function MapCanvas({
     src(SOURCE.hindcast).setData(collection(
       run.drift.frames
         .filter(f => f.hour < 0 && (f.hour % 12 === 0 || f.hour === -run.drift.backwardHours))
-        .flatMap(f => f.contour90.map(ring => ({
+        .flatMap(f => polygonsOf(f.contour90).map(rings => ({
           type: "Feature" as const, properties: { hour: f.hour },
-          geometry: { type: "Polygon" as const, coordinates: [ring] },
+          geometry: { type: "Polygon" as const, coordinates: rings },
         }))),
     ));
 
@@ -725,19 +725,20 @@ export function MapCanvas({
     // the cloud says how the mass is distributed inside them.
     const frame = run.drift.frames.find(f => f.hour === Math.round(hour)) ?? run.drift.frames[0];
 
+    // Grouped by nesting, so a hole in a credible region stays a hole.
     const rings: GeoJSON.Feature[] = [];
-    for (const ring of frame.contour90) {
+    for (const polygon of polygonsOf(frame.contour90)) {
       rings.push({
         type: "Feature",
         properties: { band: 90 },
-        geometry: { type: "Polygon", coordinates: [ring] },
+        geometry: { type: "Polygon", coordinates: polygon },
       });
     }
-    for (const ring of frame.contour50) {
+    for (const polygon of polygonsOf(frame.contour50)) {
       rings.push({
         type: "Feature",
         properties: { band: 50 },
-        geometry: { type: "Polygon", coordinates: [ring] },
+        geometry: { type: "Polygon", coordinates: polygon },
       });
     }
     src(SOURCE.contour).setData(collection(rings));

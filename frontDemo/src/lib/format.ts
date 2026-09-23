@@ -5,7 +5,7 @@
  * and placed is each design's business; what it is called is the project's.
  */
 
-import type { CandidateKind, DriftRun, ScoreTermKey } from "../sim/types";
+import type { CandidateKind, DriftRun, Run, ScoreTermKey } from "../sim/types";
 
 export function formatUtc(ms: number): string {
   return new Date(ms).toISOString().replace("T", " ").replace(".000Z", "Z");
@@ -57,6 +57,50 @@ export function relHour(hour: number): string {
  * stopped. So an ongoing discharge is stated as one, and the interval is kept
  * beside it rather than instead of it.
  */
+/**
+ * What to call a refusal, by why it happened.
+ *
+ * Most refusals are C3 -- a field too diffuse to discriminate. A real run's is
+ * not: its field is tight but never converges and has no currents, so it has
+ * no age (C1) and nothing to rank against. Calling that "diffuse" or quoting
+ * its contour area as if the area were the reason would misstate it.
+ */
+export function refusalLabel(halt: NonNullable<DriftRun["insufficientEvidence"]>): {
+  code: string;
+  title: string;
+  /** One or two words, for a flag. */
+  short: string;
+  /** Whether the contour area is the reason, and so worth leading with. */
+  areaIsReason: boolean;
+} {
+  return halt.kind === "no_age"
+    ? { code: "E-C1", title: "no convergence, no currents: nothing ranked", short: "no age", areaIsReason: false }
+    : { code: "E-C3", title: "insufficient evidence", short: "diffuse", areaIsReason: true };
+}
+
+/**
+ * The badge a run wears: REAL only when nothing in it is simulated.
+ *
+ * Every other run simulates at least its drift and its scores, even where the
+ * traffic (the Gulf scenes) or the outline (uploads, samples) is real, so the
+ * one word is "sim" and the tooltip points at the note saying which is which.
+ * The header, the case group and the map strip all wear this one badge; three
+ * hand-written copies had drifted into disagreeing with each other.
+ */
+export function provenanceFlag(run: Run | null | undefined): { tone: "ok" | "warn"; label: string; title: string } {
+  return run?.meta.provenance.startsWith("REAL")
+    ? {
+        tone: "ok",
+        label: "real",
+        title: "Real model detections, OpenDrift drift and marinecadastre AIS. Nothing simulated; nobody ranked. Identities masked.",
+      }
+    : {
+        tone: "warn",
+        label: "sim",
+        title: "Simulated drift and scores. The provenance note in the detect pane says which parts are real. Identities masked.",
+      };
+}
+
 export function ageStatement(drift: DriftRun): {
   /** Short form, for a readout. */
   value: string;

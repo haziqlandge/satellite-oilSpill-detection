@@ -38,6 +38,7 @@ import {
   type ScenarioListing,
 } from "../sim/scenarios";
 import { ensureRealTraffic } from "../sim/realAis";
+import { ensureRealRun } from "../sim/realRun";
 import type { DriftVariant } from "../sim/scoring";
 import type { Run } from "../sim/types";
 
@@ -158,7 +159,9 @@ export function useSpill(
       setLoading(false);
     };
     let id = 0;
-    ensureRealTraffic(scenario).then(() => {
+    // A real run needs its drift, detections and traffic; an authored Gulf
+    // scene its traffic; everything else returns at once.
+    Promise.all([ensureRealTraffic(scenario), ensureRealRun(scenario)]).then(() => {
       if (cancelled) return;
       id = window.setTimeout(() => {
         try {

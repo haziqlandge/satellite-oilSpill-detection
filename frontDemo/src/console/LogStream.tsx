@@ -19,7 +19,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { animate } from "animejs";
-import { clock, formatHour } from "../lib/format";
+import { clock, formatHour, refusalLabel } from "../lib/format";
 import { CONTACT_RADIUS_KM, PHASE_LABEL, type Moment } from "../lib/playback";
 import { useReducedMotion } from "../lib/motion";
 import { WEIGHTS_VERSION } from "../sim/scoring";
@@ -95,7 +95,14 @@ function seedLines(run: Run): LogEntry[] {
       `${run.suspects.length} candidates · weights ${WEIGHTS_VERSION}`,
       run.suspects.length ? "dim" : "warn",
     ),
-    entry(at, 0, "prov", PROVENANCE.short.toLowerCase(), "warn"),
+    // A real run is the one case the global "simulated" line would misstate.
+    entry(
+      at, 0, "prov",
+      run.meta.provenance.startsWith("REAL")
+        ? "real · model detections, opendrift drift, marinecadastre ais · nothing simulated, nobody ranked"
+        : PROVENANCE.short.toLowerCase(),
+      run.meta.provenance.startsWith("REAL") ? "ok" : "warn",
+    ),
   ];
 
   if (d.insufficientEvidence) {
@@ -104,7 +111,9 @@ function seedLines(run: Run): LogEntry[] {
         at,
         0,
         "halt",
-        `attribution withheld · 90% contour ${d.insufficientEvidence.area90Km2.toFixed(0)} km2`,
+        refusalLabel(d.insufficientEvidence).areaIsReason
+          ? `attribution withheld · 90% contour ${d.insufficientEvidence.area90Km2.toFixed(0)} km2`
+          : `attribution withheld · ${refusalLabel(d.insufficientEvidence).title}`,
         "alarm",
       ),
     );

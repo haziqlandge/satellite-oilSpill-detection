@@ -24,13 +24,13 @@ uploads with both a dataset PNG and a GeoTIFF.
 
 ### State of the tree
 
-The upload-path work below (the later 2026-09-23 session) is committed and
-pushed as `3c0798c`; this section's closing notes were added after it. Tests
-**510 passed, 9 skipped** (the 506 baseline plus `tests/test_onnx_export.py`);
-**`ruff check .` and `mypy ml backend scripts` are clean for the first time**
-(X11); all 10 `npm run check` scripts pass, including the new `check:geotiff`
-and `check:segmenter`; `npm run build` succeeds and ships the model and the
-onnxruntime WASM.
+The upload-path work (the second 2026-09-23 session) is committed and pushed as
+`3c0798c`, its notes as `c7a24e4`. **Everything after that is in the working
+tree, uncommitted**: the real-run views (built by the second session, finished
+and verified by the third — see "Done by the third session" below) and the
+third session's fixes. Commit via commitskill when the user asks. Tests
+**510 passed, 9 skipped**; `ruff check .` and `mypy ml backend scripts` clean
+(98 files); all 11 `npm run check` scripts pass; `npm run build` succeeds.
 
 **The model file is not in git — generate it on every other machine.**
 `frontDemo/public/models/L1-ciou-research.onnx` is gitignored (`*.onnx`, like
@@ -42,21 +42,22 @@ segmenter could not be loaded, and `check:segmenter` skips.
 
 ### Progress against this plan (counted 2026-09-23)
 
-**5 of the 27 work items in this file are done — about 19%.**
+**6 of the 27 work items in this file are done — about 22%.**
 
 | Section | Items | Done |
 |---|---|---|
-| §1 Immediate — the local demo | 6 | 4: §1.1, §1.2, §1.4, §1.6 |
+| §1 Immediate — the local demo | 6 | 5: §1.1, §1.2, §1.3, §1.4, §1.6 |
 | §2 The labelling blocker | 6 | 0 |
 | §3 The live local pipeline | 6 | 0 |
 | §4 Deployment | 3 | 1: §4.1 |
 | §5 Remaining phases | 6 | 0 (phase 07 partly covered by §1 and §3) |
 
-The later 2026-09-23 session finished §4.1. Its other fixes — LZW decoding,
-band choice, no-data handling, the WebGPU deadlock, ruff and mypy — were bugs,
-not items in this plan, and are not counted. Of what remains, §2.5 needs the
-training machine, §2.6 needs the user to confirm a delete list, and phase 08
-needs a freshly frozen holdout.
+§1.3 became done when the real runs reached the console (the third 2026-09-23
+session verified them; `lib/reconstruction.ts` was already deleted). Bug fixes
+— the checkerboard contours, the lobe count, the badges; earlier LZW, band
+choice, no-data, the WebGPU deadlock, ruff and mypy — are not plan items and
+are not counted. Of what remains, §2.5 needs the training machine, §2.6 needs
+the user to confirm a delete list, and phase 08 needs a freshly frozen holdout.
 
 ### What the later 2026-09-23 session did (do not redo)
 
@@ -119,21 +120,85 @@ needs a freshly frozen holdout.
   `drift.json` report `monotonic` with a null triple; an older note claiming
   December reached `convergence_minimum` was wrong.
 
+### The real-run views — built by the second session, finished by the third
+
+**Job 1, the real OpenDrift runs in the console, is done and verified, and not
+yet committed.** It is in the working tree after `c7a24e4`.
+
+What exists:
+
+- `frontDemo/src/sim/realRun.ts` — three scenario ids `real-20230409`,
+  `real-20230515`, `real-20231205`, listed in the picker under "real runs ·
+  nothing simulated" (`console/SpillKey.tsx`). `buildRealRun` fills a full
+  `Run` from real data only: the model's full-scene detections (366 / 1,331 /
+  89 polygons), OpenDrift's 73 backward frames (−72..0 h, forward 0), real AIS
+  (548 / 339 / 489 vessels), ERA5 wind at the seed. **Nobody is ranked**:
+  `suspects: []`, `insufficientEvidence.kind = "no_age"` (the fields never
+  converge — `monotonic` — and there is no current field, X2). Currents are NaN,
+  not zero; `dampingRatioDb` is NaN ("not measured"); `release: []`.
+- Real runs are NOT in `SCENARIOS` (the synthetic checks iterate it and would
+  fail in Node); they are in `REAL_RUN_LISTINGS`, and `buildRun` dispatches on
+  `isRealRun`. `lib/spill.ts` awaits `ensureRealRun` + `ensureRealTraffic`.
+- New data exports, all on disk and reproducible:
+  - `scripts/export_real_scenes.py` → `frontDemo/public/runs/<scene>/scene.json`
+    (detections simplified to 0.0002°, seed flagged; ERA5 wind read from the
+    SAME cached request the drift used, `DEMO_OFFLINE=1`)
+  - `scripts/export_ais_traffic.py --real-runs` → `frontDemo/public/ais/real-*.json`
+    (box = the drift's own 90% contour extent + 15 km; window = the AIS days on
+    disk: 48 h Apr/May, 72 h Dec; `REAL_RUN_AIS_SCENES` in `sim/realAis.ts`)
+- UI honesty: `refusalLabel` (`lib/format.ts`) names a refusal by kind (E-C1
+  "no convergence, no currents: nothing ranked" vs E-C3 diffuse) in the map
+  banner, HALT flag, log, case report and drift pane; the timeline says
+  "release unknown"; playback phase `reconstruction` ("release time unknown")
+  for runs with no release; no synthesised radar tile without a damping value.
+- `npm run check:realruns` builds each real run from disk and asserts it is all
+  real, frame for frame, ranks nobody — and, since the third session, that the
+  drawn outline covers exactly the exported cells.
+
+The `public/ais/real-*.json` files are committable (tracked like the other AIS
+files). The `public/runs/<scene>/scene.json` files are gitignored with
+`drift.json`; another machine regenerates them with
+`python -m scripts.export_real_scenes` after `export_drift_runs`, and
+`check:realruns` skips until they exist.
+
+### Done by the third 2026-09-23 session (uncommitted — do not redo)
+
+- **Verified the real runs end to end.** PLAY from −72 h to 0 h on April:
+  particles and contours animate, 0.7% of lit overlay pixels saturated, no
+  console errors. May and December load with the E-C1 banner, REAL badges and
+  no errors, at z 9.00. pytest 510 / 9, ruff and mypy clean, 11 checks, build.
+- **The hindcast was a checkerboard.** The export writes one box per 0.01° cell
+  (deliberately — no false precision), and the map outlined every box.
+  `dissolveCells` + `polygonsOf` in `sim/geo.ts` draw the outline of the same
+  cells, holes kept. `PREVIOUS_WORK.md` §2.16.
+- **The drift pane's "lobes" counted rings** — every cell, on a real run. It now
+  counts separate regions.
+- **One provenance badge rule** (`provenanceFlag`): the header said "No model
+  trained" and SIM on real runs; the map strip said "simulated traffic" on the
+  real-AIS Gulf scenes.
+- **Investigated last session's "may not be oil" note, and it is worse**:
+  every real run is seeded from a whole-tile look-alike block, and December's
+  is on land (`ISSUES.md` Q5).
+
 ### THE NEXT JOBS, in order
 
-1. **Wire the real OpenDrift runs into the console** — the remaining half of
-   §1.3. Artifacts (`public/runs/*/drift.json`) and the loader
-   (`sim/realDrift.ts`, `overlayFrames` now passes parcels through untouched)
-   exist; nothing selects them. They are the same three days as the real AIS,
-   so a real-run view can pair real drift with real traffic. Watch X7: the local
-   December scene is `20231205T000214`, while the Gulf AIS export for Case 3 is
-   windowed on 23:57:19 — a real-run view of the local scene needs its own AIS
-   window (Dec 3-5 are on disk; add a `Scene` in `scripts/export_ais_traffic.py`).
-2. **Framing:** raise `SCREEN_MAX` in `sim/ingest.ts` so the full raster is shown
-   when running locally (the 1024 decimation for tracing is deliberate).
-
-§4.1 — the trained detector in the browser — and the LZW decode failures that
-followed it are **done**; see above.
+1. **User decision — the real-run seed** (`ISSUES.md` Q5). Options: (a) keep
+   "largest detection" and say on the view that the seed is a whole-tile block;
+   (b) re-seed from the largest detection that is at sea on GSHHG and is not a
+   whole-tile block, and rerun `export_drift_runs` + `export_real_scenes` +
+   `export_ais_traffic --real-runs` (CPU, minutes; ERA5 may need a fresh CDS
+   request if the new seed leaves the cached box). Either way the rule must be
+   stated on the view, and chosen without looking at what it ranks — nothing
+   is ranked here anyway.
+2. **User decision — "framing".** The original ask was that uploads looked
+   cropped and the oil invisible; that was the wrong band (fixed). What is
+   still reduced: the panel shows every image at 160–224 px tall, the mask
+   overlay is rendered at 720 px, and the outline is traced on a 1024 grid
+   (`SCREEN_MAX`, deliberate; `GROUP_CELLS` is in grid cells, so raising it
+   changes grouping unless rescaled). A full-resolution viewer (click to open,
+   zoom and pan, mask at native pixels) is the change that would show the
+   whole raster; raising `SCREEN_MAX` alone would not show anything more.
+3. **Commit** via commitskill when asked.
 
 ### Waiting on the user
 

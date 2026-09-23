@@ -130,6 +130,123 @@ export function pointInPolygon(p: LngLat, parts: LngLat[][]): boolean {
   return parts.some((ring) => pointInRing(p, ring));
 }
 
+/**
+ * Group a flat list of rings into polygons by nesting: a ring inside an odd
+ * number of others is a hole in the smallest one around it.
+ *
+ * Contour lists are flat -- `contour90` is `LngLat[][]` -- and a region can
+ * have holes. Drawn one filled polygon per ring, a hole is painted as a second
+ * layer of the region instead of as a gap in it. Each ring is tested at the
+ * middle of its first edge, which no other ring can pass through: iso-lines do
+ * not cross, and a dissolved cell outline shares no edge with another ring.
+ */
+export function polygonsOf(rings: LngLat[][]): LngLat[][][] {
+  const probe = rings.map((r): LngLat => [(r[0][0] + r[1][0]) / 2, (r[0][1] + r[1][1]) / 2]);
+  const area = rings.map(ringAreaKm2);
+  const parent = rings.map((_, i) => {
+    let depth = 0;
+    let best = -1;
+    for (let j = 0; j < rings.length; j++) {
+      if (j === i || !pointInRing(probe[i], rings[j])) continue;
+      depth++;
+      if (best < 0 || area[j] < area[best]) best = j;
+    }
+    return depth % 2 === 1 ? best : -1;
+  });
+  const polygons = new Map<number, LngLat[][]>();
+  rings.forEach((ring, i) => { if (parent[i] < 0) polygons.set(i, [ring]); });
+  rings.forEach((ring, i) => { if (parent[i] >= 0) polygons.get(parent[i])?.push(ring); });
+  return [...polygons.values()];
+}
+
+/**
+ * Merge equal grid-cell boxes into the outline of their union.
+ *
+ * The real drift export writes a credible region as one box per 0.01° cell, on
+ * purpose: a smoothed iso-line would claim more precision than the grid holds
+ * (`contour_geojson` in `backend/drift/origin_field.py`). Drawn box by box,
+ * every cell gets its own outline and the region reads as a grid. This keeps
+ * exactly the same cells -- the outline still steps at the grid -- and draws
+ * only where the region ends. Outer rings run anticlockwise and holes
+ * clockwise; cells touching only at a corner stay separate rings, as they are
+ * separate regions.
+ */
+export function dissolveCells(boxes: LngLat[][]): LngLat[][] {
+  if (boxes.length === 0) return [];
+  const step = Math.abs(boxes[0][1][0] - boxes[0][0][0]);
+  let lon0 = Infinity;
+  let lat0 = Infinity;
+  for (const b of boxes) {
+    if (b.length !== 5 || Math.abs(Math.abs(b[1][0] - b[0][0]) - step) > step * 1e-3) {
+      throw new Error("dissolveCells: expected equal axis-aligned cell boxes");
+    }
+    lon0 = Math.min(lon0, b[0][0], b[2][0]);
+    lat0 = Math.min(lat0, b[0][1], b[2][1]);
+  }
+  const key = (x: number, y: number) => `${x},${y}`;
+  const cells = new Set<string>();
+  for (const b of boxes) {
+    const west = Math.min(b[0][0], b[2][0]);
+    const south = Math.min(b[0][1], b[2][1]);
+    cells.add(key(Math.round((west - lon0) / step), Math.round((south - lat0) / step)));
+  }
+
+  // Every cell side with no cell across it, directed so the region is on the
+  // left. Shared sides are never emitted, so what is left is the boundary.
+  const out = new Map<string, [number, number][]>();
+  const edge = (x0: number, y0: number, x1: number, y1: number) => {
+    const k = key(x0, y0);
+    const list = out.get(k);
+    if (list) list.push([x1, y1]);
+    else out.set(k, [[x1, y1]]);
+  };
+  for (const c of cells) {
+    const [x, y] = c.split(",").map(Number);
+    if (!cells.has(key(x, y - 1))) edge(x, y, x + 1, y);
+    if (!cells.has(key(x + 1, y))) edge(x + 1, y, x + 1, y + 1);
+    if (!cells.has(key(x, y + 1))) edge(x + 1, y + 1, x, y + 1);
+    if (!cells.has(key(x - 1, y))) edge(x, y + 1, x, y);
+  }
+
+  const rings: LngLat[][] = [];
+  const round = (v: number) => Math.round(v * 1e5) / 1e5;
+  for (const [startKey, starts] of out) {
+    while (starts.length) {
+      const [sx, sy] = startKey.split(",").map(Number);
+      const path: [number, number][] = [[sx, sy]];
+      let [px, py] = [sx, sy];
+      let [cx, cy] = starts.pop()!;
+      while (cx !== sx || cy !== sy) {
+        path.push([cx, cy]);
+        const next = out.get(key(cx, cy));
+        if (!next?.length) throw new Error("dissolveCells: open boundary");
+        // Where two cells touch only at this corner there are two ways on;
+        // the left turn keeps to the region being traced.
+        const dx = cx - px, dy = cy - py;
+        let pick = next.length - 1;
+        for (let i = 0; i < next.length; i++) {
+          if (next[i][0] - cx === -dy && next[i][1] - cy === dx) pick = i;
+        }
+        [px, py] = [cx, cy];
+        [cx, cy] = next.splice(pick, 1)[0];
+      }
+      // Drop the corners that are not corners: straight runs along a row.
+      const n = path.length;
+      const ring: LngLat[] = [];
+      for (let i = 0; i < n; i++) {
+        const [ax, ay] = path[(i + n - 1) % n];
+        const [bx, by] = path[i];
+        const [qx, qy] = path[(i + 1) % n];
+        if ((bx - ax) * (qy - by) - (by - ay) * (qx - bx) === 0) continue;
+        ring.push([round(lon0 + bx * step), round(lat0 + by * step)]);
+      }
+      ring.push(ring[0]);
+      rings.push(ring);
+    }
+  }
+  return rings;
+}
+
 /** Shortest distance from a point to a polyline, km. */
 export function distanceToPathKm(
   p: LngLat,
