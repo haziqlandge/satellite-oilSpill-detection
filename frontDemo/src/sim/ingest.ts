@@ -3,11 +3,16 @@
  *
  * The panel this replaces did not read uploads at all. It fingerprinted the
  * file against three supplied JPEGs, refused anything else, and then built its
- * mask from the *preset's* clean image rather than from the pixels it had just
+ * mask from a stored preset image rather than from the pixels it had just
  * been handed, behind four five-second timers. Nothing about the upload reached
  * the result.
  *
- * WHAT THIS IS, SAID PLAINLY. This is a dark-region threshold screen. It is
+ * TWO PATHS LIVE HERE. `ribbonFromMask` traces the trained segmenter's mask,
+ * and is what every upload and every authored sample uses. `extractRibbon`
+ * below is the dark-region screen it replaced -- on the Part I corpus that
+ * screen outlined the sea -- kept only for `check:ingest`.
+ *
+ * WHAT THE SCREEN IS, SAID PLAINLY. It is a dark-region threshold screen. It is
  * NOT the trained segmenter, and the interface must never present it as one.
  * The release weights are a single class, `slick`, and the project's own
  * research is explicit that oil cannot be separated from natural films by SAR
@@ -15,9 +20,8 @@
  * can do is find the dark region a person is pointing at, which is exactly what
  * an upload needs in order to have geometry to drift.
  *
- * It is the same screen the offline `scripts/extract-sample-geometry.py` runs
- * over the supplied samples, so an upload and a sample travel the same path.
- * Two differences, both deliberate:
+ * It began as the screen an older offline script ran over the supplied
+ * samples, with two differences, both deliberate:
  *
  *  - the threshold is chosen from the image rather than fixed at 100, because a
  *    fixed cut is a statement about one set of JPEGs and the corpus spans two
@@ -84,6 +88,15 @@ export interface Ribbon {
    * single most misleading thing this panel could do.
    */
   separation: number;
+  /** What drew the outline: the trained segmenter, or the threshold screen. */
+  method: "segmenter" | "screen";
+  /**
+   * The segmenter's own confidence: the highest-scoring detection over the
+   * traced region. Null for the screen, which has no score to give.
+   */
+  score: number | null;
+  /** Detections the segmenter returned for the whole frame, before seam merging. */
+  detections: number | null;
 }
 
 export type IngestFailure =
@@ -467,6 +480,139 @@ export function extractRibbon(
       meanInside: +meanInside.toFixed(1),
       meanOutside: +meanOutside.toFixed(1),
       separation: Math.max(0, Math.min(1, (meanOutside - meanInside) / 255)),
+      method: "screen",
+      score: null,
+      detections: null,
+    },
+  };
+}
+
+/**
+ * Fragments of one slick closer than this, in screen cells, are traced as one.
+ *
+ * The segmenter returns a slick the way the corpus labels draw it -- often a
+ * string of pieces along one streak, broken where the film thins -- and the
+ * drift needs the streak, not its largest piece. Eight cells is ~16 px of a
+ * 2048 tile: it joins breaks along a streak without reaching across open water
+ * to an unrelated slick.
+ */
+const GROUP_CELLS = 8;
+
+/**
+ * A drift-ready ribbon from the trained segmenter's mask.
+ *
+ * The mask is the model's answer and is not second-guessed here: it is pooled
+ * onto the same decimated grid the screen works on (a cell is slick if ANY of
+ * its pixels is, so a thin streak survives decimation), nearby fragments are
+ * grouped, and the group holding the most slick is traced with the same tracer
+ * the screen uses, so everything downstream reads one shape either way.
+ */
+export function ribbonFromMask(
+  mask: Uint8Array,
+  rgba: Uint8ClampedArray,
+  width: number,
+  height: number,
+  detections: { box: [number, number, number, number]; score: number }[],
+): IngestOutcome {
+  const small = decimate(rgba, width, height, SCREEN_MAX);
+  const w = small.width;
+  const h = small.height;
+  const factor = Math.max(1, Math.ceil(Math.max(width, height) / SCREEN_MAX));
+  const cells = new Uint8Array(w * h);
+  for (let y = 0; y < height && ((y / factor) | 0) < h; y++) {
+    const row = ((y / factor) | 0) * w;
+    for (let x = 0; x < width; x++) {
+      const cx = (x / factor) | 0;
+      if (cx < w && mask[y * width + x]) cells[row + cx] = 1;
+    }
+  }
+
+  // Dilate to group, separably: the grouping only decides which fragments
+  // belong together; the traced cells are still the model's own.
+  const across = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      if (!cells[y * w + x]) continue;
+      for (let d = Math.max(0, x - GROUP_CELLS); d <= Math.min(w - 1, x + GROUP_CELLS); d++) across[y * w + d] = 1;
+    }
+  const grown = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      if (!across[y * w + x]) continue;
+      for (let d = Math.max(0, y - GROUP_CELLS); d <= Math.min(h - 1, y + GROUP_CELLS); d++) grown[d * w + x] = 1;
+    }
+  // `largestDarkComponent` labels cells at or below a threshold, so the grown
+  // mask is passed inverted: slick 0, water 255.
+  const inverted = new Uint8Array(w * h);
+  for (let i = 0; i < inverted.length; i++) inverted[i] = grown[i] ? 0 : 255;
+  const groups = largestDarkComponent(inverted, w, h, 0);
+  if (groups.target < 0) {
+    return {
+      ok: false,
+      reason: "empty",
+      detail:
+        "The trained segmenter found no slick in this raster above its release confidence. " +
+        "That is its answer, not a failure: it misses most small slicks (held-out recall .11 on them).",
+    };
+  }
+
+  // The group that holds the most slick, not the widest halo.
+  const slickIn = new Map<number, number>();
+  for (let i = 0; i < cells.length; i++)
+    if (cells[i]) slickIn.set(groups.label[i], (slickIn.get(groups.label[i]) ?? 0) + 1);
+  let target = -1;
+  let most = 0;
+  for (const [id, n] of slickIn) if (n > most) { most = n; target = id; }
+  const label = new Int32Array(w * h).fill(-1);
+  let minX = w, maxX = -1, minY = h, maxY = -1;
+  for (let i = 0; i < cells.length; i++) {
+    if (!cells[i] || groups.label[i] !== target) continue;
+    label[i] = 0;
+    const x = i % w, y = (i / w) | 0;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const coverage = most / (w * h);
+
+  const { ring, axis, touchesEdge } = trace(label, 0, w, h, w);
+  if (ring.length < 8 || axis.length < 3) {
+    return { ok: false, reason: "too-small", detail: "The segmented slick is too small to trace an outline.", coverage };
+  }
+
+  // The score of the traced slick: the best detection whose box lies over it.
+  const bx0 = minX * factor, bx1 = (maxX + 1) * factor, by0 = minY * factor, by1 = (maxY + 1) * factor;
+  let score = 0;
+  for (const d of detections) {
+    const [x1, y1, x2, y2] = d.box;
+    if (x2 >= bx0 && x1 <= bx1 && y2 >= by0 && y1 <= by1 && d.score > score) score = d.score;
+  }
+
+  let insideSum = 0, insideN = 0, outsideSum = 0, outsideN = 0;
+  for (let i = 0; i < label.length; i++) {
+    if (label[i] === 0) { insideSum += small.grey[i]; insideN++; }
+    else if (!cells[i]) { outsideSum += small.grey[i]; outsideN++; }
+  }
+  const meanInside = insideN ? insideSum / insideN : 0;
+  const meanOutside = outsideN ? outsideSum / outsideN : 0;
+
+  return {
+    ok: true,
+    ribbon: {
+      ring,
+      axis,
+      coverage,
+      components: slickIn.size,
+      threshold: 0,
+      touchesEdge,
+      splits: 0,
+      meanInside: +meanInside.toFixed(1),
+      meanOutside: +meanOutside.toFixed(1),
+      separation: Math.max(0, Math.min(1, (meanOutside - meanInside) / 255)),
+      method: "segmenter",
+      score: +score.toFixed(3),
+      detections: detections.length,
     },
   };
 }

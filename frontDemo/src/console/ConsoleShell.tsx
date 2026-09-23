@@ -35,7 +35,9 @@ import { Workspace } from "./Workspace";
 import { Detect, Drift, Traffic } from "./panes";
 import { Attribute, Evidence, Method } from "./reports";
 import { SpillKey } from "./SpillKey";
-import { SampleImagePanel, useSampleSession } from "./SampleImagePanel";
+import {
+  nextFrame, SampleImagePanel, stageEnd, stageStart, UploadTimings, useSampleSession,
+} from "./SampleImagePanel";
 import { PanelsMenu } from "./PanelsMenu";
 import { DockRail } from "./dock/DockRail";
 import { FloatWindow } from "./dock/FloatWindow";
@@ -185,6 +187,26 @@ export default function ConsoleShell() {
     state.setScenario(scenario);
   }, [state]);
 
+  /*
+    An upload goes straight onto the map once the segmenter and coastline are
+    done: `runUpload` registers the scene and bumps `runs`, and this selects it,
+    timing the build (drift ensemble, traffic, scoring) for the timing panel.
+    A frame is yielded first so the stage's spinner is painted before the
+    synchronous build holds the main thread.
+  */
+  const selectedUploadRuns = useRef(0);
+  const scenarioChangeRef = useRef(handleScenarioChange);
+  scenarioChangeRef.current = handleScenarioChange;
+  useEffect(() => {
+    if (sampleSession.key || sampleSession.state !== "complete" || sampleSession.runs === selectedUploadRuns.current) return;
+    selectedUploadRuns.current = sampleSession.runs;
+    stageStart("Drift, traffic and scoring", "hindcast −36 h · forecast +72 h");
+    void nextFrame().then(() => {
+      scenarioChangeRef.current("upload");
+      stageEnd("Drift, traffic and scoring", "done", "hindcast −36 h · forecast +72 h · on the map");
+    });
+  }, [sampleSession.key, sampleSession.state, sampleSession.runs]);
+
   const panelState = useMemo(() => activeRun
     ? { ...state, run: activeRun, scenario: activeRun.meta.id, listing: scenarioListing(activeRun.meta.id) }
     : state, [state, activeRun]);
@@ -333,6 +355,16 @@ export default function ConsoleShell() {
     }
 
     if (id === "modelTiming") {
+      // The latest upload, live, whenever it is what the console is showing or
+      // is still being processed; otherwise the scenario's own figures.
+      const uploadLive = !sampleSession.key && sampleSession.timings.length > 0 &&
+        (activeRun?.meta.id === "upload" || sampleSession.startedAt >= scenarioSwitchRef.current);
+      if (uploadLive) {
+        return <div data-pane-narrow className="min-h-0 flex-1 overflow-y-auto px-2 py-2" style={SCROLL}>
+          <GroupHead right={<Flag tone="ok">measured · live</Flag>}>pipeline time</GroupHead>
+          <UploadTimings />
+        </div>;
+      }
       const sample = isSample(activeRun?.meta.id ?? null) ? DEMO_PRESETS[activeRun!.meta.id as DemoSampleKey] : null;
       const rows = sample?.timings ?? [
         { label: "Run preparation", durationMs: 840 },

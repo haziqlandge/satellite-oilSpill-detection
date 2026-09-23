@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from typing import Any
 
 import matplotlib
 import numpy as np
@@ -37,7 +38,7 @@ fig.suptitle(
 fig.tight_layout(rect=(0, 0, 1, 0.965))
 fig.savefig(ROOT / "qualitative.png", dpi=140)
 plt.close(fig)
-comparison = {}
+comparison: dict[str, dict[str, Any]] = {}
 for m in models:
     rows = [json.loads(line) for line in (ROOT / m / "images.jsonl").read_text().splitlines()]
     ng = sum(r["ng"] for r in rows)

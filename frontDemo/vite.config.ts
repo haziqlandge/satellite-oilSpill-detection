@@ -7,6 +7,9 @@ export default defineConfig({
   // 5180 by default, but overridable from the environment so a second dev
   // server can run alongside the first without either of them moving.
   server: { port: Number(process.env.PORT) || 5180, open: false },
+  // onnxruntime-web locates its .wasm beside its own module URL; pre-bundling
+  // it into .vite/deps moves the module and the runtime then 404s its binary.
+  optimizeDeps: { exclude: ["onnxruntime-web"] },
   build: {
     rollupOptions: {
       output: {

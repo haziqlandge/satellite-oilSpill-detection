@@ -5,16 +5,24 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
+from typing import Any, cast
 
 import torch
 from ultralytics.models.yolo.segment import SegmentationTrainer
 from ultralytics.utils.torch_utils import unwrap_model
 
+# The casts below are for the type checker only. ultralytics declares trainer
+# state (`ema`, `metrics`, `validator`) as None until training sets it up, and
+# torch's `Module.to` stub has no `memory_format` overload although the runtime
+# accepts one; by the time these functions run, all of it is populated.
+
 
 def fp32_inference_model(model: torch.nn.Module) -> torch.nn.Module:
     """Return a detached FP32 release copy without saturating finite weights."""
 
-    released = deepcopy(unwrap_model(model)).float().to(memory_format=torch.contiguous_format)
+    released: Any = deepcopy(unwrap_model(model)).float().to(
+        memory_format=torch.contiguous_format,  # type: ignore[call-overload]
+    )
     if hasattr(released, "criterion"):
         released.criterion = None
     for value in released.state_dict().values():
@@ -22,23 +30,25 @@ def fp32_inference_model(model: torch.nn.Module) -> torch.nn.Module:
             raise RuntimeError("Refusing to release a checkpoint with non-finite model state")
     for parameter in released.parameters():
         parameter.requires_grad_(False)
-    return released
+    return cast(torch.nn.Module, released)
 
 
 def save_fp32_inference_checkpoint(trainer: SegmentationTrainer, destination: Path) -> Path:
     """Write a minimal Ultralytics-compatible checkpoint from the live FP32 EMA."""
 
+    ema = cast(Any, trainer.ema)
+    metrics = cast(dict[str, Any], trainer.metrics)
     destination.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
         {
             "epoch": -1,
-            "model": fp32_inference_model(trainer.ema.ema),
+            "model": fp32_inference_model(ema.ema),
             "ema": None,
             "optimizer": None,
             "updates": None,
             "scaler": None,
             "train_args": vars(trainer.args),
-            "train_metrics": {**trainer.metrics, "fitness": trainer.fitness},
+            "train_metrics": {**metrics, "fitness": trainer.fitness},
             "train_results": trainer.read_results_csv(),
         },
         destination,
@@ -49,18 +59,20 @@ def save_fp32_inference_checkpoint(trainer: SegmentationTrainer, destination: Pa
 def save_fp32_resume_checkpoint(trainer: SegmentationTrainer, destination: Path) -> Path:
     """Write a resumable checkpoint without converting the EMA to FP16."""
 
+    ema = cast(Any, trainer.ema)
+    metrics = cast(dict[str, Any], trainer.metrics)
     destination.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
         {
             "epoch": trainer.epoch,
             "best_fitness": trainer.best_fitness,
             "model": None,
-            "ema": fp32_inference_model(trainer.ema.ema),
-            "updates": trainer.ema.updates,
+            "ema": fp32_inference_model(ema.ema),
+            "updates": ema.updates,
             "optimizer": deepcopy(trainer.optimizer.state_dict()),
             "scaler": trainer.scaler.state_dict(),
             "train_args": vars(trainer.args),
-            "train_metrics": {**trainer.metrics, "fitness": trainer.fitness},
+            "train_metrics": {**metrics, "fitness": trainer.fitness},
             "train_results": trainer.read_results_csv(),
             "date": datetime.now().astimezone().isoformat(),
         },
@@ -77,7 +89,7 @@ class FP32ReleaseTrainer(SegmentationTrainer):
         return self.wdir / "best-fp32.pt"
 
     def save_model(self) -> bool:
-        saved = super().save_model()
+        saved = cast(bool, super().save_model())
         save_fp32_resume_checkpoint(self, self.last)
         if self.best_fitness == self.fitness:
             save_fp32_inference_checkpoint(self, self.fp32_best)
@@ -87,11 +99,11 @@ class FP32ReleaseTrainer(SegmentationTrainer):
         super().final_eval()
         if not self.fp32_best.exists():
             return
-        self.validator.args.plots = self.args.plots
-        self.validator.args.compile = False
-        self.metrics = self.validator(model=self.fp32_best)
-        self.metrics.pop("fitness", None)
+        validator = cast(Any, self.validator)
+        validator.args.plots = self.args.plots
+        validator.args.compile = False
+        self.metrics = validator(model=self.fp32_best)
+        cast(Any, self.metrics).pop("fitness", None)
         self.epoch += 1
         self.run_callbacks("on_fit_epoch_end")
         self.epoch -= 1
-

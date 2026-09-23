@@ -38,6 +38,7 @@ import math
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 from dotenv import load_dotenv
@@ -149,7 +150,8 @@ def export_scene(path: Path, *, forcing_mode: str, hours: int, verbose: bool = T
     centre, bbox, polygons = largest_polygon(path)
 
     readers = None
-    forcing = Forcing()
+    # None once real readers carry the forcing; `run_ensemble` takes either.
+    forcing: Forcing | None = Forcing()
     if forcing_mode == "era5":
         from backend.ingest.metocean.cache import fetch_with_cache
         from backend.ingest.metocean.era5 import era5_reader, fetch_era5_wind, wind_request
@@ -210,7 +212,7 @@ def export_scene(path: Path, *, forcing_mode: str, hours: int, verbose: bool = T
     rows_per_hour = max(1, round(1.0 / step_h))
     stride = max(1, result.lon_history.shape[1] // RENDER_PARTICLES)
 
-    frames = []
+    frames: list[dict[str, Any]] = []
     for row in range(0, len(times), rows_per_hour):
         hour = -round(row * step_h)
         lons = result.lon_history[row, ::stride]

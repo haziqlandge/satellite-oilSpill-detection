@@ -19,6 +19,7 @@ import argparse
 import json
 import pathlib
 import random
+from typing import Any
 
 from PIL import Image
 
@@ -53,7 +54,7 @@ def main() -> int:
         if label.exists() and label.read_text().strip():
             buckets[source].append(path)
 
-    manifest = []
+    manifest: list[dict[str, Any]] = []
     for source, files in buckets.items():
         random.shuffle(files)
         for path in files[: args.per_source]:

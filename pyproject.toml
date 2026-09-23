@@ -49,6 +49,11 @@ detect = [
     "ultralytics>=8.2",
     "sahi>=0.11",
 ]
+export = [
+    # ONNX export of the release segmenter for the browser, and its parity check.
+    "onnx>=1.16",
+    "onnxruntime>=1.18",
+]
 dev = [
     "pytest>=8.2",
     "pytest-cov>=5.0",

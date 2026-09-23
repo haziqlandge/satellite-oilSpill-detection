@@ -2,7 +2,7 @@ export const DEMO_SAMPLE_KEYS = ["sample1", "sample2", "sample3"] as const;
 
 export type DemoSampleKey = (typeof DEMO_SAMPLE_KEYS)[number];
 
-export type AnimationFrameSource = "input" | "clean" | "blend" | "mask";
+export type AnimationFrameSource = "input" | "mask";
 
 export interface DemoModelTiming {
   label: string;
@@ -28,7 +28,6 @@ export interface DemoPreset {
   id: DemoSampleKey;
   title: string;
   sampleImage: string;
-  cleanImage: string;
   sampleHint: string;
   summary: string;
   hindcast: {
@@ -61,7 +60,6 @@ export const DEMO_PRESETS: Record<DemoSampleKey, DemoPreset> = {
     id: "sample1",
     title: "sample1 — coastal discharge prebuilt scenario",
     sampleImage: "/data_sample/sample1.jpg",
-    cleanImage: "/data_sample/clean1.jpg",
     sampleHint: "Upload any file named sample1.* to trigger this preset.",
     summary:
       "A low-energy release with a smooth, compact slick on the western flank of the plume.",
@@ -95,9 +93,9 @@ export const DEMO_PRESETS: Record<DemoSampleKey, DemoPreset> = {
     animationFrames: [
       { label: "Input ingest", source: "input", filter: "grayscale(12%) contrast(1.07)", scale: 1 },
       { label: "Noise suppression", source: "input", filter: "contrast(1.18) saturate(0.85)", scale: 1.02 },
-      { label: "Initial detection", source: "blend", filter: "contrast(1.22) saturate(0.94)", scale: 1.01 },
-      { label: "Clean comparison", source: "clean", filter: "contrast(1.02)", scale: 1.0 },
-      { label: "Forecast envelope", source: "clean", filter: "brightness(1.08)", scale: 1.03 },
+      { label: "Initial detection", source: "input", filter: "contrast(1.22) saturate(0.94)", scale: 1.01 },
+      { label: "Segmentation review", source: "input", filter: "contrast(1.02)", scale: 1.0 },
+      { label: "Forecast envelope", source: "input", filter: "brightness(1.08)", scale: 1.03 },
       { label: "Black-mask boundary", source: "mask", filter: "none", scale: 1 },
     ],
   },
@@ -105,7 +103,6 @@ export const DEMO_PRESETS: Record<DemoSampleKey, DemoPreset> = {
     id: "sample2",
     title: "sample2 — platform drift scenario",
     sampleImage: "/data_sample/sample2.jpg",
-    cleanImage: "/data_sample/clean2.jpg",
     sampleHint: "Upload any file named sample2.* to trigger this preset.",
     summary:
       "A larger, textured slick crossing a high-current shear with a wider confidence band.",
@@ -139,9 +136,9 @@ export const DEMO_PRESETS: Record<DemoSampleKey, DemoPreset> = {
     animationFrames: [
       { label: "Input ingest", source: "input", filter: "grayscale(10%) contrast(1.03)", scale: 1 },
       { label: "Contrast normalisation", source: "input", filter: "contrast(1.12) saturate(0.8)", scale: 1.01 },
-      { label: "Texture suppression", source: "blend", filter: "brightness(1.04) contrast(1.18)", scale: 1.0 },
-      { label: "Mask extraction", source: "clean", filter: "saturate(1.1)", scale: 1.02 },
-      { label: "Forecast envelope", source: "clean", filter: "contrast(1.08)", scale: 1.03 },
+      { label: "Texture suppression", source: "input", filter: "brightness(1.04) contrast(1.18)", scale: 1.0 },
+      { label: "Mask extraction", source: "input", filter: "saturate(1.1)", scale: 1.02 },
+      { label: "Forecast envelope", source: "input", filter: "contrast(1.08)", scale: 1.03 },
       { label: "Black-mask boundary", source: "mask", filter: "none", scale: 1 },
     ],
   },
@@ -149,7 +146,6 @@ export const DEMO_PRESETS: Record<DemoSampleKey, DemoPreset> = {
     id: "sample3",
     title: "sample3 — channel discharge scenario",
     sampleImage: "/data_sample/sample3.jpg",
-    cleanImage: "/data_sample/clean3.jpg",
     sampleHint: "Upload any file named sample3.* to trigger this preset.",
     summary:
       "A dispersed field with channel boundaries, producing a broader predicted drift path.",
@@ -183,9 +179,9 @@ export const DEMO_PRESETS: Record<DemoSampleKey, DemoPreset> = {
     animationFrames: [
       { label: "Input ingest", source: "input", filter: "contrast(1.04) brightness(0.98)", scale: 1 },
       { label: "Boundary suppression", source: "input", filter: "grayscale(16%) contrast(1.06)", scale: 1.01 },
-      { label: "Feature consolidation", source: "blend", filter: "brightness(1.02)", scale: 1.0 },
-      { label: "Mask extraction", source: "clean", filter: "contrast(1.06)", scale: 1.03 },
-      { label: "Forward spread", source: "clean", filter: "saturate(1.05)", scale: 1.02 },
+      { label: "Feature consolidation", source: "input", filter: "brightness(1.02)", scale: 1.0 },
+      { label: "Mask extraction", source: "input", filter: "contrast(1.06)", scale: 1.03 },
+      { label: "Forward spread", source: "input", filter: "saturate(1.05)", scale: 1.02 },
       { label: "Black-mask boundary", source: "mask", filter: "none", scale: 1 },
     ],
   },
@@ -195,7 +191,7 @@ export const PROCESS_MESSAGES = [
   "Predicting hindcast and forecast",
   "Checking vessel information",
   "Running simulated AIS confidence",
-  "Composing clean-vs-sample evidence",
+  "Composing the segmented evidence",
 ] as const;
 
 export const PROCESS_MESSAGE_MS = 5_000;

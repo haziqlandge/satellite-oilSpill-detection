@@ -4,7 +4,8 @@
  * Three things have to come from somewhere before an upload can be drifted at
  * all, and exactly one of them is in the pixels:
  *
- *  - **the outline.** Measured, by the dark-region screen in `ingest.ts`
+ *  - **the outline.** Measured, by the trained segmenter (`segmenter.ts`) --
+ *    or, for the offline checks, the dark-region screen in `ingest.ts`
  *  - **the acquisition time.** Read from the file name when it is a Sentinel-1
  *    product, asked for otherwise. Without it there is no wind field, no AIS
  *    window and no honest time axis, and a guess would poison all three
@@ -20,12 +21,12 @@
  * length, its widths and its damping ratio are all measured off the raster they
  * uploaded.
  *
- * WHAT IS NOT CLAIMED. The class is `slick_unknown`, never `oos`. A threshold
- * screen cannot separate oil from a natural film -- the project's own research
- * concluded that SAR intensity alone is unreliable for exactly this -- and the
- * release weights carry one class. Calling an uploaded dark region an
- * operational discharge would be the system asserting the thing it is built to
- * be careful about.
+ * WHAT IS NOT CLAIMED. The class is `slick_unknown`, never `oos`. Neither the
+ * segmenter nor a threshold screen can separate oil from a natural film -- the
+ * project's own research concluded that SAR intensity alone is unreliable for
+ * exactly this -- and the release weights carry one class. Calling an uploaded
+ * slick an operational discharge would be the system asserting the thing it is
+ * built to be careful about.
  */
 
 import { planCorridors } from "./ais";
@@ -122,12 +123,22 @@ export function buildUploadSpec(ribbon: Ribbon, a: UploadAssertions): ScenarioSp
   // loaded -- `SampleImagePanel` awaits `ensureLandmask` before calling this.
   const lanes = planCorridors(centre);
   const assertedPosition = a.positionSource === "operator";
+  const outline =
+    ribbon.method === "segmenter"
+      ? "SIM · Outline, bearing, length, widths and damping ratio are MEASURED from the " +
+        "uploaded raster by the trained segmenter (L1-ciou research release, one class; " +
+        `${ribbon.detections} tile detections, best ${ribbon.score?.toFixed(2)} over the traced slick, ` +
+        `covering ${(ribbon.coverage * 100).toFixed(2)}% of the frame). It outlines slick-like ` +
+        "regions and cannot separate oil from a natural film, so the class is slick_unknown; on the " +
+        "held-out test it scored mAP50 .364 and missed most small slicks. "
+      : "SIM · Outline, bearing, length, widths and damping ratio are MEASURED from the " +
+        `uploaded raster by a dark-region threshold screen (Otsu cut at grey ${ribbon.threshold}, ` +
+        `covering ${(ribbon.coverage * 100).toFixed(2)}% of the frame). That screen is NOT the ` +
+        "trained segmenter and this is not a detection: intensity alone cannot separate oil from a " +
+        "natural film, so the class is slick_unknown. ";
   const provenance =
-    "SIM · Outline, bearing, length, widths and damping ratio are MEASURED from the " +
-    `uploaded raster by a dark-region threshold screen (Otsu cut at grey ${ribbon.threshold}, ` +
-    `covering ${(ribbon.coverage * 100).toFixed(2)}% of the frame). That screen is NOT the ` +
-    "trained segmenter and this is not a detection: intensity alone cannot separate oil from a " +
-    "natural film, so the class is slick_unknown. The dB figure assumes the corpus window " +
+    outline +
+    "The dB figure assumes the corpus window " +
     `${dbLow} to ${dbHigh} dB. Acquisition time ${a.acquisitionSource === "filename" ? "parsed from the file name" : "asserted by the operator"}. ` +
     (assertedPosition
       ? "POSITION ASSERTED BY OPERATOR — the raster carries no georeferencing, so the map location and scale are stated, not measured. "
@@ -149,7 +160,8 @@ export function buildUploadSpec(ribbon: Ribbon, a: UploadAssertions): ScenarioSp
       sceneId: a.fileName.replace(/\.[^.]+$/, "").slice(0, 48) || "UPLOAD",
       place: assertedPosition ? "an operator-asserted position" : "the raster's own position",
       summary:
-        `A ${lengthKm.toFixed(1)} km dark region traced from the uploaded raster, drifted ` +
+        `A ${lengthKm.toFixed(1)} km ${ribbon.method === "segmenter" ? "candidate slick segmented" : "dark region traced"} ` +
+        "from the uploaded raster, drifted " +
         "backward 36 h and forward 72 h through a simulated field.",
       tests: "The geometry is the operator's image; everything downstream is simulated.",
       expectedTop1: "No ground truth: an uploaded scene has no authored answer to check against.",
@@ -178,8 +190,9 @@ export function buildUploadSpec(ribbon: Ribbon, a: UploadAssertions): ScenarioSp
       fragments: 1,
       // Never `oos`. See the header.
       className: "slick_unknown",
-      // The screen's contrast separation, not a model score.
-      confidence: +ribbon.separation.toFixed(2),
+      // The segmenter's own score when it drew the outline; the screen has no
+      // score, so for it this is its contrast separation, which is not one.
+      confidence: +(ribbon.method === "segmenter" && ribbon.score !== null ? ribbon.score : ribbon.separation).toFixed(2),
       dampingRatioDb,
     },
     drift: {

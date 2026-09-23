@@ -456,6 +456,39 @@ exactly what tuning-after-the-fact looks like, and it was not.
 
 ---
 
+## 2.15 The upload path: wrong band, then a screen that outlined the sea
+
+Two defects stacked, and each hid the other. Measured 2026-09-23 against the
+Part I ground-truth masks.
+
+**Wider spread is not more signal.** The GeoTIFF decoder chose the band with the
+larger standard deviation. On Part I that is band 1, VH near the noise floor,
+where the spread IS the speckle: oil sat a median 0.5 dB from the water there
+against 5.5 dB in band 2, and 3 grey levels on screen. The co-polarised band is
+the brighter one over the sea (by 4.0 dB at least, 12.4 typically, 60/60 scenes),
+so that is now the rule, and it agrees with `SAR_BAND = 2` in training.
+
+**A threshold cannot find a slick that covers 1% of a frame.** With the right
+band, the Otsu screen still outlined the sea: over 24 validation scenes its
+median precision was **.045** (IoU .045) while the release model through
+`infer_scene` scored **.915** (IoU .769). Otsu splits the population it can
+see, and in a scene that is 99% water that population is the water — the
+recursive split does not save it. The model now runs in the browser instead;
+the port matches Python pixel for pixel (mask IoU 1.000 on four scenes, .997 on
+a fifth), and `check:segmenter` holds a floor on it.
+
+Neither of these is a claim about generalisation: the model numbers are
+validation-split, the same split checkpoint selection used.
+
+**Then two input bugs, both the model's input rather than the model.** Where
+the browser still went wrong it was always a preparation mistake, never the
+network: (1) geotiff.js's LZW dictionary is three entries short of 12-bit, so a
+sizeable share of Part I would not decode at all (`ISSUES.md` F16); (2) the
+zero-fill outside a swath was counted as data, so on half-empty scenes both
+band medians were 0 dB and the model was handed band 1 (`DATA.md` §2.1). With
+the input prepared exactly as `infer_scene` prepares it, the browser matched
+Python pixel for pixel on every scene compared, including the zero-filled one.
+
 ## Where the detailed evidence lives
 
 | Artifact | Contents |

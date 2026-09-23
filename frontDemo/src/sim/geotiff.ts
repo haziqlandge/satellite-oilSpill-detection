@@ -28,6 +28,7 @@
  */
 
 import { DB_WINDOW } from "./ingest";
+import { useFixedLzw } from "./lzw";
 import { kmPerDegLon, KM_PER_DEG_LAT } from "./geo";
 import type { LngLat } from "./types";
 
@@ -56,6 +57,20 @@ export interface GeoRaster {
   mappedHigh: number;
   /** True when the corpus window would have clipped most of the data away. */
   windowFallback: boolean;
+  /** 1 where the source holds data; null when every pixel does. */
+  valid: Uint8Array | null;
+  /** Share of the raster that is no-data (non-finite, or a float zero). */
+  noDataFraction: number;
+}
+
+/**
+ * Which values of a band are no-data: non-finite always, and exactly zero in
+ * a float raster, where the corpus zero-fills outside the swath (the release
+ * manifest's `masked_zero`). In an 8-bit raster zero is a real grey level.
+ */
+function noDataTest(data: ArrayLike<number>): (v: number) => boolean {
+  const float = data instanceof Float32Array || data instanceof Float64Array;
+  return float ? (v) => !Number.isFinite(v) || v === 0 : (v) => !Number.isFinite(v);
 }
 
 export type GeoTiffOutcome =
@@ -82,7 +97,11 @@ export async function decodeGeoTiff(file: File): Promise<GeoTiffOutcome> {
     getImage: (i?: number) => Promise<unknown>;
   }>;
   try {
-    ({ fromArrayBuffer } = await import("geotiff"));
+    const geotiff = await import("geotiff");
+    // geotiff.js's own LZW dictionary is three entries short and throws on a
+    // sizeable share of the corpus; see `lzw.ts` and ISSUES.md F16.
+    useFixedLzw(geotiff);
+    ({ fromArrayBuffer } = geotiff);
   } catch {
     return { ok: false, reason: "The GeoTIFF decoder could not be loaded." };
   }
@@ -153,48 +172,65 @@ export async function decodeGeoTiff(file: File): Promise<GeoTiffOutcome> {
   }
 
   /*
-    Which band, decided by measurement rather than by assumption.
+    Which band: the co-polarised one, identified by its level.
 
-    DATA.md D5 records that the VV/VH band order in this corpus is an
-    ASSUMPTION -- it was never read from metadata -- and that one band was found
-    to carry about 0.51 dB of contrast, which is no signal at all. Measured
-    across two real corpus scenes the order is not even consistent: band 1
-    carries the wider spread in the Part I file (sd 3.12 against 1.82) and band 2
-    in the Part III file (2.20 against 0.78).
+    The corpus scenes carry two bands with no names on them (DATA.md D5). This
+    used to take the band with the larger standard deviation, which reads like
+    "the band with more contrast" and is the opposite. On Part I the wider
+    spread is band 1, VH, sitting near the noise floor, where the spread IS the
+    speckle and the slick is not there at all. Measured against the ground-truth
+    masks over 60 corpus scenes, oil sat a median 0.5 dB from the water in band
+    1 and 5.5 dB in band 2; the panel showed band 1 for 37 of 40 Part I scenes,
+    and the oil an operator was looking for was 3 grey levels from the sea.
 
-    So the band with the greater standard deviation is used. That is a
-    measurement of which band can discriminate anything, it is stated in the
-    panel, and it does not pretend to have resolved D5. Hardcoding band 2 would
-    have silently screened the Part I scene on its flattest channel.
+    Oil damps the short Bragg waves the co-polarised return comes from, so VV
+    (or HH) is where it shows. Over the sea the co-polarised return sits well
+    above the cross-polarised one, so the band with the higher median
+    backscatter IS the co-polarised band, whatever order the file stores them
+    in. On every corpus scene measured that is band 2 -- the band the training
+    loader reads (`SAR_BAND` in ml/datasets/oos_dataset.py) -- and here it is
+    read off the pixels rather than assumed from the position.
+
+    `npm run check:geotiff` decodes real train scenes through this function and
+    fails if the oil is not visible in what comes out.
+
+    NO-DATA IS NOT DATA. Scenes cut at a swath edge are zero-filled: 14 of 121
+    Part I scenes sampled carry some, 3 carry more than half a frame. The release
+    manifest records the convention (`masked_zero: true`) and `infer_scene`
+    excludes those pixels. Counted in, a 61%-empty scene has a median of 0 dB in
+    BOTH bands, the tie went to band 1, and the segmenter was handed VH and
+    marked a fifth of the frame. So zeros in a float raster are no-data
+    throughout: not in the band statistics, not in the mapping, and not
+    available to a detection.
   */
   const bandCount = Math.max(1, image.getSamplesPerPixel());
   let raster: ArrayLike<number>;
   let band = 1;
   let bandNote = "single band";
   try {
-    const candidates: { index: number; data: ArrayLike<number>; sd: number }[] = [];
+    const candidates: { index: number; data: ArrayLike<number>; median: number }[] = [];
     for (let s = 0; s < Math.min(bandCount, 4); s++) {
       const read = (await image.readRasters({ samples: [s] })) as ArrayLike<number>[];
       const data = read[0];
-      let sum = 0;
+      const noData = noDataTest(data);
+      const sample = new Float64Array(Math.ceil(data.length / 7));
       let n = 0;
       for (let i = 0; i < data.length; i += 7) {
         const v = data[i];
-        if (Number.isFinite(v)) { sum += v; n++; }
+        if (!noData(v)) sample[n++] = v;
       }
-      const mean = n ? sum / n : 0;
-      let variance = 0;
-      for (let i = 0; i < data.length; i += 7) {
-        const v = data[i];
-        if (Number.isFinite(v)) variance += (v - mean) ** 2;
-      }
-      candidates.push({ index: s, data, sd: n ? Math.sqrt(variance / n) : 0 });
+      const sorted = sample.subarray(0, n).sort();
+      candidates.push({ index: s, data, median: n ? sorted[n >> 1] : -Infinity });
     }
-    const best = candidates.reduce((a, b) => (b.sd > a.sd ? b : a));
+    const best = candidates.reduce((a, b) => (b.median > a.median ? b : a));
     raster = best.data;
     band = best.index + 1;
-    if (bandCount > 1)
-      bandNote = `band ${band} of ${bandCount}, chosen for the wider spread (sd ${best.sd.toFixed(2)} dB)`;
+    if (bandCount > 1) {
+      const others = candidates.filter((c) => c !== best).map((c) => c.median.toFixed(1)).join(", ");
+      bandNote =
+        `band ${band} of ${bandCount}, the brighter by median (${best.median.toFixed(1)} dB against ` +
+        `${others}), which on a dual-pol scene is the co-polarised band`;
+    }
   } catch {
     return { ok: false, reason: "The raster bands could not be read." };
   }
@@ -219,21 +255,34 @@ export async function decodeGeoTiff(file: File): Promise<GeoTiffOutcome> {
     own robust range is used instead and the panel SAYS which mapping it got.
     Comparability across tiles is the thing being traded away, and it is worth
     naming rather than losing silently.
+
+    Both of those scenes were measured on band 1, VH, which the band choice
+    above no longer picks. Band 2 fits the window on all 60 corpus scenes
+    measured (at most 2.3% clipped), so on the corpus this fallback should not
+    fire; it stays for a raster that genuinely sits outside the window.
   */
   const [windowLow, windowHigh] = DB_WINDOW;
+  const noData = noDataTest(raster);
   let min = Infinity;
   let max = -Infinity;
   let finiteCount = 0;
   let clipped = 0;
+  let valid: Uint8Array | null = null;
   for (let i = 0; i < raster.length; i++) {
     const v = raster[i];
-    if (!Number.isFinite(v)) continue;
+    if (noData(v)) {
+      // Allocated on the first no-data pixel: most scenes never need it.
+      if (!valid) { valid = new Uint8Array(raster.length).fill(1); }
+      valid[i] = 0;
+      continue;
+    }
     finiteCount++;
     if (v < min) min = v;
     if (v > max) max = v;
     if (v < windowLow || v > windowHigh) clipped++;
   }
-  if (!finiteCount) return { ok: false, reason: "The raster holds no finite values." };
+  if (!finiteCount) return { ok: false, reason: "The raster holds no valid values." };
+  const noDataFraction = 1 - finiteCount / raster.length;
 
   // Already-8-bit data is passed through; only dB-scaled values are windowed.
   const scaledThroughWindow = min < 0;
@@ -272,7 +321,9 @@ export async function decodeGeoTiff(file: File): Promise<GeoTiffOutcome> {
   for (let i = 0; i < width * height; i++) {
     const value = raster[i];
     let grey: number;
-    if (!Number.isFinite(value)) grey = 0;
+    // No-data renders as 0 dB -- the top of the window, white -- because that is
+    // what `infer_scene` and the training loader feed the model for it.
+    if (valid && !valid[i]) grey = scaledThroughWindow ? 255 : 0;
     else if (scaledThroughWindow) grey = Math.round(((value - mappedLow) / span) * 255);
     else grey = Math.round(value);
     const clamped = grey < 0 ? 0 : grey > 255 ? 255 : grey;
@@ -308,6 +359,8 @@ export async function decodeGeoTiff(file: File): Promise<GeoTiffOutcome> {
       mappedLow: +mappedLow.toFixed(2),
       mappedHigh: +mappedHigh.toFixed(2),
       windowFallback,
+      valid,
+      noDataFraction,
     },
   };
 }

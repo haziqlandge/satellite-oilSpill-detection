@@ -39,7 +39,7 @@ groups = collections.defaultdict(list)
 for r in images:
     groups[r["sha256"]].append(r["split"] + "/" + r["name"])
 duplicates = [v for v in groups.values() if len(v) > 1]
-counts = collections.defaultdict(
+counts: collections.defaultdict[str, dict[str, int]] = collections.defaultdict(
     lambda: dict(images=0, negative=0, instances=0, lookalike=0, no_oil=0, missing_label=0)
 )
 for r in images:

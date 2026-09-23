@@ -22,7 +22,6 @@ import {
   type DemoJobStatus,
   type DemoSampleKey,
   FRAME_TICK_MS,
-  type DemoFrame,
   parseSampleFromFileName,
   PROCESS_MESSAGE_MS,
   PROCESS_MESSAGES,
@@ -63,11 +62,9 @@ function msToText(ms: number) {
 
 function getFrameImage(
   presetId: DemoSampleKey,
-  frame: DemoFrame,
   uploads: Record<DemoSampleKey, string | null>,
 ) {
   const preset = DEMO_PRESETS[presetId];
-  if (frame.source === "clean") return preset.cleanImage;
   return uploads[presetId] ?? preset.sampleImage;
 }
 
@@ -264,8 +261,7 @@ export function SampleAnimationLab() {
             Drop any image file named <code>sample1</code>, <code>sample2</code>,
             or <code>sample3</code> into the panel below or paste from clipboard.
             The system then simulates a full run and reveals the matching
-            prebuilt clean image variant (clean1, clean2, clean3), animation, and
-            evidence cards.
+            animation and evidence cards.
           </Body>
         </Wide>
 
@@ -424,7 +420,7 @@ export function SampleAnimationLab() {
                       {frame ? (
                         <div className="relative overflow-hidden border" style={{ borderColor: "var(--line)" }}>
                           <img
-                            src={getFrameImage(selectedPreset, frame, uploads)}
+                            src={getFrameImage(selectedPreset, uploads)}
                             alt={`${selectedPresetData.id} animation frame`}
                             className="h-64 w-full object-cover transition-all duration-500"
                             style={{
@@ -432,14 +428,6 @@ export function SampleAnimationLab() {
                               transform: `scale(${frame.scale ?? 1})`,
                             }}
                           />
-                          {frame.source === "blend" && (
-                            <img
-                              src={selectedPresetData.cleanImage}
-                              alt="blend reference"
-                              className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-40 mix-blend-screen"
-                              style={{ transform: `scale(${frame.scale ?? 1})` }}
-                            />
-                          )}
                           <div
                             className="absolute right-2 top-2 border px-2 py-1 text-[10px] tracking-[0.16em] uppercase"
                             style={{ borderColor: "color-mix(in oklab, var(--line) 72%, transparent)" }}

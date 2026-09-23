@@ -11,7 +11,7 @@ export function isSample(id: string | null): id is DemoSampleKey {
 
 export const SAMPLE_LISTINGS: ScenarioListing[] = DEMO_SAMPLE_KEYS.map((id, i) => ({
   id, name: `Sample ${i + 1}`, short: "Image reconstruction · −36 h to +72 h",
-  region: i === 0 ? "gulf-of-mexico" : i === 1 ? "indian-waters" : "south-china-sea", tests: "Cleaned mask, drift ensemble and simulated vessel evidence.",
+  region: i === 0 ? "gulf-of-mexico" : i === 1 ? "indian-waters" : "south-china-sea", tests: "Model-segmented outline, drift ensemble and simulated vessel evidence.",
 }));
 
 function sampleSpec(id: DemoSampleKey, index: number): ScenarioSpec {
@@ -41,7 +41,7 @@ function sampleSpec(id: DemoSampleKey, index: number): ScenarioSpec {
     geometry: geom,
     meta: {
       id, name: `Sample ${index + 1}`, region: index === 0 ? "gulf-of-mexico" : index === 1 ? "indian-waters" : "south-china-sea", place: ["Open Gulf of Mexico", "Arabian Sea", "South China Sea"][index],
-      provenance: "SIM · Outline extracted from the supplied clean image. Ocean location, scale, forcing, AIS and timings are simulated; the image has no georeferencing.",
+      provenance: "SIM · Outline segmented from the supplied sample image by the trained model (L1-ciou research release). Ocean location, scale, forcing, AIS and timings are simulated; the image has no georeferencing.",
       acquiredAtIso: "2026-09-10T06:00:00Z", centre, zoom: 9.8,
       sceneId: `SAMPLE-${index + 1}-SAR`,
       summary: "Image-derived oil ribbon with 36-hour reconstruction and 72-hour drift forecast.",

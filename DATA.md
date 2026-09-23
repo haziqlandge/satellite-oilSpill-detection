@@ -80,10 +80,32 @@ operator asserted and a position the file states.
 
 **Two traps that come with them.** The dB range is NOT inside the corpus window
 of −35 to 0: measured scenes span −49.5 to −20.1 dB and −39.0 to −27.3 dB, so
-mapping them through the fixed window clips most of the scene to black. And the
-band order is still the open question D5 records — measured, band 1 carries the
-wider spread in one scene (sd 3.12 against 1.82) and band 2 in another (2.20
-against 0.78), so it is not consistent and must not be hardcoded.
+mapping them through the fixed window clips most of the scene to black. That is
+a **band 1** (VH) effect: over 60 scenes the window clips more than a fifth of
+band 1 in 27, and of band 2 (VV) in none — at most 2.3% of its pixels.
+
+**Wider spread is not more signal.** This section used to say the band order was
+inconsistent because band 1 had the larger standard deviation in one scene and
+band 2 in another. The console's upload path acted on that and showed whichever
+band had the larger sd. On Part I that is band 1, VH near the noise floor, where
+the spread is speckle and the oil is invisible. Measured against the masks over
+60 scenes, band 2 carries more oil contrast in all 60 (median 5.5 dB against
+0.5 dB on Part I), and it is the brighter band by median in every one (by 4.0 dB
+at the least, 12.4 dB typically), as the co-polarised return over the sea is. The upload path now takes the
+brighter band. `frontDemo/scripts/check-geotiff.ts` guards it.
+
+It is not a law: train scene 00818 shows its slick about equally in both bands
+(7.2 dB in band 1, 6.7 in band 2). Band 2 is still the right one to hand the
+model, which was trained on it; the check fails only when the chosen band shows
+the oil at less than half the strength of the other.
+
+**Zero is no-data, and it must be excluded before the medians are taken.**
+Scenes cut at a swath edge are zero-filled (the release manifest's
+`masked_zero: true`): 14 of 121 Part I scenes sampled, 3 of them more than half
+empty. Counted as data, a 61%-empty scene has a median of 0 dB in both bands,
+and the tie picked band 1 — train 01034 then came back 22.6% "slick" at
+precision .04. Excluding zeros, the brighter band is band 2 in all 121, and
+01034 segments at precision .999, identical to `infer_scene`.
 
 Every record disagrees with the others on every convention that matters, and
 each disagreement is silent. The traps are documented in `PREVIOUS_WORK.md`;
@@ -135,6 +157,8 @@ pipeline.
 | `weights/L1-ciou-research.pt` | The release checkpoint, exported. 13 MB. SHA-256 `d4a749…fc6c`. **Gitignored** |
 | `weights/L1-ciou-research.json` | Its manifest — class scheme, frozen inference config, raster convention. **Tracked**, and the loader enforces it |
 | `weights/yolo26n.pt`, `yolo11n-seg.pt` | Pretrained bases. Tracked via a `!weights/` negation |
+| `frontDemo/public/models/L1-ciou-research.onnx` | The release exported for the browser, fp32, 12.9 MB. **Gitignored** (`*.onnx`); regenerate with `.venv/Scripts/python.exe -m ml.export.onnx_export`, which checks it against PyTorch first |
+| `frontDemo/public/models/L1-ciou-research.json` | Its web manifest: the frozen inference config, the ONNX hash, and the PyTorch parity figures. **Tracked**; `tests/test_onnx_export.py` checks a present `.onnx` against it |
 | `runs/final_l1_fp32_release/` | 274 MB. The 100/100-epoch FP32 reproduction |
 | `runs/final/` | 604 MB. `none-ciou`, `L1-ciou` (best + epoch snapshots), `L4-ciou` (no weights — NaN failure) |
 | `runs/ablation/` | 233 MB. The 12 screening cells. `none-ciou` has no checkpoint |
