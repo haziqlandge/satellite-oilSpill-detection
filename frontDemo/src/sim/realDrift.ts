@@ -42,6 +42,16 @@ export interface RealDriftRun {
   scene: string;
   acquiredAtIso: string;
   seed: LngLat;
+  /** Which detection was hindcast and why (`choose_seed` in the export). */
+  seedDetection?: {
+    rule: string;
+    areaKm2: number;
+    confidence: number;
+    straightEdgeKm: number;
+    landFraction: number;
+    passedOver: { frameCut: number; ashore: number };
+    of: number;
+  };
   detectionPolygons: number;
   engine: string;
   forcing: string;
@@ -53,6 +63,8 @@ export interface RealDriftRun {
   forwardHours: number;
   stepMinutes: number;
   memberFailures: string[];
+  /** Share of every parcel position on OpenDrift's own GSHHG land, percent. */
+  onLandPct?: number;
   elapsedSeconds: number;
   /** A triple when the field converged, or a refusal. Nulls, never NaN. */
   age: {

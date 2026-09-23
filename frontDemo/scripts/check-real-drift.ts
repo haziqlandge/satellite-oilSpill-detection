@@ -80,10 +80,16 @@ for (const scene of scenes) {
   // Diffusion is irreversible: the origin field is widest furthest back.
   assert.ok(widening > 1, `${scene}: backward field did not widen (x${widening.toFixed(2)})`);
 
-  // OpenDrift itself leaves 0.10-0.26% of these parcels on its own land. More
-  // than 1% beyond the raster's rounding means the mask and the physics have
-  // stopped describing the same coastline.
-  assert.ok(deep / parcels < 0.01, `${scene}: ${(100 * deep / parcels).toFixed(2)}% of parcels are inland by more than a cell`);
+  // Whether the physics stayed on its coast is OpenDrift's own answer, measured
+  // on its GSHHG polygons at export: 0.00-0.26% so far. This used to be judged
+  // from `deep` on the raster, and the December run seeded at sea broke it:
+  // parcels carried into the delta passes, which are narrower than one
+  // 1/240-degree cell, read as 1.28% "deep ashore" -- 98.8% of them are water
+  // on GSHHG, every one within a quarter cell of it. The raster's own agreement
+  // with GSHHG is tested where it is built (tests/test_landmask.py, >= 99.9%);
+  // `coastal` and `deep` stay in the table as what the map's mask says.
+  assert.ok(run.onLandPct !== undefined, `${scene}: re-export -- the run does not record its parcels on OpenDrift's land`);
+  assert.ok(run.onLandPct < 1, `${scene}: ${run.onLandPct}% of parcels are on OpenDrift's own land`);
 
   rows.push({
     scene: scene.slice(0, 26),
@@ -95,6 +101,7 @@ for (const scene of scenes) {
     spreadAtHorizonKm: +earliest.spreadKm.toFixed(2),
     inCoastalCellPct: +(100 * coastal / parcels).toFixed(2),
     deepAshorePct: +(100 * deep / parcels).toFixed(2),
+    openDriftLandPct: run.onLandPct,
     age: run.age.age_method && run.age.age_method !== 'none' ? run.age.age_method : (run.age.status ?? 'refused'),
     seconds: run.elapsedSeconds,
   });

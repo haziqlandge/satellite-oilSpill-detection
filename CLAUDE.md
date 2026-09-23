@@ -19,6 +19,13 @@ drift/physics chain, dataset tooling and the frontend all run fine on CPU.
 machine. Do not start a training run here, and do not quietly substitute a
 shorter one.
 
+**On the 4060 Ti machine this is reversed** — check with
+`.venv/Scripts/python.exe -c "import torch; print(torch.cuda.get_device_name(0))"`.
+As of 2026-09-23 the work has moved there: training is allowed, and
+`FUTURE_WORK.md` §0 says what comes first (Part II and the look-alike rate,
+then the rest of the plan). Files git does not carry are listed in
+`pasteHere.txt` at the repository root.
+
 The frontend is authored separately and pushed straight to GitHub, so
 `origin/main` can be ahead on `frontDemo/` while local is ahead on backend/ML.
 Check `git rev-list --left-right --count main...origin/main` before assuming
@@ -108,9 +115,9 @@ freshly frozen, independently labelled holdout.
 .venv/Scripts/python.exe -m ruff check . && .venv/Scripts/python.exe -m mypy ml backend scripts
 ```
 
-Baseline is **510 passed, 9 skipped** — six database tests skip because the
+Baseline is **515 passed, 9 skipped** — six database tests skip because the
 Supabase session pooler returns tenant/user not found, and the rest need
-hardware this machine lacks. A drop below 510 is a regression. ruff and mypy
+hardware this machine lacks. A drop below 515 is a regression. ruff and mypy
 are both clean as of 2026-09-23; keep them that way. For the frontend,
 `cd frontDemo && npx tsc -b && npm run check` (11 scripts; the corpus and
 real-run checks skip on a machine without their data or the exported model).

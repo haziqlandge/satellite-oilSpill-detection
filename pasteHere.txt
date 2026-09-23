@@ -1,0 +1,63 @@
+FILES NOT IN GIT -- copy each one to the SAME relative path on the 4060 Ti machine
+Repository root = the folder holding CLAUDE.md. Paths below are relative to it.
+After copying, run:  .venv/Scripts/python.exe -m scripts.repath_artifacts --check
+
+=== 1. REQUIRED ===
+
+.env
+    credentials (ERA5/CDS, CDSE, Supabase). Keep it private; never commit it.
+
+data/cache/metocean/era5-wind_86288587ba348dbdcff00eefe3f4a1b0.nc
+data/cache/metocean/era5-wind_9f03c80f1c01f19cd8bf4609b3031c4a.nc
+data/cache/metocean/era5-wind_c2312765246eebba00ac4c586c53ce58.nc
+data/cache/metocean/era5-wind_c9b32aae631e1b0533d8bebf1ae26571.nc
+    the ERA5 wind the three real drift runs used (612 KB total)
+
+frontDemo/public/runs/S1A_IW_GRDH_1SDV_20230409T000206_20230409T000231_048012_05C552_27F2_s0db/drift.json
+frontDemo/public/runs/S1A_IW_GRDH_1SDV_20230409T000206_20230409T000231_048012_05C552_27F2_s0db/scene.json
+frontDemo/public/runs/S1A_IW_GRDH_1SDV_20230515T000208_20230515T000233_048537_05D69B_35AF_s0db/drift.json
+frontDemo/public/runs/S1A_IW_GRDH_1SDV_20230515T000208_20230515T000233_048537_05D69B_35AF_s0db/scene.json
+frontDemo/public/runs/S1A_IW_GRDH_1SDV_20231205T000214_20231205T000239_051512_0637C7_66B8_s0db/drift.json
+frontDemo/public/runs/S1A_IW_GRDH_1SDV_20231205T000214_20231205T000239_051512_0637C7_66B8_s0db/scene.json
+    the three real-run views (13 MB). Can be regenerated instead: FUTURE_WORK.md section 0, "Regenerating the real runs"
+
+frontDemo/public/models/L1-ciou-research.onnx
+    the browser segmenter (13 MB). Can be regenerated instead:
+    .venv/Scripts/python.exe -m ml.export.onnx_export
+
+weights/L1-ciou-research.pt
+    the release checkpoint (13 MB). Skip if that machine already has it
+    (it was exported there from runs/final_l1_fp32_release/).
+
+=== 2. OPTIONAL -- only to RE-EXPORT AIS (the app already has the exported JSON in git) ===
+
+data/interim/ais/AIS_2023_04_07_gulf.npz
+data/interim/ais/AIS_2023_04_08_gulf.npz
+data/interim/ais/AIS_2023_04_09_gulf.npz
+data/interim/ais/AIS_2023_05_13_gulf.npz
+data/interim/ais/AIS_2023_05_14_gulf.npz
+data/interim/ais/AIS_2023_05_15_gulf.npz
+data/interim/ais/AIS_2023_12_02_gulf.npz
+data/interim/ais/AIS_2023_12_03_gulf.npz
+data/interim/ais/AIS_2023_12_04_gulf.npz
+data/interim/ais/AIS_2023_12_05_gulf.npz
+    218 MB. Enough on their own; the raw zips below are only needed to rebuild these.
+
+data/raw/ais/2023/AIS_2023_04_07.zip   ... through ...   data/raw/ais/2023/AIS_2023_12_05.zip
+    10 files, 2.9 GB (Apr 7-9, May 13-15, Dec 2-5). Re-downloadable from marinecadastre.gov.
+
+=== 3. OPTIONAL -- only to RE-RUN full-scene inference with new weights (FUTURE_WORK section 0, job 2) ===
+
+data/processed/sar/S1A_IW_GRDH_1SDV_20230409T000206_20230409T000231_048012_05C552_27F2_s0db.tif
+data/processed/sar/S1A_IW_GRDH_1SDV_20230515T000208_20230515T000233_048537_05D69B_35AF_s0db.tif
+data/processed/sar/S1A_IW_GRDH_1SDV_20231205T000214_20231205T000239_051512_0637C7_66B8_s0db.tif
+    3.6 GB each. Skip if that machine already has data/processed/sar/ (SNAP ran there).
+
+data/processed/sar/windows/S1A_IW_GRDH_1SDV_20230409T000206_20230409T000231_048012_05C552_27F2_s0db_win1536.tif
+    a georeferenced window for testing uploads
+
+=== NOT NEEDED (recreate on that machine) ===
+
+.venv/                  -> scripts/SETUP_NEW_MACHINE.md
+frontDemo/node_modules/ -> cd frontDemo && npm install
+runs/, data/interim/datasets/zenodo/  -> already on the 4060 Ti machine

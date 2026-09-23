@@ -523,10 +523,23 @@ Recorded 2026-09-23 while wiring the three real OpenDrift runs into the console
   outline and every uncovered neighbour outside; its separate-region counts
   (25 / 16 / 24 at most) match shapely's `unary_union` independently. The drift
   pane's "lobes" had been counting rings, i.e. every cell.
-- **The real runs are seeded from whole-tile look-alike blocks** (`ISSUES.md`
-  Q5). "The largest detection" is a 1024-px tile the model filled entirely;
-  December's is on GSHHG land. Measured and recorded, not yet changed: which
-  detection to hindcast is the user's call.
+- **The real runs were seeded from boxes the model had filled** (`ISSUES.md`
+  Q5): "the ring with the biggest bounding box" rewards exactly that shape, and
+  December's pick was an inland water body. What gives a filled box away is not
+  its size but its edge: YOLO-seg crops a mask to its predicted box, so a mask
+  that filled the box ends in straight axis-aligned sides, 3-9 km of them,
+  where 90% of real detections never run straight for more than ~0.6 km.
+  `choose_seed` takes the largest detection at sea (GSHHG) with no straight run
+  of 1.2 km or more; it was checked by eye on rendered SAR crops before the
+  rule was written, and it ranks nothing, so it cannot steer an answer. New
+  seeds: April 5.5 km², May 6.7 km², December a 3.2 km² discharge streak at
+  confidence .81.
+- **A guard can fire on its own proxy.** The re-seeded December run carried
+  parcels into delta passes narrower than one 1/240° raster cell, and
+  `check:realdrift`'s raster "deep ashore" count rose to 1.28%. On OpenDrift's
+  own GSHHG polygons 98.8% of those parcels are water, every one within a
+  quarter cell. The export now records `onLandPct` from the polygons and the
+  check asserts that; the threshold was not loosened.
 - **Three provenance badges had drifted apart.** The header still said
   "Simulated. No model trained" (false since the model runs in the browser) and
   wore SIM on real runs; the map strip said "simulated traffic" on the Gulf

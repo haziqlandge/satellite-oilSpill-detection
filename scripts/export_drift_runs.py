@@ -36,7 +36,9 @@ import argparse
 import json
 import math
 import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -75,12 +77,152 @@ def scene_acquired_at(stem: str) -> datetime | None:
     )
 
 
-def largest_polygon(path: Path) -> tuple[tuple[float, float], tuple[float, float, float, float], int]:
-    """Centroid of the biggest detected polygon, the scene bbox, and the count."""
+# A traced slick's outline follows the pixel grid in short steps. It runs
+# straight along a row or a column for a kilometre only where something cut it:
+# YOLO-seg crops every mask to its predicted box, so a mask that filled its box
+# -- the model found dark water but no edge to it -- ends in straight,
+# axis-aligned sides. Over the three Gulf scenes 90% of detections have no
+# straight run longer than ~60 px (~0.6 km); the filled boxes run 380-959 px.
+FRAME_EDGE_KM = 1.2
+# At sea on OpenDrift's own coastline (GSHHG): a seed ashore is not a seed, and
+# OpenDrift has to move its particles off land before it can start.
+MAX_LAND_FRACTION = 0.1
+
+SEED_RULE = (
+    "the largest detection at sea (GSHHG: centre offshore, at most "
+    f"{MAX_LAND_FRACTION:.0%} of it on land) whose outline never runs straight along the "
+    f"pixel grid for {FRAME_EDGE_KM} km or more -- an edge that straight is the model's "
+    "box, not a slick's edge"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class Seed:
+    """The detection a backward run starts from, and what was passed over for it."""
+
+    centre: tuple[float, float]
+    feature: int
+    part: int
+    area_km2: float
+    confidence: float
+    straight_edge_km: float
+    land_fraction: float
+    frame_cut: int
+    ashore: int
+    candidates: int
+
+    def as_dict(self) -> dict[str, Any]:
+        return dict(
+            rule=SEED_RULE,
+            areaKm2=round(self.area_km2, 3),
+            confidence=round(self.confidence, 4),
+            straightEdgeKm=round(self.straight_edge_km, 3),
+            landFraction=round(self.land_fraction, 3),
+            passedOver=dict(frameCut=self.frame_cut, ashore=self.ashore),
+            of=self.candidates,
+        )
+
+
+def polygon_parts(document: dict[str, Any]) -> list[tuple[int, int, Any, float]]:
+    """(feature, part, polygon, confidence) for every polygon in a detection file."""
+    from shapely.geometry import shape
+
+    parts = []
+    for fi, feature in enumerate(document.get("features", [])):
+        geometry = shape(feature["geometry"])
+        polygons = list(geometry.geoms) if geometry.geom_type == "MultiPolygon" else [geometry]
+        confidence = float(feature.get("properties", {}).get("confidence", 0.0))
+        for pi, polygon in enumerate(polygons):
+            parts.append((fi, pi, polygon, confidence))
+    return parts
+
+
+def straight_edge_km(polygon: Any) -> float:
+    """The longest run of any ring along one pixel row or column, in km."""
+    best = 0.0
+    for ring in [polygon.exterior, *polygon.interiors]:
+        coords = list(ring.coords)
+        run = 0.0
+        line: tuple[str, float] | None = None
+        for (x0, y0), (x1, y1) in pairwise(coords):
+            if y0 == y1 and x0 != x1:
+                here = ("row", y0)
+                length = abs(x1 - x0) * km_per_deg_lon(y0)
+            elif x0 == x1 and y0 != y1:
+                here = ("col", x0)
+                length = abs(y1 - y0) * EARTH_KM_PER_DEG_LAT
+            else:
+                run, line = 0.0, None
+                continue
+            # Consecutive edges on the same row or column are one straight run.
+            run = run + length if here == line else length
+            line = here
+            best = max(best, run)
+    return best
+
+
+def land_fraction(polygon: Any, landmask: Any) -> float:
+    """Share of the polygon on GSHHG land, sampled on a grid over its extent."""
+    from shapely import contains_xy
+
+    west, south, east, north = polygon.bounds
+    grid_x, grid_y = np.meshgrid(np.linspace(west, east, 30), np.linspace(south, north, 30))
+    xs, ys = grid_x.ravel(), grid_y.ravel()
+    inside = contains_xy(polygon, xs, ys)
+    if inside.sum() < 5:
+        point = polygon.representative_point()
+        return float(landmask.contains(point.x, point.y))
+    return float(np.mean(landmask.contains_many(xs[inside], ys[inside])))
+
+
+def choose_seed(path: Path) -> Seed:
+    """The detection to hindcast: see `SEED_RULE`.
+
+    This used to be "the ring with the biggest bounding box". In every processed
+    Gulf scene that was a box the model had filled -- whole tiles of sheltered
+    or wind-calmed water, and in December an inland water body (ISSUES Q5). A
+    bounding box rewards exactly that shape. The rule is fixed before any run,
+    and nothing is ranked from these fields, so it cannot be steering an answer.
+    """
+    from roaring_landmask import RoaringLandmask
+
+    landmask = RoaringLandmask.new()
+    parts = polygon_parts(json.loads(path.read_text()))
+    frame_cut = ashore = 0
+    for fi, pi, polygon, confidence in sorted(parts, key=lambda p: -p[2].area):
+        edge = straight_edge_km(polygon)
+        if edge >= FRAME_EDGE_KM:
+            frame_cut += 1
+            continue
+        centroid = polygon.centroid
+        centre = centroid if polygon.contains(centroid) else polygon.representative_point()
+        share = land_fraction(polygon, landmask)
+        if landmask.contains(centre.x, centre.y) or share > MAX_LAND_FRACTION:
+            ashore += 1
+            continue
+        area = polygon.area * km_per_deg_lon(centre.y) * EARTH_KM_PER_DEG_LAT
+        return Seed(
+            centre=(float(centre.x), float(centre.y)),
+            feature=fi, part=pi, area_km2=area, confidence=confidence,
+            straight_edge_km=edge, land_fraction=share,
+            frame_cut=frame_cut, ashore=ashore, candidates=len(parts),
+        )
+    raise SystemExit(
+        f"{path.name}: no detection meets the seed rule ({frame_cut} box-cut, "
+        f"{ashore} ashore, of {len(parts)})"
+    )
+
+
+def scene_bbox(path: Path) -> tuple[tuple[float, float, float, float], int]:
+    """Every ring's extent, and the feature count.
+
+    The ERA5 request is made for this box and its cache is keyed on it, so it
+    stays exactly what the first real runs asked for, whichever detection seeds.
+    """
     document = json.loads(path.read_text())
     features = document.get("features", [])
-    best_centre = None
-    best_area = 0.0
+    if not features:
+        raise SystemExit(f"{path.name}: no polygons to seed from")
     west = south = math.inf
     east = north = -math.inf
     for feature in features:
@@ -92,13 +234,7 @@ def largest_polygon(path: Path) -> tuple[tuple[float, float], tuple[float, float
             ys = [c[1] for c in ring]
             west, east = min(west, *xs), max(east, *xs)
             south, north = min(south, *ys), max(north, *ys)
-            area = (max(xs) - min(xs)) * (max(ys) - min(ys))
-            if area > best_area:
-                best_area = area
-                best_centre = (sum(xs) / len(xs), sum(ys) / len(ys))
-    if best_centre is None:
-        raise SystemExit(f"{path.name}: no polygons to seed from")
-    return best_centre, (west, south, east, north), len(features)
+    return (west, south, east, north), len(features)
 
 
 def ring_area_km2(ring: list[list[float]]) -> float:
@@ -147,7 +283,9 @@ def export_scene(path: Path, *, forcing_mode: str, hours: int, verbose: bool = T
     acquired = scene_acquired_at(stem)
     if acquired is None:
         raise SystemExit(f"{stem}: no acquisition time in the scene name")
-    centre, bbox, polygons = largest_polygon(path)
+    seed = choose_seed(path)
+    centre = seed.centre
+    bbox, polygons = scene_bbox(path)
 
     readers = None
     # None once real readers carry the forcing; `run_ensemble` takes either.
@@ -205,6 +343,20 @@ def export_scene(path: Path, *, forcing_mode: str, hours: int, verbose: bool = T
         )
 
     field = build_origin_field(result.lon_history, result.lat_history, result.times)
+
+    # OpenDrift's own answer to "is this parcel ashore", over every position the
+    # run produced: the GSHHG polygons its landmask reader tests. The frontend's
+    # 1/240-degree raster cannot resolve a pass narrower than a cell, so it is
+    # not the arbiter of whether the physics left its coast (ISSUES F13).
+    from roaring_landmask import RoaringLandmask
+
+    all_lon = result.lon_history.ravel()
+    all_lat = result.lat_history.ravel()
+    finite = np.isfinite(all_lon) & np.isfinite(all_lat)
+    ashore = RoaringLandmask.new().contains_many(
+        all_lon[finite].astype(np.float64), all_lat[finite].astype(np.float64)
+    )
+    on_land_pct = float(100.0 * np.mean(ashore)) if ashore.size else 0.0
 
     # `times` descends: row 0 is the observation, row k is k steps BEFORE it.
     times = result.times
@@ -271,6 +423,7 @@ def export_scene(path: Path, *, forcing_mode: str, hours: int, verbose: bool = T
         scene=stem,
         acquiredAtIso=acquired.isoformat() + "Z",
         seed=[round(centre[0], 6), round(centre[1], 6)],
+        seedDetection=seed.as_dict(),
         detectionPolygons=polygons,
         engine="OpenDrift OpenOil",
         forcing=forcing_mode,
@@ -286,6 +439,7 @@ def export_scene(path: Path, *, forcing_mode: str, hours: int, verbose: bool = T
         forwardHours=0,
         stepMinutes=round(step_h * 60),
         memberFailures=list(result.failures),
+        onLandPct=round(on_land_pct, 3),
         elapsedSeconds=round(elapsed, 1),
         age=age,
         convergence=[
@@ -325,8 +479,12 @@ def main() -> int:
     scenes = sorted(SCENES.glob("*.geojson"))
     if args.list or not (args.all or args.scene):
         for path in scenes:
-            centre, _, count = largest_polygon(path)
-            print(f"{path.stem}\n  {count} polygons, largest centroid {centre[0]:.4f}, {centre[1]:.4f}")
+            seed = choose_seed(path)
+            print(
+                f"{path.stem}\n  seed {seed.centre[0]:.4f}, {seed.centre[1]:.4f}: "
+                f"{seed.area_km2:.2f} km2, conf {seed.confidence:.2f}; passed over "
+                f"{seed.frame_cut} box-cut and {seed.ashore} ashore of {seed.candidates}"
+            )
         if not (args.all or args.scene):
             print("\npass --all, or --scene <substring>")
         return 0

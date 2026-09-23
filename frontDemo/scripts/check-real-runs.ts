@@ -71,6 +71,11 @@ for (const { id, scene } of REAL_RUN_LISTINGS) {
   // Detections: the exported model output, all of it, seeded from one.
   assert.equal(run.detection.parts.length, file.detections.length, `${id}: detections dropped or invented`);
   assert.equal(file.detections.filter((d) => d.seed).length, 1, `${id}: exactly one seed polygon`);
+  // The seed is chosen by a stated rule, and the view states it (ISSUES Q5).
+  const pick = drift.seedDetection;
+  assert.ok(pick, `${id}: the drift does not record which detection it was seeded from`);
+  assert.ok(pick.straightEdgeKm < 1.2 && pick.landFraction <= 0.1, `${id}: the seed is a filled box or ashore`);
+  assert.match(run.meta.provenance, /box-cut/, `${id}: the provenance does not say what the seed rule passed over`);
   assert.equal(run.detection.className, 'slick_unknown', `${id}: a real detection is never called oos`);
 
   // Drift: OpenDrift's frames, untouched, most-backward first.

@@ -9,7 +9,7 @@ through, so both are written beside it as `frontDemo/public/runs/<scene>/scene.j
   its confidence. They follow pixel edges, which makes the files 1.6-12 MB; each
   ring is simplified to 0.0002 degrees (~20 m, two Sentinel-1 pixels) with its
   topology preserved, which is invisible at any zoom the console uses. The
-  polygon the drift was seeded from is flagged.
+  polygon the drift was seeded from (`choose_seed`) is flagged.
 * **Wind** is read from the SAME cached ERA5 request the drift used, at the
   seed, hour by hour. `DEMO_OFFLINE=1` is set so this can only read the cache:
   a wind series that was fetched separately would not be the wind the particles
@@ -33,39 +33,29 @@ from scripts.export_drift_runs import (
     BACKWARD_HOURS,
     OUT,
     SCENES,
-    largest_polygon,
+    choose_seed,
+    polygon_parts,
     scene_acquired_at,
+    scene_bbox,
 )
 
 SIMPLIFY_DEG = 0.0002
 
 
 def detections(path: Path) -> list[dict[str, object]]:
-    from shapely.geometry import shape
-
-    document = json.loads(path.read_text())
-    seed, _, _ = largest_polygon(path)
+    seed = choose_seed(path)
     out: list[dict[str, object]] = []
-    for feature in document.get("features", []):
-        geometry = shape(feature["geometry"])
-        polygons = list(geometry.geoms) if geometry.geom_type == "MultiPolygon" else [geometry]
-        for polygon in polygons:
-            simple = polygon.simplify(SIMPLIFY_DEG, preserve_topology=True)
-            if simple.is_empty or simple.geom_type != "Polygon":
-                continue
-            ring = [[round(x, 5), round(y, 5)] for x, y in simple.exterior.coords]
-            xs = [p[0] for p in polygon.exterior.coords]
-            ys = [p[1] for p in polygon.exterior.coords]
-            # The drift export seeds from the centroid of the vertex list of the
-            # ring with the biggest bounding box; flag that ring the same way.
-            is_seed = math.isclose(sum(xs) / len(xs), seed[0], abs_tol=1e-9) and math.isclose(
-                sum(ys) / len(ys), seed[1], abs_tol=1e-9
-            )
-            out.append({
-                "ring": ring,
-                "confidence": round(float(feature["properties"].get("confidence", 0.0)), 4),
-                "seed": is_seed,
-            })
+    for fi, pi, polygon, confidence in polygon_parts(json.loads(path.read_text())):
+        simple = polygon.simplify(SIMPLIFY_DEG, preserve_topology=True)
+        if simple.is_empty or simple.geom_type != "Polygon":
+            continue
+        ring = [[round(x, 5), round(y, 5)] for x, y in simple.exterior.coords]
+        out.append({
+            "ring": ring,
+            "confidence": round(confidence, 4),
+            # The same polygon the drift export seeded from, by position.
+            "seed": (fi, pi) == (seed.feature, seed.part),
+        })
     return out
 
 
@@ -77,7 +67,8 @@ def wind(path: Path) -> dict[str, object]:
 
     acquired = scene_acquired_at(path.stem)
     assert acquired is not None
-    seed, bbox, _ = largest_polygon(path)
+    seed = choose_seed(path).centre
+    bbox, _ = scene_bbox(path)
     # Exactly the request `export_drift_runs.export_scene` made.
     request = wind_request(
         west=bbox[0], south=bbox[1], east=bbox[2], north=bbox[3],

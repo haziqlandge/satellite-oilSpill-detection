@@ -29,7 +29,7 @@
  * run is stamped with the fact that they were asserted.
  */
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Flag, GroupHead, SCROLL } from "./components";
 import { DEMO_PRESETS, DEMO_SAMPLE_KEYS, type DemoSampleKey } from "../site/demoData";
 import { DB_WINDOW, parseAcquisitionTime, ribbonFromMask, type Ribbon } from "../sim/ingest";
@@ -40,6 +40,7 @@ import { buildUploadSpec } from "../sim/uploadSpec";
 import { registerUpload } from "../sim/scenarios";
 import { ensureLandmask, isLand, LANDMASK_SOURCE, type LandmaskBuild } from "../sim/landmask";
 import { PositionPicker } from "./PositionPicker";
+import { RasterViewer } from "./RasterViewer";
 import type { LngLat, ScenarioId } from "../sim/types";
 
 
@@ -155,6 +156,43 @@ function greyToDataUrl(rgba: Uint8ClampedArray, width: number, height: number): 
   return canvas.toDataURL("image/png");
 }
 
+/**
+ * The model's mask as its own transparent layer, at the raster's size.
+ *
+ * The panel's composite (`overlay`) is capped at 720 px, which is right for a
+ * thumbnail and wrong for looking: a streak a few pixels wide at 2048 is under
+ * one pixel at 720. The full-resolution viewer lays this over either image
+ * instead, so every pixel the model marked is shown where it marked it.
+ */
+function maskLayer(
+  segmented: { mask: Uint8Array; width: number; height: number },
+  ribbon: Ribbon,
+): string {
+  const { mask, width, height } = segmented;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "";
+  const frame = ctx.createImageData(width, height);
+  for (let i = 0; i < mask.length; i++) {
+    if (!mask[i]) continue;
+    frame.data[i * 4] = 40;
+    frame.data[i * 4 + 1] = 200;
+    frame.data[i * 4 + 2] = 255;
+    frame.data[i * 4 + 3] = 140;
+  }
+  ctx.putImageData(frame, 0, 0);
+  ctx.beginPath();
+  // The ring is normalised by image WIDTH, so both axes scale by it.
+  ribbon.ring.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x * width, y * width) : ctx.lineTo(x * width, y * width)));
+  ctx.closePath();
+  ctx.lineWidth = Math.max(1.5, width / 700);
+  ctx.strokeStyle = "rgba(255, 196, 0, 0.95)";
+  ctx.stroke();
+  return canvas.toDataURL("image/png");
+}
+
 export const SAMPLE_STAGES = [
   "Decoding raster",
   "Running the trained segmenter",
@@ -193,6 +231,8 @@ export interface SampleSession {
   /** A Lee-despeckled copy, for reading only; the segmenter never sees it. */
   cleanUrl: string | null;
   maskUrl: string | null;
+  /** The model's mask alone, transparent, at the raster's own size (`maskLayer`). */
+  markUrl: string | null;
   maskPresented: boolean;
   completed: DemoSampleKey[];
   error: string;
@@ -255,7 +295,7 @@ export const DEFAULT_WHEN = "2026-09-10T06:00";
 
 let session: SampleSession = {
   key: null, state: "idle", step: -1, startedAt: 0, completedAt: null,
-  sourceName: "", sourceUrl: null, cleanUrl: null, maskUrl: null, maskPresented: false, completed: [], error: "",
+  sourceName: "", sourceUrl: null, cleanUrl: null, maskUrl: null, markUrl: null, maskPresented: false, completed: [], error: "",
   ribbon: null, measured: null, parsedAcquiredAt: null, geo: null, tiles: null,
   timings: [], preparing: "", coastline: null, runs: 0,
 };
@@ -373,7 +413,7 @@ export async function uploadSample(file: File) {
   const startedAt = Date.now();
   publish({
     key: namedSample(file), state: "processing", step: 0, startedAt, completedAt: null,
-    sourceName: file.name, sourceUrl: url, cleanUrl: null, maskUrl: null, maskPresented: false, error: "",
+    sourceName: file.name, sourceUrl: url, cleanUrl: null, maskUrl: null, markUrl: null, maskPresented: false, error: "",
     ribbon: null, measured: null, geo: null, tiles: null, parsedAcquiredAt: parseAcquisitionTime(file.name),
     timings: pendingStages(), preparing: "", coastline: null,
   });
@@ -473,6 +513,7 @@ export async function uploadSample(file: File) {
 
     const preview = await overlay(cleanUrl, outcome.ribbon, segmented);
     if (sequence !== uploadSequence) return;
+    const markUrl = maskLayer(segmented, outcome.ribbon);
 
     let marked = 0;
     for (let i = 0; i < segmented.mask.length; i++) marked += segmented.mask[i];
@@ -481,6 +522,7 @@ export async function uploadSample(file: File) {
       step: 3,
       state: "ready",
       maskUrl: preview,
+      markUrl,
       ribbon: outcome.ribbon,
       measured: {
         width, height,
@@ -579,20 +621,61 @@ export function SampleEvidenceImages({ sample }: { sample: DemoSampleKey }) {
 /** The uploaded raster and what the segmenter made of it, for the detect pane. */
 export function UploadEvidenceImages() {
   const current = useSampleSession();
+  const [open, setOpen] = useState<ViewerTarget | null>(null);
   if (!current.sourceUrl) return null;
   const drawn = current.ribbon?.method === "segmenter" ? "Segmented slick · over the despeckled copy" : "Screened boundary";
+  const figures: [string, string | null, ViewerTarget][] = [
+    ["Uploaded raster · model input, as the segmenter saw it", current.sourceUrl, { layer: "input", mask: false }],
+    ["Despeckled · Lee 7x7, display only", current.cleanUrl, { layer: "clean", mask: false }],
+    [drawn, current.maskUrl, { layer: "clean", mask: true }],
+  ];
   return <div className="grid gap-2 p-2" data-upload-evidence>
-    {[
-      ["Uploaded raster · model input, as the segmenter saw it", current.sourceUrl],
-      ["Despeckled · Lee 7x7, display only", current.cleanUrl],
-      [drawn, current.maskUrl],
-    ].map(([label, url]) =>
+    {figures.map(([label, url, target]) =>
       url ? <figure key={label} className="border" style={{ borderColor: "var(--line)" }}>
         <figcaption className="px-2 py-1 text-[10px] uppercase" style={{ color: "var(--ink-faint)" }}>{label}</figcaption>
-        <img src={url} alt={label ?? ""} className="mx-auto block max-h-56 object-contain"
-          style={{ background: "var(--ink-void, #0b0f12)" }} />
+        <FullSizeButton label={label} onOpen={() => setOpen(target)}>
+          <img src={url} alt={label} className="mx-auto block max-h-56 object-contain"
+            style={{ background: "var(--ink-void, #0b0f12)" }} />
+        </FullSizeButton>
       </figure> : null)}
+    {open && <UploadViewer session={current} target={open} onClose={() => setOpen(null)} />}
   </div>;
+}
+
+interface ViewerTarget {
+  layer: "input" | "clean";
+  mask: boolean;
+}
+
+/** An image that opens the full-resolution viewer, and says so. */
+function FullSizeButton({ label, onOpen, children }: { label: string; onOpen: () => void; children: ReactNode }) {
+  return <button type="button" onClick={onOpen} aria-label={`${label}: open at full resolution`}
+    className="group relative block w-full cursor-zoom-in" data-full-size>
+    {children}
+    <span className="pointer-events-none absolute bottom-1 right-1 border px-1 text-[9px] uppercase tracking-[0.14em] opacity-70 group-hover:opacity-100"
+      style={{ borderColor: "var(--line)", background: "var(--base)", color: "var(--ink-dim)" }}>full size</span>
+  </button>;
+}
+
+/** The viewer over this upload's images: the input, the despeckled copy, and the mask. */
+function UploadViewer({ session: s, target, onClose }: { session: SampleSession; target: ViewerTarget; onClose: () => void }) {
+  const known = s.measured ?? (s.geo ? { width: s.geo.width, height: s.geo.height } : null);
+  const [natural, setNatural] = useState<{ width: number; height: number } | null>(null);
+  useEffect(() => {
+    if (known || !s.sourceUrl) return;
+    let alive = true;
+    void loadImage(s.sourceUrl).then((image) => {
+      if (alive) setNatural({ width: image.naturalWidth, height: image.naturalHeight });
+    });
+    return () => { alive = false; };
+  }, [known, s.sourceUrl]);
+  const dims = known ?? natural;
+  if (!dims || !s.sourceUrl) return null;
+  const layers = [{ key: "input", label: "model input", url: s.sourceUrl }];
+  if (s.cleanUrl) layers.push({ key: "clean", label: "despeckled", url: s.cleanUrl });
+  return <RasterViewer title={s.sourceName || "uploaded raster"} width={dims.width} height={dims.height}
+    layers={layers} initial={layers.some((l) => l.key === target.layer) ? target.layer : "input"}
+    maskUrl={s.markUrl} maskInitially={target.mask} onClose={onClose} />;
 }
 
 const formatMs = (ms: number) => (ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`);

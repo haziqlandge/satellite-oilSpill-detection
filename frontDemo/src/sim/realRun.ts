@@ -9,7 +9,8 @@
  *    (`eval/final/scenes/`), every slick it found, exported beside the run by
  *    `scripts/export_real_scenes.py`
  *  - **drift** -- OpenDrift OpenOil, 10 members x 200 particles, run backward
- *    72 h from the largest detection by `scripts/export_drift_runs.py`, with
+ *    72 h by `scripts/export_drift_runs.py` from the largest detection that is
+ *    at sea and not a box the model filled (`choose_seed`, ISSUES Q5), with
  *    ERA5 wind and NO current field (ISSUES X2)
  *  - **traffic** -- marinecadastre AIS cut around that seed
  *    (`export_ais_traffic.py --real-runs`), identities withheld; 48 h of it for
@@ -205,10 +206,19 @@ export function buildRealRun(id: RealRunId): Run {
     `${vessels.length} real vessels are shown; none is scored.`;
 
   const count = scene.detections.length;
+  const pick = drift.seedDetection;
+  // Say which detection was hindcast and what was passed over for it. The
+  // largest detections in these scenes are boxes the model filled (ISSUES Q5);
+  // seeding from one of those is what this sentence exists to rule out.
+  const seedNote = pick
+    ? `the drift is seeded from ${pick.rule} (${pick.areaKm2.toFixed(1)} km2, confidence ` +
+      `${pick.confidence.toFixed(2)}; ${pick.passedOver.frameCut} larger box-cut and ` +
+      `${pick.passedOver.ashore} ashore detection${pick.passedOver.ashore === 1 ? "" : "s"} passed over)`
+    : `the drift is seeded from the largest (confidence ${seedRing.confidence.toFixed(2)})`;
   const provenance =
     `REAL · Detections: the release model (L1-ciou research) on the full Sentinel-1 scene, ` +
-    `${count} slick polygon${count === 1 ? "" : "s"}; the drift is seeded from the largest ` +
-    `(confidence ${seedRing.confidence.toFixed(2)}). Drift: ${drift.engine}, ${drift.members} members x ` +
+    `${count} slick polygon${count === 1 ? "" : "s"}; ${seedNote}. SAR alone cannot tell oil ` +
+    `from a natural film (ISSUES Q2). Drift: ${drift.engine}, ${drift.members} members x ` +
     `${drift.particlesPerMember} particles, ${drift.backwardHours} h backward, ${drift.forcingNote} ` +
     `AIS: marinecadastre.gov, identities withheld; it covers the last ${aisHours} h of the ` +
     `${drift.backwardHours} h hindcast. Wind: ${scene.wind.source}. ` +
@@ -228,7 +238,7 @@ export function buildRealRun(id: RealRunId): Run {
       sceneId: drift.scene,
       summary:
         `The model's ${count} detections in a real Sentinel-1 scene, OpenDrift's backward field ` +
-        "from the largest, and the real traffic around it.",
+        "from the largest one at sea with a slick's edge, and the real traffic around it.",
       tests: "Real detections, real OpenDrift, real AIS — and the refusal the physics forces.",
       expectedTop1: "Nobody: the field never converges and has no currents, so no candidate is ranked.",
     },
