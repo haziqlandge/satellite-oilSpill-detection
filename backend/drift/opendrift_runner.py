@@ -37,7 +37,7 @@ outcome worth modelling.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import numpy as np
@@ -108,6 +108,20 @@ class DriftResult:
         return int(self.lon.size)
 
 
+def naive_utc(moment: datetime) -> datetime:
+    """The same instant as a naive UTC datetime, which is what OpenDrift and its readers compare against.
+
+    An aware datetime (an ISO string with an offset, a GeoTIFF or API
+    timestamp) used to fail deep inside xarray with "Cannot compare tz-naive
+    and tz-aware datetime-like objects" (ISSUES X10). Naive input is taken as
+    UTC already and returned unchanged.
+    """
+
+    if moment.tzinfo is None:
+        return moment
+    return moment.astimezone(UTC).replace(tzinfo=None)
+
+
 def run_drift(
     *,
     lon: float | np.ndarray,
@@ -142,6 +156,7 @@ def run_drift(
       for no real reason.
     """
 
+    start = naive_utc(start)
     if hours <= 0:
         raise DriftError(f"hours must be positive, got {hours}")
     if number < 1:

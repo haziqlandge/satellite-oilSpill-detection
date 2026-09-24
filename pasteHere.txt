@@ -11,7 +11,11 @@ data/cache/metocean/era5-wind_86288587ba348dbdcff00eefe3f4a1b0.nc
 data/cache/metocean/era5-wind_9f03c80f1c01f19cd8bf4609b3031c4a.nc
 data/cache/metocean/era5-wind_c2312765246eebba00ac4c586c53ce58.nc
 data/cache/metocean/era5-wind_c9b32aae631e1b0533d8bebf1ae26571.nc
-    the ERA5 wind the three real drift runs used (612 KB total)
+data/cache/metocean/era5-wind_1051679ef881d3d799ed279fb252cb98.nc
+data/cache/metocean/era5-wind_ad4a10c30e3af7074aee8a99c0aef363.nc
+data/cache/metocean/era5-wind_1b9640c179818c2eca9b4cc566265640.nc
+    the ERA5 wind the real drift runs used (1.2 MB total): before each pass, and the
+    three newest (2026-09-23 evening) after it, for the 72 h forecast
 
 frontDemo/public/runs/S1A_IW_GRDH_1SDV_20230409T000206_20230409T000231_048012_05C552_27F2_s0db/drift.json
 frontDemo/public/runs/S1A_IW_GRDH_1SDV_20230409T000206_20230409T000231_048012_05C552_27F2_s0db/scene.json
@@ -19,7 +23,7 @@ frontDemo/public/runs/S1A_IW_GRDH_1SDV_20230515T000208_20230515T000233_048537_05
 frontDemo/public/runs/S1A_IW_GRDH_1SDV_20230515T000208_20230515T000233_048537_05D69B_35AF_s0db/scene.json
 frontDemo/public/runs/S1A_IW_GRDH_1SDV_20231205T000214_20231205T000239_051512_0637C7_66B8_s0db/drift.json
 frontDemo/public/runs/S1A_IW_GRDH_1SDV_20231205T000214_20231205T000239_051512_0637C7_66B8_s0db/scene.json
-    the three real-run views (13 MB). Can be regenerated instead: FUTURE_WORK.md section 0, "Regenerating the real runs"
+    the three real-run views, -72 h to +72 h (25 MB). Can be regenerated instead: FUTURE_WORK.md section 0, "Regenerating the real runs"
 
 frontDemo/public/models/L1-ciou-research.onnx
     the browser segmenter (13 MB). Can be regenerated instead:

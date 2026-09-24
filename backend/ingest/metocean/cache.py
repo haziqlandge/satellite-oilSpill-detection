@@ -93,6 +93,49 @@ def cached_path(request: ForcingRequest, *, cache_dir: Path = DEFAULT_CACHE_DIR)
     return path if path.exists() and path.stat().st_size > 0 else None
 
 
+# CDS snaps a requested area to its grid, inward: a file fetched for exactly a
+# request can stop up to one ERA5 step (0.25 degrees) short of the box it asked
+# for. A covering file is held to the same standard, no stricter.
+GRID_TOLERANCE_DEG = 0.25
+
+
+def covering_path(request: ForcingRequest, *, cache_dir: Path = DEFAULT_CACHE_DIR) -> Path | None:
+    """A cached file of the same product whose box and window contain `request`'s, or None.
+
+    Reanalysis for a fixed place and time never changes, so a file fetched for a
+    larger box or a longer window answers a smaller request exactly -- the
+    reader subsets it by position and time. This is what lets a window cut from
+    a processed scene run offline on the scene's own cached wind: its detections
+    span a smaller box, so its exact key is new. Each file is opened to read
+    its extent; the key is a digest and says nothing about coverage. Never
+    touches the network.
+    """
+
+    import numpy as np
+    import xarray as xr
+
+    start, end = np.datetime64(request.start), np.datetime64(request.end)
+    for path in sorted(cache_dir.glob(f"{request.product}_*.nc")):
+        if path.stat().st_size == 0:
+            continue
+        try:
+            with xr.open_dataset(path) as ds:
+                time_name = "valid_time" if "valid_time" in ds.coords else "time"
+                lat_name = "latitude" if "latitude" in ds.coords else "lat"
+                lon_name = "longitude" if "longitude" in ds.coords else "lon"
+                lons, lats, times = ds[lon_name].values, ds[lat_name].values, ds[time_name].values
+        except (OSError, KeyError, ValueError):
+            continue
+        tol = GRID_TOLERANCE_DEG
+        if (
+            lons.min() <= request.west + tol and lons.max() >= request.east - tol
+            and lats.min() <= request.south + tol and lats.max() >= request.north - tol
+            and times.min() <= start and times.max() >= end
+        ):
+            return path
+    return None
+
+
 def fetch_with_cache(
     request: ForcingRequest,
     fetcher: Callable[[ForcingRequest, Path], None] | None = None,

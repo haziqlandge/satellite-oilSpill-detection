@@ -29,6 +29,7 @@ makes the result a probability.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -137,8 +138,8 @@ def sample_members(count: int, *, seed: int = 0) -> tuple[Member, ...]:
 
 def run_ensemble(
     *,
-    lon: float,
-    lat: float,
+    lon: float | np.ndarray,
+    lat: float | np.ndarray,
     start: datetime,
     hours: int = DEFAULT_HORIZON_H,
     backward: bool = True,
@@ -150,6 +151,7 @@ def run_ensemble(
     seed: int = 0,
     time_step_s: int | None = None,
     coastline_action: str | None = None,
+    progress: Callable[[int, int], None] | None = None,
 ) -> EnsembleResult:
     """Run `members` perturbed drift simulations and stack their histories.
 
@@ -157,7 +159,17 @@ def run_ensemble(
     aborting the ensemble — losing one of ten members widens the field slightly,
     where losing the run entirely gives PHASE-06 nothing to gate on. If **every**
     member fails the error is raised, because an empty field is not a result.
+
+    `lon`/`lat` are one point, seeded as a disc of `radius_m`, or arrays of
+    `particles` starting positions -- a detected slick's own shape
+    (`seeding.points_in_polygon`) -- handed unchanged to every member.
+
+    `progress(done, total)` is called after each member, failed or not, so a
+    caller streaming the run (`backend/pipeline`) reports members as they land.
     """
+
+    if not np.isscalar(lon) and np.size(lon) != particles:
+        raise EnsembleError(f"{np.size(lon)} seed positions for {particles} particles per member")
 
     sampled = sample_members(members, seed=seed)
 
@@ -206,6 +218,8 @@ def run_ensemble(
             )
         except (DriftError, ValueError, RuntimeError) as error:
             failures.append(f"member {member.index}: {error}")
+            if progress is not None:
+                progress(member.index + 1, len(sampled))
             continue
 
         if not times:
@@ -219,6 +233,8 @@ def run_ensemble(
         lat_stack = [array[:steps] for array in lat_stack]
         lon_stack.append(result.lon_history[:steps])
         lat_stack.append(result.lat_history[:steps])
+        if progress is not None:
+            progress(member.index + 1, len(sampled))
 
     if not lon_stack:
         raise EnsembleError(f"every ensemble member failed: {failures[:3]}")

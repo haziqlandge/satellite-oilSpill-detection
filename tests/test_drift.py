@@ -188,6 +188,27 @@ def test_sampling_is_reproducible() -> None:
     assert sample_members(8, seed=7) != sample_members(8, seed=8)
 
 
+def test_a_timezone_aware_start_is_run_as_naive_utc() -> None:
+    """X10: an ISO time with an offset used to die deep in xarray.
+
+    `TypeError: Cannot compare tz-naive and tz-aware datetime-like objects`,
+    raised from inside the reader, with nothing pointing at the cause. A
+    GeoTIFF or API timestamp is naturally aware, so the engine takes it and
+    runs on the same instant in naive UTC, which is what OpenDrift expects.
+    """
+
+    from datetime import timezone
+
+    ist = timezone(timedelta(hours=5, minutes=30))
+    aware = datetime(2023, 5, 15, 5, 32, tzinfo=ist)  # 00:02 UTC
+
+    result = run_drift(lon=LON, lat=LAT, start=aware, hours=1, number=4,
+                       forcing=Forcing(u_current=0.1), time_step_s=1800)
+
+    assert result.times[0] == T0
+    assert result.times[0].tzinfo is None
+
+
 @pytest.mark.slow
 def test_an_ensemble_stacks_members_rather_than_averaging_them() -> None:
     """Averaging positions would collapse the ensemble into one trajectory.
@@ -228,3 +249,15 @@ def test_ensemble_is_anchored_at_the_requested_observation_time() -> None:
 
     assert result.times[0] == T0, "the ensemble must report the observation time it was given"
     assert result.times[0] > result.times[-1], "a backward axis descends"
+
+
+def test_an_ensemble_reports_each_member_as_it_lands() -> None:
+    """The live pipeline streams members to the console; a count it cannot trust is worse than none."""
+
+    seen: list[tuple[int, int]] = []
+    run_ensemble(
+        lon=LON, lat=LAT, start=T0, hours=2, members=MIN_MEMBERS, particles=5,
+        forcing=Forcing(u_current=0.2), progress=lambda done, total: seen.append((done, total)),
+    )
+
+    assert seen == [(k, MIN_MEMBERS) for k in range(1, MIN_MEMBERS + 1)]

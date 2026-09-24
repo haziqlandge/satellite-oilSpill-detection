@@ -28,6 +28,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 from .cache import ForcingRequest
 
@@ -70,6 +71,51 @@ def wind_request(
         end=end,
         variables=ERA5_WIND_VARIABLES,
     )
+
+
+def run_wind_requests(
+    bbox: tuple[float, float, float, float],
+    acquired: datetime,
+    *,
+    hours: int,
+    forward: int,
+) -> tuple[ForcingRequest, ForcingRequest]:
+    """The two ERA5 requests a scene's runs are forced by: before the pass, and after it.
+
+    One place, because the real-run export, the live pipeline and the wind the
+    views show all read the same cached files, and a series fetched separately
+    would not be the wind the parcels felt. `bbox` is every detection ring's
+    extent; `acquired` is naive UTC. One hour past each end, so the reader
+    brackets the run rather than ending on it.
+    """
+    west, south, east, north = bbox
+    box = dict(west=west, south=south, east=east, north=north)
+    back = wind_request(**box, start=acquired - timedelta(hours=hours + 1), end=acquired + timedelta(hours=1))
+    ahead = wind_request(**box, start=acquired - timedelta(hours=1), end=acquired + timedelta(hours=forward + 1))
+    return back, ahead
+
+
+def wind_only_readers(wind_path: Path) -> list[Any]:
+    """The readers a wind-forced OpenOil run needs: ERA5 wind, the coast, and zero current.
+
+    OpenOil needs more than wind. It requires currents and a land mask, and
+    refuses to start without a reader for each -- "every ensemble member
+    failed" is what a missing one looks like.
+
+    Order is priority: ERA5 answers the wind, OpenDrift's own global landmask
+    answers the coast, and the constant reader answers what is left, which is
+    the currents. Those are ZERO, because CMEMS has no credentials (ISSUES X2)
+    -- so this is a wind-driven reconstruction and every artifact says so rather
+    than implying a full metocean field.
+
+    The landmask is OpenDrift's own, not the frontend's: hand-rolling coastline
+    handling inside the physics is exactly what C6 forbids.
+    """
+    from opendrift.readers import reader_global_landmask
+
+    from backend.drift.opendrift_runner import Forcing
+
+    return [era5_reader(wind_path), reader_global_landmask.Reader(), Forcing().as_reader()]
 
 
 def _hours_between(start: datetime, end: datetime) -> list[datetime]:
