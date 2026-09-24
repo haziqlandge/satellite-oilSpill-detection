@@ -1,0 +1,66 @@
+{
+  "source": "15298010__train__sentinel_1054",
+  "class_scheme": [
+    "oos",
+    "slick_unknown"
+  ],
+  "note": "proposed_class is a suggestion, not a label. Set confirmed_class and confirmed_by to accept or override it. Records left unconfirmed are ignored.",
+  "instances": [
+    {
+      "label": 1,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.542,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.576,
+        "compactness": 0.4194,
+        "solidity": 0.816,
+        "area_px": 22113.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.6 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 1,
+        "area_px": 22113,
+        "perimeter_px": 813.9543648263007,
+        "elongation": 2.576000342617916,
+        "compactness": 0.41942799765139976,
+        "solidity": 0.8160079707738292,
+        "orientation_deg": 11.347052308580746,
+        "centroid_rc": [
+          135.25030525030525,
+          199.61818839596617
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": null,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    }
+  ],
+  "image_sha256": "6a4a81495f7f06bb8a287d37629736096cb99e1478474317f97d1c82608ac375",
+  "mask_sha256": "f107c373bc6a83ff9fdddcb87b9c0e0c73b434886062a47f00bff47b6cacb4a8",
+  "original_image": "data/interim/datasets/zenodo/15298010/images/images/train/sentinel_1054.png",
+  "original_mask": "data/interim/datasets/zenodo/15298010/masks/masks/train/sentinel_1054.png",
+  "split": "val",
+  "cfar": {
+    "status": "not_applicable",
+    "reason": "not a calibrated backscatter raster (an 8-bit image scaled by its authors, DATA.md D6); CA-CFAR's threshold is derived for linear power, so it is not run",
+    "targets": []
+  },
+  "pixel_spacing_m": null,
+  "background_db": null,
+  "wind": {
+    "status": "unknown",
+    "reason": "the corpus records no acquisition time, so ERA5 wind cannot be looked up"
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "source": "15298010__train__sentinel_0",
+  "class_scheme": [
+    "oos",
+    "slick_unknown"
+  ],
+  "note": "proposed_class is a suggestion, not a label. Set confirmed_class and confirmed_by to accept or override it. Records left unconfirmed are ignored.",
+  "instances": [
+    {
+      "label": 1,
+      "proposed_class": null,
+      "confidence": 0.0,
+      "needs_review": true,
+      "terms": {
+        "elongation": 3.469,
+        "compactness": 0.4626,
+        "solidity": 0.971,
+        "area_px": 1909.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 3.5 falls between 3.0 and 6.0; morphology does not distinguish the classes here"
+      ],
+      "morphology": {
+        "label": 1,
+        "area_px": 1909,
+        "perimeter_px": 227.7167747730646,
+        "elongation": 3.46901483057067,
+        "compactness": 0.4626214272796574,
+        "solidity": 0.9710071210579858,
+        "orientation_deg": -66.66279629737382,
+        "centroid_rc": [
+          18.817181770560502,
+          35.55893137768465
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": null,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 2,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.673,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.266,
+        "compactness": 0.097,
+        "solidity": 0.429,
+        "area_px": 19658.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.3 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 2,
+        "area_px": 19658,
+        "perimeter_px": 1595.5737725975564,
+        "elongation": 1.265846185296081,
+        "compactness": 0.09703209692894935,
+        "solidity": 0.4293545921153216,
+        "orientation_deg": -2.4136940096296042,
+        "centroid_rc": [
+          169.8761827245905,
+          176.36860311323633
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": null,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    }
+  ],
+  "image_sha256": "95bcfa98c83e191016c7fefdf895f7ae282f2afe196efd8b80cff30046ee0a97",
+  "mask_sha256": "02edeaa9d9e125ec3c1ca0eaa8d70c98a04be8eab9399f67b0bce7bfc64486db",
+  "original_image": "data/interim/datasets/zenodo/15298010/images/images/train/sentinel_0.png",
+  "original_mask": "data/interim/datasets/zenodo/15298010/masks/masks/train/sentinel_0.png",
+  "split": "train",
+  "cfar": {
+    "status": "not_applicable",
+    "reason": "not a calibrated backscatter raster (an 8-bit image scaled by its authors, DATA.md D6); CA-CFAR's threshold is derived for linear power, so it is not run",
+    "targets": []
+  },
+  "pixel_spacing_m": null,
+  "background_db": null,
+  "wind": {
+    "status": "unknown",
+    "reason": "the corpus records no acquisition time, so ERA5 wind cannot be looked up"
+  }
+}

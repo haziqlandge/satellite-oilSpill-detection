@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slick review pack</title>
+<style>
+  :root {
+    --base: #0c1114; --panel: #121a1e; --line: #24323a; --ink: #d9e4e8; --dim: #8fa3ab; --faint: #5f7780;
+    --accent: #5fe0a8; --warn: #f0b54a; --alarm: #ef6b5b; --oos: #ff9f43; --unk: #7cc4ff;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace; --sans: system-ui, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --base: #f4f6f7; --panel: #ffffff; --line: #d3dadd; --ink: #152026; --dim: #4b5d65; --faint: #7a8c93; --accent: #0f8a5f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--base); color: var(--ink); font: 14px/1.5 var(--sans); }
+  header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+  h1 { font: 600 15px var(--mono); letter-spacing: .08em; text-transform: uppercase; margin: 0; }
+  main { max-width: 1280px; margin: 0 auto; padding: 16px; }
+  label.field { display: inline-flex; gap: 6px; align-items: center; color: var(--dim); font-size: 12px; }
+  input[type=text], select, textarea { background: var(--base); color: var(--ink); border: 1px solid var(--line); padding: 4px 6px; font: 12px var(--sans); }
+  button { background: transparent; color: var(--accent); border: 1px solid var(--accent); padding: 5px 10px; font: 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; cursor: pointer; }
+  button:disabled { color: var(--faint); border-color: var(--line); cursor: not-allowed; }
+  .bar { height: 6px; background: var(--line); flex: 1 1 160px; min-width: 120px; }
+  .bar > span { display: block; height: 100%; background: var(--accent); }
+  .muted { color: var(--dim); } .faint { color: var(--faint); } .mono { font-family: var(--mono); }
+  details.rubric { background: var(--panel); border: 1px solid var(--line); padding: 10px 14px; margin-bottom: 16px; }
+  details.rubric summary { cursor: pointer; font: 600 12px var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+  details.rubric li { margin: 4px 0; }
+  section.tile { background: var(--panel); border: 1px solid var(--line); margin-bottom: 18px; }
+  section.tile > h2 { margin: 0; padding: 8px 12px; border-bottom: 1px solid var(--line); font: 600 13px var(--mono); display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; }
+  .grid { display: grid; grid-template-columns: minmax(0, 520px) minmax(0, 1fr); gap: 0; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  figure { margin: 0; padding: 10px; border-right: 1px solid var(--line); }
+  .stage { position: relative; width: 100%; background: #000; }
+  .stage img { display: block; width: 100%; height: auto; }
+  .stage img.mask, .stage svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .stage svg text { font: 600 13px var(--mono); paint-order: stroke; stroke: #000; stroke-width: 3px; fill: #fff; }
+  .toggles { display: flex; gap: 12px; margin-top: 6px; font-size: 12px; color: var(--dim); flex-wrap: wrap; }
+  dl.facts { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 8px 0 0; font-size: 12px; }
+  dl.facts dt { color: var(--faint); } dl.facts dd { margin: 0; }
+  .instances { padding: 6px 10px 10px; overflow-x: auto; }
+  .inst { border-bottom: 1px solid var(--line); padding: 8px 2px; }
+  .inst.focus { outline: 1px solid var(--accent); outline-offset: -1px; }
+  .inst h3 { margin: 0 0 4px; font: 600 12px var(--mono); display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; cursor: pointer; }
+  .tag { font: 11px var(--mono); padding: 0 5px; border: 1px solid var(--line); text-transform: uppercase; }
+  .tag.oos { color: var(--oos); border-color: var(--oos); } .tag.unk { color: var(--unk); border-color: var(--unk); }
+  .tag.none { color: var(--faint); } .tag.done { color: var(--accent); border-color: var(--accent); }
+  .measures { display: flex; flex-wrap: wrap; gap: 2px 14px; font: 12px var(--mono); color: var(--dim); }
+  .measures b { color: var(--ink); font-weight: 600; }
+  .reasons { font-size: 12px; color: var(--dim); margin: 4px 0; }
+  .decide { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 12px; align-items: center; }
+  .decide label { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; }
+  .decide textarea { flex: 1 1 220px; min-height: 26px; height: 26px; resize: vertical; }
+  .note { font-size: 12px; color: var(--warn); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <h1>Slick review pack</h1>
+    <span class="muted mono" id="counts"></span>
+    <div class="bar" aria-hidden="true"><span id="progress" style="width:0"></span></div>
+    <span class="mono" id="progressText"></span>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <label class="field">Reviewer <input type="text" id="reviewer" placeholder="your name" autocomplete="name"></label>
+    <label class="field"><input type="checkbox" id="analyst"> I am a trained SAR analyst</label>
+    <label class="field">Show
+      <select id="filter">
+        <option value="all">every instance</option>
+        <option value="undecided">undecided</option>
+        <option value="review">flagged for review</option>
+        <option value="oos">proposed oos</option>
+      </select>
+    </label>
+    <label class="field">Corpus <select id="corpus"><option value="all">all</option></select></label>
+    <button type="button" id="download" disabled>Download decisions</button>
+    <label class="field"><button type="button" id="importButton">Load decisions</button><input type="file" id="import" accept="application/json" class="hidden"></label>
+    <span class="note" id="status" role="status"></span>
+  </div>
+</header>
+<main>
+  <details class="rubric" open>
+    <summary>The rubric (FUTURE_WORK.md §2.3) — read before deciding</summary>
+    <ol>
+      <li><b>Wind first.</b> Below about 3 m/s there is no Bragg roughness for oil to damp, so the whole sea is dark
+        and contrast means nothing; above about 10–12 m/s wind mixes oil down. Outside that band, <b>defer</b>.
+        <span class="muted">For these tiles the wind is unknown: the corpus records no acquisition time, so ERA5
+        cannot be looked up. Use the scene itself: if the sea around the instance is uniformly dark and
+        featureless, defer. The tile's background (median band-2 backscatter outside every instance) is shown
+        as a hint, not a wind speed.</span></li>
+      <li><b>Linear, trailing a vessel, not widening</b> — a bright target at one end, a straight or gently curving
+        dark trail that stays roughly the same width → <b>oos</b>.</li>
+      <li><b>Linear, diverging in a V from a bright target</b> → a <b>ship wake</b>. Reject it. This is the most
+        dangerous confusion: a wake is linear, dark, next to a vessel, and would be blamed on the ship that made
+        it. "Target at an end" below is true for both; the V is what separates them.</li>
+      <li><b>Irregular or compact, no vessel</b> → <b>slick_unknown</b>.</li>
+      <li><b>Sharp boundary and strong contrast</b> → oil-like. <b>Weak contrast</b> argues a biogenic film → defer.
+        Contrast is shown in dB (the instance against a ring of sea around it); it is relative, never a thickness.</li>
+      <li>Never promote a <b>Lookalike</b> or <b>No oil</b> tile. This pack holds Oil tiles only.</li>
+      <li>Uncertain? <b>Defer</b>. A deferral costs nothing; a wrong label trains the model to be wrong.
+        Your name is recorded as <span class="mono">&lt;name&gt; (non-specialist, rubric-assisted)</span> unless
+        you tick the analyst box, with your confidence.</li>
+    </ol>
+    <p class="muted">Background: Brekke &amp; Solberg 2005, <i>Remote Sensing of Environment</i> 95(1):1–13;
+      Topouzelis 2013; EMSA CleanSeaNet guidance. Proposals below are the tool's suggestion from shape and
+      bright-target distance only, never a label. Decisions are kept in this browser; download them and apply
+      with <span class="mono">python -m scripts.apply_review_decisions &lt;file&gt;</span>.</p>
+  </details>
+  <div id="tiles"></div>
+</main>
+<script id="pack" type="application/json">/*__PACK_DATA__*/null</script>
+<script>
+(() => {
+  const PACK = JSON.parse(document.getElementById("pack").textContent);
+  const KEY = `slick-review:${PACK.summary.tiles}:${PACK.summary.instances}`;
+  const DECISIONS = [
+    ["oos", "oos"], ["slick_unknown", "slick_unknown"], ["reject_wake", "reject: wake"],
+    ["reject_lookalike", "reject: look-alike"], ["reject_mask_error", "reject: mask wrong"], ["defer", "defer"],
+  ];
+  const total = PACK.tiles.reduce((s, t) => s + t.instances.length, 0);
+  let state = { reviewer: "", analyst: false, decisions: {} };
+  try { const saved = JSON.parse(localStorage.getItem(KEY) || "null"); if (saved) state = { ...state, ...saved }; } catch {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} };
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, attrs = {}, ...kids) => {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "class") node.className = v; else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+      else if (v !== false && v !== null && v !== undefined) node.setAttribute(k, v === true ? "" : v);
+    }
+    for (const kid of kids.flat()) if (kid !== null && kid !== undefined) node.append(kid.nodeType ? kid : String(kid));
+    return node;
+  };
+  const fmt = (v, digits = 1, unit = "") => (v === null || v === undefined ? "—" : `${Number(v).toFixed(digits)}${unit}`);
+  const keyOf = (tile, inst) => `${tile.identity}#${inst.label}`;
+
+  $("counts").textContent = `${PACK.summary.tiles} tiles · ${total} instances · CFAR run on ${PACK.summary.cfar.run || 0}, `
+    + `${PACK.summary.targets} bright targets · proposed oos ${PACK.summary.proposed.oos}, slick_unknown `
+    + `${PACK.summary.proposed.slick_unknown}, deferred ${PACK.summary.proposed.deferred}`;
+  for (const corpus of [...new Set(PACK.tiles.map((t) => t.corpus))])
+    $("corpus").append(el("option", { value: corpus }, corpus));
+  $("reviewer").value = state.reviewer; $("analyst").checked = state.analyst;
+
+  const tagFor = (cls) => el("span", { class: `tag ${cls === "oos" ? "oos" : cls === "slick_unknown" ? "unk" : "none"}` },
+    cls ? `proposed ${cls}` : "no proposal");
+
+  function tileSection(tile) {
+    const width = Math.round(tile.width * tile.scale), height = Math.round(tile.height * tile.scale);
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    const add = (name, attrs, text) => {
+      const node = document.createElementNS("http://www.w3.org/2000/svg", name);
+      for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+      if (text) node.textContent = text;
+      svg.append(node); return node;
+    };
+    const targets = tile.targets.map((t) => add("circle", { cx: t.x, cy: t.y, r: 9, fill: "none", stroke: "#00e5ff", "stroke-width": 2, class: "target" }));
+    const labels = tile.instances.map((i) => add("text", { x: i.x, y: i.y, "text-anchor": "middle", class: "lbl" }, `#${i.label}`));
+    const focusRing = add("circle", { r: 16, fill: "none", stroke: "#ffe14d", "stroke-width": 2.5, class: "hidden" });
+    const mask = el("img", { class: "mask", src: tile.mask, alt: "" });
+    const toggle = (label, on, apply) => {
+      const box = el("input", { type: "checkbox", checked: on, onchange: (e) => apply(e.target.checked) });
+      return el("label", {}, box, label);
+    };
+    const facts = el("dl", { class: "facts" },
+      el("dt", {}, "split"), el("dd", {}, tile.split),
+      el("dt", {}, "pixel"), el("dd", {}, tile.pixel_spacing_m ? `${tile.pixel_spacing_m[0].toFixed(1)} × ${tile.pixel_spacing_m[1].toFixed(1)} m` : "unknown (not georeferenced)"),
+      el("dt", {}, "CFAR"), el("dd", {}, tile.cfar.status === "run"
+        ? `${tile.cfar.count} bright target${tile.cfar.count === 1 ? "" : "s"} (band ${tile.cfar.band}, pfa ${tile.cfar.params.pfa})`
+        : `not run — ${tile.cfar.reason}`),
+      el("dt", {}, "wind"), el("dd", {}, `unknown — ${tile.wind.reason}`),
+      el("dt", {}, "sea"), el("dd", {}, tile.background_db === null ? "—" : `${tile.background_db.toFixed(1)} dB median band-2 backscatter outside the instances (a sea-state hint, not a wind)`),
+    );
+    const figure = el("figure", {},
+      el("div", { class: "stage", style: `aspect-ratio:${width}/${height}` }, el("img", { src: tile.image, alt: `${tile.identity}, band 2 through the training dB window` }), mask, svg),
+      el("div", { class: "toggles" },
+        toggle("mask", true, (on) => mask.classList.toggle("hidden", !on)),
+        toggle("bright targets", true, (on) => targets.forEach((t) => t.classList.toggle("hidden", !on))),
+        toggle("labels", true, (on) => labels.forEach((t) => t.classList.toggle("hidden", !on))),
+        el("a", { href: tile.image, target: "_blank", rel: "noopener" }, "open image")),
+      facts);
+    const list = el("div", { class: "instances" }, tile.instances.map((inst) => instanceRow(tile, inst, focusRing)));
+    return el("section", { class: "tile", "data-corpus": tile.corpus },
+      el("h2", {}, tile.identity, el("span", { class: "faint" }, `${tile.instances.length} instance${tile.instances.length === 1 ? "" : "s"}`)),
+      el("div", { class: "grid" }, figure, list));
+  }
+
+  function instanceRow(tile, inst, focusRing) {
+    const key = keyOf(tile, inst);
+    const current = state.decisions[key] || {};
+    const e = inst.evidence, t = inst.terms;
+    const done = el("span", { class: `tag done ${current.decision ? "" : "hidden"}` }, "decided");
+    const radios = DECISIONS.map(([value, label]) => el("label", {},
+      el("input", { type: "radio", name: key, value, checked: current.decision === value, onchange: () => record(key, { decision: value }, row, done) }), label));
+    const confidence = el("select", { "aria-label": "confidence", onchange: (ev) => record(key, { confidence: ev.target.value || null }, row, done) },
+      el("option", { value: "" }, "confidence…"), ...["low", "medium", "high"].map((c) => el("option", { value: c, selected: current.confidence === c }, c)));
+    const notes = el("textarea", { placeholder: "notes", "aria-label": "notes", onchange: (ev) => record(key, { notes: ev.target.value }, row, done) });
+    notes.value = current.notes || "";
+    const row = el("div", { class: "inst", "data-key": key, "data-review": inst.needs_review, "data-proposed": inst.proposed_class || "none" },
+      el("h3", { onclick: () => { focusRing.setAttribute("cx", inst.x); focusRing.setAttribute("cy", inst.y); focusRing.classList.remove("hidden");
+        document.querySelectorAll(".inst.focus").forEach((n) => n.classList.remove("focus")); row.classList.add("focus"); } },
+        `#${inst.label}`, tagFor(inst.proposed_class),
+        el("span", { class: "faint" }, inst.proposed_class ? `confidence ${inst.confidence}` : ""),
+        inst.needs_review ? el("span", { class: "tag" }, "review") : null, done),
+      el("div", { class: "measures" },
+        el("span", {}, "elongation ", el("b", {}, fmt(t.elongation, 1))),
+        el("span", {}, "compactness ", el("b", {}, fmt(t.compactness, 3))),
+        el("span", {}, "solidity ", el("b", {}, fmt(t.solidity, 2))),
+        el("span", {}, "area ", el("b", {}, inst.area_km2 === null ? `${t.area_px} px` : `${inst.area_km2} km²`)),
+        el("span", {}, "contrast ", el("b", {}, fmt(e.contrast_db, 1, " dB"))),
+        el("span", {}, "nearest target ", el("b", {}, e.nearest_target_px === null ? "none" : `${fmt(e.nearest_target_px, 0)} px${e.nearest_target_m === null ? "" : ` · ${fmt(e.nearest_target_m / 1000, 2)} km`}`)),
+        el("span", {}, "target at an end ", el("b", {}, e.target_at_end === null ? "—" : e.target_at_end ? "yes" : "no"))),
+      el("div", { class: "reasons" }, inst.reasons.join(" · ")),
+      el("div", { class: "decide", role: "group", "aria-label": `decision for #${inst.label}` }, radios, confidence, notes));
+    return row;
+  }
+
+  function record(key, patch, row, done) {
+    state.decisions[key] = { ...(state.decisions[key] || {}), ...patch };
+    done.classList.toggle("hidden", !state.decisions[key].decision);
+    save(); refresh();
+  }
+
+  function refresh() {
+    const decided = Object.values(state.decisions).filter((d) => d.decision).length;
+    $("progress").style.width = `${(100 * decided) / Math.max(1, total)}%`;
+    $("progressText").textContent = `${decided} / ${total} decided`;
+    $("download").disabled = !state.reviewer.trim() || decided === 0;
+    const filter = $("filter").value, corpus = $("corpus").value;
+    document.querySelectorAll("section.tile").forEach((section) => {
+      let shown = 0;
+      section.querySelectorAll(".inst").forEach((row) => {
+        const d = state.decisions[row.dataset.key];
+        const ok = filter === "all" || (filter === "undecided" && !d?.decision) || (filter === "review" && row.dataset.review === "true")
+          || (filter === "oos" && row.dataset.proposed === "oos");
+        row.classList.toggle("hidden", !ok); if (ok) shown++;
+      });
+      section.classList.toggle("hidden", shown === 0 || (corpus !== "all" && section.dataset.corpus !== corpus));
+    });
+  }
+
+  $("reviewer").addEventListener("input", (e) => { state.reviewer = e.target.value; save(); refresh(); });
+  $("analyst").addEventListener("change", (e) => { state.analyst = e.target.checked; save(); });
+  $("filter").addEventListener("change", refresh);
+  $("corpus").addEventListener("change", refresh);
+  $("download").addEventListener("click", () => {
+    const reviewer = state.reviewer.trim() + (state.analyst ? "" : " (non-specialist, rubric-assisted)");
+    const decisions = Object.entries(state.decisions).filter(([, d]) => d.decision).map(([key, d]) => {
+      const [source, label] = key.split("#");
+      return { source, label: Number(label), decision: d.decision, confidence: d.confidence || null, notes: d.notes || "" };
+    });
+    const bundle = { version: 1, reviewer, created: new Date().toISOString(), pack: { tiles: PACK.summary.tiles, instances: total }, decisions };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" }));
+    const a = el("a", { href: url, download: `review-decisions-${new Date().toISOString().slice(0, 10)}.json` });
+    document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    $("status").textContent = `Downloaded ${decisions.length} decisions. Apply with python -m scripts.apply_review_decisions <file>.`;
+  });
+  $("importButton").addEventListener("click", () => $("import").click());
+  $("import").addEventListener("change", async (e) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    try {
+      const bundle = JSON.parse(await file.text());
+      for (const d of bundle.decisions || []) state.decisions[`${d.source}#${d.label}`] = { decision: d.decision, confidence: d.confidence, notes: d.notes };
+      if (bundle.reviewer && !state.reviewer) state.reviewer = String(bundle.reviewer).replace(/ \(non-specialist, rubric-assisted\)$/, "");
+      save(); location.reload();
+    } catch (error) { $("status").textContent = `That file is not a decisions bundle (${error.message}).`; }
+  });
+
+  const root = $("tiles");
+  PACK.tiles.forEach((tile) => root.append(tileSection(tile)));
+  refresh();
+})();
+</script>
+</body>
+</html>

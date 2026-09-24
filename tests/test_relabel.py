@@ -96,6 +96,25 @@ def test_linear_and_vessel_adjacent_proposes_oos() -> None:
     assert "bright_target_distance_px" in result.terms
 
 
+def test_vessel_adjacency_is_measured_to_the_trail_not_its_centroid() -> None:
+    """A long trail with the vessel at its end is the textbook oos.
+
+    Measured to the centroid, a 960 px trail puts a vessel 10 px past its end
+    about 490 px away -- outside the 300 px adjacency -- and the proposer
+    deferred it as "no bright target within 300 px", which was false. On the
+    real pilot, three linear instances with CFAR targets 15-22 px from the
+    trail were deferred this way.
+    """
+
+    mask = np.zeros((200, 1100), dtype=np.uint8)
+    mask[98:103, 20:980] = 1
+
+    (result,) = propose_all(mask, bright_targets=[(100.0, 990.0)])
+
+    assert result.proposed_class == "oos"
+    assert result.terms["bright_target_distance_px"] <= 11.0
+
+
 def test_an_irregular_blob_proposes_slick_unknown() -> None:
     blob = analyse_mask(_blob())[0]
 

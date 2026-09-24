@@ -27,6 +27,20 @@
       ],
       "port": 5190,
       "autoPort": true
+    },
+    {
+      "name": "review-pack",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5195",
+        "--bind",
+        "127.0.0.1",
+        "--directory",
+        "eval/phase2-closure/annotation-pilot-cfar"
+      ],
+      "port": 5195
     }
   ]
 }

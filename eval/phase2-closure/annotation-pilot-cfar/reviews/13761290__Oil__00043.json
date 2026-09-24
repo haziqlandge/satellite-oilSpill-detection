@@ -1,0 +1,128 @@
+{
+  "source": "13761290__Oil__00043",
+  "class_scheme": [
+    "oos",
+    "slick_unknown"
+  ],
+  "note": "proposed_class is a suggestion, not a label. Set confirmed_class and confirmed_by to accept or override it. Records left unconfirmed are ignored.",
+  "instances": [
+    {
+      "label": 1,
+      "proposed_class": "oos",
+      "confidence": 0.778,
+      "needs_review": false,
+      "terms": {
+        "elongation": 8.144,
+        "compactness": 0.1154,
+        "solidity": 0.562,
+        "area_px": 60576.0,
+        "bright_target_distance_px": 17.0
+      },
+      "reasons": [
+        "elongation 8.1 >= 6.0 (linear) and a bright target 17 px away (<= 300)"
+      ],
+      "morphology": {
+        "label": 1,
+        "area_px": 60576,
+        "perimeter_px": 2568.820597366782,
+        "elongation": 8.143732076900553,
+        "compactness": 0.11535672201954521,
+        "solidity": 0.5620859237264545,
+        "orientation_deg": 76.68210011927012,
+        "centroid_rc": [
+          1937.2299425515055,
+          1044.4452753565768
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -6.37,
+        "nearest_target_px": 17.9,
+        "nearest_target_m": 170.9,
+        "target_at_end": true
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 2,
+      "proposed_class": "oos",
+      "confidence": 0.708,
+      "needs_review": false,
+      "terms": {
+        "elongation": 6.41,
+        "compactness": 0.1478,
+        "solidity": 0.503,
+        "area_px": 45544.0,
+        "bright_target_distance_px": 14.3
+      },
+      "reasons": [
+        "elongation 6.4 >= 6.0 (linear) and a bright target 14 px away (<= 300)"
+      ],
+      "morphology": {
+        "label": 2,
+        "area_px": 45544,
+        "perimeter_px": 1967.9545442950498,
+        "elongation": 6.409914882216439,
+        "compactness": 0.14777838260892448,
+        "solidity": 0.5031652212340496,
+        "orientation_deg": -75.11169941956742,
+        "centroid_rc": [
+          1928.285394343931,
+          323.36878622870194
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -7.45,
+        "nearest_target_px": 15.1,
+        "nearest_target_m": 147.2,
+        "target_at_end": true
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    }
+  ],
+  "image_sha256": "0323e0449dc6305d2f176adfc9767dc49e40a1601cadce7447d13319b41c18ff",
+  "mask_sha256": "b29c4b1215baa07ce0265f42eaa6f473d780e0b0364dceef831406d1636eae85",
+  "original_image": "data/interim/datasets/zenodo/13761290/02_Test_images_and_ground_truth/Images/Oil/00043.tif",
+  "original_mask": "data/interim/datasets/zenodo/13761290/02_Test_images_and_ground_truth/Mask/Oil/00043_segmentation.tif",
+  "split": "val",
+  "cfar": {
+    "status": "run",
+    "band": 2,
+    "params": {
+      "guard_px": 4,
+      "train_px": 8,
+      "pfa": 1e-06,
+      "min_area_px": 4
+    },
+    "targets": [
+      {
+        "row": 1908.9,
+        "col": 640.2,
+        "area_px": 19,
+        "peak_db": 8.2
+      },
+      {
+        "row": 1929.5,
+        "col": 645.7,
+        "area_px": 15,
+        "peak_db": 5.57
+      }
+    ]
+  },
+  "pixel_spacing_m": [
+    9.45,
+    9.93
+  ],
+  "background_db": -22.95,
+  "wind": {
+    "status": "unknown",
+    "reason": "the corpus records no acquisition time, so ERA5 wind cannot be looked up"
+  }
+}

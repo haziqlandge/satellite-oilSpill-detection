@@ -1,0 +1,168 @@
+{
+  "source": "8346860__Oil__00000",
+  "class_scheme": [
+    "oos",
+    "slick_unknown"
+  ],
+  "note": "proposed_class is a suggestion, not a label. Set confirmed_class and confirmed_by to accept or override it. Records left unconfirmed are ignored.",
+  "instances": [
+    {
+      "label": 2,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.574,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.256,
+        "compactness": 0.7909,
+        "solidity": 0.931,
+        "area_px": 67.0,
+        "bright_target_distance_px": 790.6
+      },
+      "reasons": [
+        "elongation 2.3 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 2,
+        "area_px": 67,
+        "perimeter_px": 32.62741699796952,
+        "elongation": 2.256150446055995,
+        "compactness": 0.790895818966927,
+        "solidity": 0.9305555555555556,
+        "orientation_deg": -58.223313029135355,
+        "centroid_rc": [
+          959.9402985074627,
+          770.2686567164179
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -2.64,
+        "nearest_target_px": 790.6,
+        "nearest_target_m": 5607.0,
+        "target_at_end": false
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 4,
+      "proposed_class": null,
+      "confidence": 0.0,
+      "needs_review": true,
+      "terms": {
+        "elongation": 3.82,
+        "compactness": 0.2236,
+        "solidity": 0.802,
+        "area_px": 14307.0,
+        "bright_target_distance_px": 606.0
+      },
+      "reasons": [
+        "elongation 3.8 falls between 3.0 and 6.0; morphology does not distinguish the classes here"
+      ],
+      "morphology": {
+        "label": 4,
+        "area_px": 14307,
+        "perimeter_px": 896.613311116846,
+        "elongation": 3.8198984513227785,
+        "compactness": 0.2236392756549151,
+        "solidity": 0.8023666647972632,
+        "orientation_deg": 72.1311055883629,
+        "centroid_rc": [
+          1026.1730621374152,
+          978.0870203396938
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -4.74,
+        "nearest_target_px": 606.0,
+        "nearest_target_m": 5189.0,
+        "target_at_end": false
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 7,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.657,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.434,
+        "compactness": 0.9034,
+        "solidity": 0.885,
+        "area_px": 85.0,
+        "bright_target_distance_px": 703.2
+      },
+      "reasons": [
+        "elongation 1.4 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 7,
+        "area_px": 85,
+        "perimeter_px": 34.384776310850235,
+        "elongation": 1.4341083330913724,
+        "compactness": 0.9034339003383879,
+        "solidity": 0.8854166666666666,
+        "orientation_deg": 88.28734749194798,
+        "centroid_rc": [
+          1062.8235294117646,
+          966.7294117647059
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -2.54,
+        "nearest_target_px": 703.2,
+        "nearest_target_m": 5786.7,
+        "target_at_end": false
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    }
+  ],
+  "image_sha256": "b164662ebf451ab83578d1214f94cdfeda26de10395fa7cba67aa3d3583d9693",
+  "mask_sha256": "16ccddfecc14e3225a2d2be6e525bd36eb990947ac13a100419e25d1795eb001",
+  "original_image": "data/interim/datasets/zenodo/8346860/01_Train_Val_Oil_Spill_images/Oil/00000.tif",
+  "original_mask": "data/interim/datasets/zenodo/8346860/01_Train_Val_Oil_Spill_mask/Mask_oil/00000.tif",
+  "split": "train",
+  "cfar": {
+    "status": "run",
+    "band": 2,
+    "params": {
+      "guard_px": 4,
+      "train_px": 8,
+      "pfa": 1e-06,
+      "min_area_px": 4
+    },
+    "targets": [
+      {
+        "row": 1426.7,
+        "col": 1896.6,
+        "area_px": 9,
+        "peak_db": 5.55
+      },
+      {
+        "row": 547.0,
+        "col": 1452.0,
+        "area_px": 15,
+        "peak_db": 4.03
+      }
+    ]
+  },
+  "pixel_spacing_m": [
+    5.7,
+    9.93
+  ],
+  "background_db": -20.73,
+  "wind": {
+    "status": "unknown",
+    "reason": "the corpus records no acquisition time, so ERA5 wind cannot be looked up"
+  }
+}

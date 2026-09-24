@@ -241,6 +241,7 @@ def propose(
     instance: Morphology,
     *,
     bright_targets: list[tuple[float, float]] | None = None,
+    target_distance_px: float | None = None,
 ) -> Proposal:
     """Propose a class for one instance, with the terms that produced it.
 
@@ -254,10 +255,22 @@ def propose(
 
     Neither is decisive alone. A linear instance with no bright target near it
     is exactly the ship-wake case, so it is deferred rather than called `oos`.
+
+    `target_distance_px` is the distance from the nearest target to the
+    instance ITSELF, which `propose_all` measures from the mask. Without it the
+    distance falls back to the centroid, which misjudges exactly the case the
+    rule exists for: a long trail with the vessel at its end has its centroid
+    half a trail away. On the real pilot that deferred three linear instances
+    whose CFAR targets sat 15-22 px from the trail, as "no bright target
+    within 300 px".
     """
 
     targets = bright_targets or []
-    distance = _nearest_bright_target(instance.centroid_rc, targets)
+    distance = (
+        float(target_distance_px)
+        if target_distance_px is not None and targets
+        else _nearest_bright_target(instance.centroid_rc, targets)
+    )
     vessel_adjacent = distance <= VESSEL_ADJACENT_PX
 
     terms: dict[str, float] = {
@@ -340,11 +353,34 @@ def propose_all(
     min_area_px: int = MIN_INSTANCE_PX,
     threshold: float | None = None,
 ) -> list[Proposal]:
-    """Propose a class for every instance in a binary mask."""
+    """Propose a class for every instance in a binary mask.
 
+    Vessel adjacency is measured from each bright target to the nearest pixel
+    of the instance (one distance transform per mask), not to its centroid --
+    see `propose`.
+    """
+
+    instances = analyse_mask(mask, min_area_px=min_area_px, threshold=threshold)
+    if not bright_targets or not instances:
+        return [propose(instance, bright_targets=bright_targets) for instance in instances]
+
+    from scipy import ndimage
+    from skimage.measure import label as label_components
+
+    labelled = label_components(binarise(mask, threshold=threshold), connectivity=2)
+    seeds = np.ones(labelled.shape, dtype=bool)
+    for row, col in bright_targets:
+        r, c = round(row), round(col)
+        if 0 <= r < seeds.shape[0] and 0 <= c < seeds.shape[1]:
+            seeds[r, c] = False
+    if seeds.all():
+        # Every target fell outside the raster; the centroid rule still applies.
+        return [propose(instance, bright_targets=bright_targets) for instance in instances]
+    to_target = ndimage.distance_transform_edt(seeds)
+    nearest = ndimage.minimum(to_target, labels=labelled, index=[i.label for i in instances])
     return [
-        propose(instance, bright_targets=bright_targets)
-        for instance in analyse_mask(mask, min_area_px=min_area_px, threshold=threshold)
+        propose(instance, bright_targets=bright_targets, target_distance_px=float(distance))
+        for instance, distance in zip(instances, np.atleast_1d(nearest), strict=True)
     ]
 
 

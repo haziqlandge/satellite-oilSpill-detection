@@ -1,0 +1,20 @@
+{
+  "tiles": 24,
+  "instances": 355,
+  "cfar": {
+    "run": 16,
+    "not_applicable": 8
+  },
+  "targets": 33,
+  "proposed_before": {
+    "slick_unknown": 279,
+    "None": 76
+  },
+  "proposed": {
+    "oos": 3,
+    "slick_unknown": 279,
+    "deferred": 73
+  },
+  "seconds": 27.3,
+  "note": "Proposals are suggestions, not labels. Train/validation tiles only; no test data. Wind is unknown for every tile (no acquisition time in the corpus)."
+}

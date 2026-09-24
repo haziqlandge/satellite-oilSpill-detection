@@ -1,0 +1,2075 @@
+{
+  "source": "13761290__Oil__00004",
+  "class_scheme": [
+    "oos",
+    "slick_unknown"
+  ],
+  "note": "proposed_class is a suggestion, not a label. Set confirmed_class and confirmed_by to accept or override it. Records left unconfirmed are ignored.",
+  "instances": [
+    {
+      "label": 1,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.674,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.261,
+        "compactness": 0.6813,
+        "solidity": 0.881,
+        "area_px": 111.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.3 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 1,
+        "area_px": 111,
+        "perimeter_px": 45.248737341529164,
+        "elongation": 1.2613714803254892,
+        "compactness": 0.681271016806496,
+        "solidity": 0.8809523809523809,
+        "orientation_deg": -49.43261689227913,
+        "centroid_rc": [
+          49.42342342342342,
+          1244.6126126126126
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.76,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 2,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.68,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.2,
+        "compactness": 0.5962,
+        "solidity": 0.887,
+        "area_px": 3137.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.2 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 2,
+        "area_px": 3137,
+        "perimeter_px": 257.1431816442575,
+        "elongation": 1.199646322425769,
+        "compactness": 0.5961758182261546,
+        "solidity": 0.8871606334841629,
+        "orientation_deg": 57.27531438501487,
+        "centroid_rc": [
+          143.43130379343322,
+          1239.6904686005737
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -4.25,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 4,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.676,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.237,
+        "compactness": 0.8394,
+        "solidity": 0.898,
+        "area_px": 185.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.2 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 4,
+        "area_px": 185,
+        "perimeter_px": 52.62741699796952,
+        "elongation": 1.2372414298266445,
+        "compactness": 0.8393778072536918,
+        "solidity": 0.8980582524271845,
+        "orientation_deg": 58.105436640939175,
+        "centroid_rc": [
+          162.0162162162162,
+          1144.7027027027027
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.24,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 5,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.64,
+      "needs_review": true,
+      "terms": {
+        "elongation": 1.604,
+        "compactness": 0.7669,
+        "solidity": 0.933,
+        "area_px": 321.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.6 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 5,
+        "area_px": 321,
+        "perimeter_px": 72.52691193458118,
+        "elongation": 1.6043033919187968,
+        "compactness": 0.7668607741822521,
+        "solidity": 0.9331395348837209,
+        "orientation_deg": -16.34597968060238,
+        "centroid_rc": [
+          206.5202492211838,
+          1253.2647975077882
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -4.23,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 7,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.699,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.009,
+        "compactness": 0.7132,
+        "solidity": 0.888,
+        "area_px": 533.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.0 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 7,
+        "area_px": 533,
+        "perimeter_px": 96.9116882454314,
+        "elongation": 1.0089737339607634,
+        "compactness": 0.7131563516610165,
+        "solidity": 0.8883333333333333,
+        "orientation_deg": -48.32547322958522,
+        "centroid_rc": [
+          225.6078799249531,
+          1880.3302063789868
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.44,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 8,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.698,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.019,
+        "compactness": 0.7562,
+        "solidity": 0.914,
+        "area_px": 106.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.0 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 8,
+        "area_px": 106,
+        "perimeter_px": 41.97056274847714,
+        "elongation": 1.0193468568193855,
+        "compactness": 0.7561816679636489,
+        "solidity": 0.9137931034482759,
+        "orientation_deg": 6.774504268869657,
+        "centroid_rc": [
+          232.74528301886792,
+          2039.8207547169811
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -4.59,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 11,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.656,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.436,
+        "compactness": 0.8312,
+        "solidity": 0.958,
+        "area_px": 568.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.4 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 11,
+        "area_px": 568,
+        "perimeter_px": 92.66904755831213,
+        "elongation": 1.4363346671656008,
+        "compactness": 0.8311679739423854,
+        "solidity": 0.9578414839797639,
+        "orientation_deg": -8.546349015938008,
+        "centroid_rc": [
+          269.1654929577465,
+          1955.619718309859
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -4.35,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 15,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.667,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.331,
+        "compactness": 0.4774,
+        "solidity": 0.874,
+        "area_px": 2392.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.3 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 15,
+        "area_px": 2392,
+        "perimeter_px": 250.93607486307096,
+        "elongation": 1.3309184722652847,
+        "compactness": 0.4773586958825543,
+        "solidity": 0.8736303871439006,
+        "orientation_deg": -13.662123310757618,
+        "centroid_rc": [
+          324.52884615384613,
+          1290.4887123745818
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.99,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 17,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.687,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.131,
+        "compactness": 0.8955,
+        "solidity": 0.875,
+        "area_px": 105.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.1 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 17,
+        "area_px": 105,
+        "perimeter_px": 38.384776310850235,
+        "elongation": 1.1310397906476828,
+        "compactness": 0.8955320533051832,
+        "solidity": 0.875,
+        "orientation_deg": 85.69460061292753,
+        "centroid_rc": [
+          301.74285714285713,
+          1965.5428571428572
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.43,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 23,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.641,
+      "needs_review": true,
+      "terms": {
+        "elongation": 1.591,
+        "compactness": 0.6981,
+        "solidity": 0.817,
+        "area_px": 67.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.6 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 23,
+        "area_px": 67,
+        "perimeter_px": 34.72792206135786,
+        "elongation": 1.5911947132463693,
+        "compactness": 0.6981151621255219,
+        "solidity": 0.8170731707317073,
+        "orientation_deg": 45.320538128236635,
+        "centroid_rc": [
+          350.6268656716418,
+          1884.0298507462687
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -1.72,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 29,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.644,
+      "needs_review": true,
+      "terms": {
+        "elongation": 1.559,
+        "compactness": 0.2871,
+        "solidity": 0.706,
+        "area_px": 8808.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.6 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 29,
+        "area_px": 8808,
+        "perimeter_px": 620.9259735953043,
+        "elongation": 1.5586474215622663,
+        "compactness": 0.28708302654456536,
+        "solidity": 0.705656144848582,
+        "orientation_deg": 35.14104801515781,
+        "centroid_rc": [
+          436.98819255222526,
+          1332.5064713896459
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -4.28,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 31,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.606,
+      "needs_review": true,
+      "terms": {
+        "elongation": 1.945,
+        "compactness": 0.6007,
+        "solidity": 0.896,
+        "area_px": 310.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.9 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 31,
+        "area_px": 310,
+        "perimeter_px": 80.53300858899107,
+        "elongation": 1.944574685379011,
+        "compactness": 0.6006530821456767,
+        "solidity": 0.8959537572254336,
+        "orientation_deg": -27.43879848467046,
+        "centroid_rc": [
+          426.60322580645163,
+          1874.0645161290322
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -4.21,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 38,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.656,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.438,
+        "compactness": 0.7205,
+        "solidity": 0.906,
+        "area_px": 317.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.4 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 38,
+        "area_px": 317,
+        "perimeter_px": 74.35533905932738,
+        "elongation": 1.4375043535303722,
+        "compactness": 0.7205179580482517,
+        "solidity": 0.9057142857142857,
+        "orientation_deg": 32.60279918493627,
+        "centroid_rc": [
+          467.1608832807571,
+          1293.372239747634
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.72,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 39,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.672,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.276,
+        "compactness": 0.5031,
+        "solidity": 0.75,
+        "area_px": 653.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.3 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 39,
+        "area_px": 653,
+        "perimeter_px": 127.71067811865476,
+        "elongation": 1.276104608740072,
+        "compactness": 0.5031165729294472,
+        "solidity": 0.7497129735935706,
+        "orientation_deg": 53.056133408271165,
+        "centroid_rc": [
+          490.23583460949465,
+          1520.9341500765697
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -2.71,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 41,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.615,
+      "needs_review": true,
+      "terms": {
+        "elongation": 1.855,
+        "compactness": 0.7282,
+        "solidity": 0.886,
+        "area_px": 395.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.9 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 41,
+        "area_px": 395,
+        "perimeter_px": 82.56244584051393,
+        "elongation": 1.8547118986172015,
+        "compactness": 0.7281852195177022,
+        "solidity": 0.8856502242152466,
+        "orientation_deg": 84.36527893587483,
+        "centroid_rc": [
+          532.0607594936708,
+          1313.053164556962
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.18,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 42,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.505,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.948,
+        "compactness": 0.2247,
+        "solidity": 0.618,
+        "area_px": 2717.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.9 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 42,
+        "area_px": 2717,
+        "perimeter_px": 389.8122292025696,
+        "elongation": 2.948366342408894,
+        "compactness": 0.22469250345604014,
+        "solidity": 0.6180618744313012,
+        "orientation_deg": -75.21143142755963,
+        "centroid_rc": [
+          551.6915715863084,
+          1472.4777327935224
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.31,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 46,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.536,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.636,
+        "compactness": 0.1552,
+        "solidity": 0.598,
+        "area_px": 12940.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.6 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 46,
+        "area_px": 12940,
+        "perimeter_px": 1023.685424949238,
+        "elongation": 2.6363466267300857,
+        "compactness": 0.15517119349473218,
+        "solidity": 0.5982985019419271,
+        "orientation_deg": -69.79835157897425,
+        "centroid_rc": [
+          636.3874034003092,
+          1934.6199381761978
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.51,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 47,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.628,
+      "needs_review": true,
+      "terms": {
+        "elongation": 1.715,
+        "compactness": 0.5507,
+        "solidity": 0.734,
+        "area_px": 94.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.7 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 47,
+        "area_px": 94,
+        "perimeter_px": 46.31370849898477,
+        "elongation": 1.7150291931884445,
+        "compactness": 0.5507044703976808,
+        "solidity": 0.734375,
+        "orientation_deg": 29.433414782996696,
+        "centroid_rc": [
+          583.2127659574468,
+          1932.7340425531916
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.73,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 48,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.543,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.57,
+        "compactness": 0.5549,
+        "solidity": 0.798,
+        "area_px": 95.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.6 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 48,
+        "area_px": 95,
+        "perimeter_px": 46.384776310850235,
+        "elongation": 2.569524062412501,
+        "compactness": 0.5548588739589264,
+        "solidity": 0.7983193277310925,
+        "orientation_deg": -84.93133548344193,
+        "centroid_rc": [
+          590.8210526315789,
+          1529.1157894736841
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.55,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 50,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.571,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.286,
+        "compactness": 0.3647,
+        "solidity": 0.781,
+        "area_px": 1081.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.3 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 50,
+        "area_px": 1081,
+        "perimeter_px": 192.99494936611666,
+        "elongation": 2.28618362512407,
+        "compactness": 0.364706640089897,
+        "solidity": 0.7805054151624549,
+        "orientation_deg": -79.62581251460401,
+        "centroid_rc": [
+          605.1008325624422,
+          1649.8168362627198
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.07,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 53,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.562,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.382,
+        "compactness": 0.6732,
+        "solidity": 0.931,
+        "area_px": 625.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.4 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 53,
+        "area_px": 625,
+        "perimeter_px": 108.01219330881975,
+        "elongation": 2.3820464110151964,
+        "compactness": 0.6732003163052732,
+        "solidity": 0.9314456035767511,
+        "orientation_deg": -88.16670577095502,
+        "centroid_rc": [
+          614.3504,
+          1434.8304
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.46,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 55,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.601,
+      "needs_review": true,
+      "terms": {
+        "elongation": 1.989,
+        "compactness": 0.0201,
+        "solidity": 0.813,
+        "area_px": 1733791.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.0 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 55,
+        "area_px": 1733791,
+        "perimeter_px": 32884.35232416562,
+        "elongation": 1.9894446662114806,
+        "compactness": 0.02014781818181027,
+        "solidity": 0.8132605594725083,
+        "orientation_deg": -73.79318115889905,
+        "centroid_rc": [
+          1551.6994257093272,
+          1146.5142580622462
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -5.0,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 57,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.572,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.276,
+        "compactness": 0.5827,
+        "solidity": 0.862,
+        "area_px": 243.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.3 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 57,
+        "area_px": 243,
+        "perimeter_px": 72.39087296526012,
+        "elongation": 2.276405857799009,
+        "compactness": 0.5827046850926518,
+        "solidity": 0.8617021276595744,
+        "orientation_deg": -49.42991457689239,
+        "centroid_rc": [
+          666.8024691358024,
+          1314.0288065843622
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.77,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 63,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.673,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.274,
+        "compactness": 0.7678,
+        "solidity": 0.916,
+        "area_px": 271.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.3 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 63,
+        "area_px": 271,
+        "perimeter_px": 66.59797974644667,
+        "elongation": 1.2735379119726364,
+        "compactness": 0.7678158002325982,
+        "solidity": 0.9155405405405406,
+        "orientation_deg": -25.322744266107634,
+        "centroid_rc": [
+          694.9151291512915,
+          1287.110701107011
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -4.02,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 70,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.647,
+      "needs_review": true,
+      "terms": {
+        "elongation": 1.533,
+        "compactness": 0.6859,
+        "solidity": 0.883,
+        "area_px": 534.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.5 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 70,
+        "area_px": 534,
+        "perimeter_px": 98.91168824543142,
+        "elongation": 1.5334077452564188,
+        "compactness": 0.6858922440185015,
+        "solidity": 0.8826446280991735,
+        "orientation_deg": -4.511294046161925,
+        "centroid_rc": [
+          733.8220973782771,
+          1874.3389513108614
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.82,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 72,
+      "proposed_class": null,
+      "confidence": 0.0,
+      "needs_review": true,
+      "terms": {
+        "elongation": 3.837,
+        "compactness": 0.2462,
+        "solidity": 0.542,
+        "area_px": 1246.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 3.8 falls between 3.0 and 6.0; morphology does not distinguish the classes here"
+      ],
+      "morphology": {
+        "label": 72,
+        "area_px": 1246,
+        "perimeter_px": 252.20815280171308,
+        "elongation": 3.8371824843003246,
+        "compactness": 0.24615556788114093,
+        "solidity": 0.542446669569003,
+        "orientation_deg": -13.595558268604908,
+        "centroid_rc": [
+          783.4943820224719,
+          1268.771268057785
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.07,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 76,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.58,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.2,
+        "compactness": 0.5273,
+        "solidity": 0.829,
+        "area_px": 1721.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.2 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 76,
+        "area_px": 1721,
+        "perimeter_px": 202.51576464628795,
+        "elongation": 2.2000379274430113,
+        "compactness": 0.5273185657074142,
+        "solidity": 0.8285989407799711,
+        "orientation_deg": -35.5785127357184,
+        "centroid_rc": [
+          786.4846019755956,
+          1355.6978500871587
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.23,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 78,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.578,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.223,
+        "compactness": 0.5664,
+        "solidity": 0.88,
+        "area_px": 567.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.2 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 78,
+        "area_px": 567,
+        "perimeter_px": 112.1543289325507,
+        "elongation": 2.222691351426038,
+        "compactness": 0.5664490341705143,
+        "solidity": 0.8804347826086957,
+        "orientation_deg": -65.96416662090724,
+        "centroid_rc": [
+          778.1622574955908,
+          1536.2874779541446
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.26,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 86,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.686,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.144,
+        "compactness": 0.5556,
+        "solidity": 0.794,
+        "area_px": 378.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.1 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 86,
+        "area_px": 378,
+        "perimeter_px": 92.46194077712559,
+        "elongation": 1.1438935190036306,
+        "compactness": 0.555617164476322,
+        "solidity": 0.7941176470588235,
+        "orientation_deg": 29.337691238435166,
+        "centroid_rc": [
+          813.9391534391534,
+          1566.611111111111
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -4.18,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 87,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.671,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.292,
+        "compactness": 0.7084,
+        "solidity": 0.878,
+        "area_px": 194.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.3 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 87,
+        "area_px": 194,
+        "perimeter_px": 58.66295090390226,
+        "elongation": 1.2921730870114727,
+        "compactness": 0.7084085320977188,
+        "solidity": 0.8778280542986425,
+        "orientation_deg": 32.14148014049688,
+        "centroid_rc": [
+          809.1958762886597,
+          1158.5515463917525
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.29,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 89,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.653,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.475,
+        "compactness": 0.5063,
+        "solidity": 0.814,
+        "area_px": 838.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.5 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 89,
+        "area_px": 838,
+        "perimeter_px": 144.22539674441617,
+        "elongation": 1.4745941139959415,
+        "compactness": 0.5062562501969221,
+        "solidity": 0.814382896015549,
+        "orientation_deg": 52.889980112936364,
+        "centroid_rc": [
+          832.8937947494034,
+          1332.8651551312648
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.1,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 91,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.676,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.24,
+        "compactness": 0.9233,
+        "solidity": 0.934,
+        "area_px": 184.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.2 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 91,
+        "area_px": 184,
+        "perimeter_px": 50.04163056034261,
+        "elongation": 1.2399857672596781,
+        "compactness": 0.9233466595615629,
+        "solidity": 0.934010152284264,
+        "orientation_deg": 12.071256401522394,
+        "centroid_rc": [
+          836.2065217391304,
+          1274.8478260869565
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -2.71,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 95,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.656,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.441,
+        "compactness": 0.8103,
+        "solidity": 0.939,
+        "area_px": 539.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.4 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 95,
+        "area_px": 539,
+        "perimeter_px": 91.42640687119285,
+        "elongation": 1.440868599753775,
+        "compactness": 0.8103176996168026,
+        "solidity": 0.9390243902439024,
+        "orientation_deg": -81.58325491142554,
+        "centroid_rc": [
+          881.8682745825603,
+          876.4712430426716
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -2.96,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 98,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.668,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.324,
+        "compactness": 0.8273,
+        "solidity": 0.896,
+        "area_px": 233.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.3 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 98,
+        "area_px": 233,
+        "perimeter_px": 59.49137802864844,
+        "elongation": 1.323749455302496,
+        "compactness": 0.8272899097986277,
+        "solidity": 0.8961538461538462,
+        "orientation_deg": -84.0172356669593,
+        "centroid_rc": [
+          884.7167381974249,
+          1315.4334763948498
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.05,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 101,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.665,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.355,
+        "compactness": 0.6258,
+        "solidity": 0.868,
+        "area_px": 988.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.4 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 101,
+        "area_px": 988,
+        "perimeter_px": 140.8528137423857,
+        "elongation": 1.3545543112169582,
+        "compactness": 0.6258002819075217,
+        "solidity": 0.8681898066783831,
+        "orientation_deg": -6.612555284396175,
+        "centroid_rc": [
+          905.5880566801619,
+          1184.0759109311741
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.53,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 117,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.545,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.547,
+        "compactness": 0.4773,
+        "solidity": 0.754,
+        "area_px": 92.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.5 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 117,
+        "area_px": 92,
+        "perimeter_px": 49.21320343559643,
+        "elongation": 2.5473811738258916,
+        "compactness": 0.4773472450020977,
+        "solidity": 0.7540983606557377,
+        "orientation_deg": -66.87501520961516,
+        "centroid_rc": [
+          1000.8913043478261,
+          1964.3478260869565
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -2.4,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 119,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.666,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.343,
+        "compactness": 0.3898,
+        "solidity": 0.753,
+        "area_px": 843.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.3 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 119,
+        "area_px": 843,
+        "perimeter_px": 164.8528137423857,
+        "elongation": 1.3432871006199938,
+        "compactness": 0.38980258092646974,
+        "solidity": 0.7526785714285714,
+        "orientation_deg": -13.925509358569935,
+        "centroid_rc": [
+          1020.5432977461447,
+          1929.799525504152
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -2.2,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 121,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.644,
+      "needs_review": true,
+      "terms": {
+        "elongation": 1.565,
+        "compactness": 0.6519,
+        "solidity": 0.832,
+        "area_px": 208.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.6 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 121,
+        "area_px": 208,
+        "perimeter_px": 63.31980515339464,
+        "elongation": 1.56474832464799,
+        "compactness": 0.6519196316463822,
+        "solidity": 0.832,
+        "orientation_deg": -58.618028577883244,
+        "centroid_rc": [
+          1012.9519230769231,
+          1868.0336538461538
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.43,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 124,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.643,
+      "needs_review": true,
+      "terms": {
+        "elongation": 1.568,
+        "compactness": 0.4737,
+        "solidity": 0.747,
+        "area_px": 127.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.6 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 124,
+        "area_px": 127,
+        "perimeter_px": 58.04163056034261,
+        "elongation": 1.568215108263866,
+        "compactness": 0.4737338043286243,
+        "solidity": 0.7470588235294118,
+        "orientation_deg": 17.04276921474555,
+        "centroid_rc": [
+          1022.6299212598425,
+          1899.0866141732283
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -1.88,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 128,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.682,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.177,
+        "compactness": 0.4337,
+        "solidity": 0.786,
+        "area_px": 92.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.2 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 128,
+        "area_px": 92,
+        "perimeter_px": 51.62741699796952,
+        "elongation": 1.1768990326037176,
+        "compactness": 0.43374741253441584,
+        "solidity": 0.7863247863247863,
+        "orientation_deg": -21.273531024297807,
+        "centroid_rc": [
+          1050.9565217391305,
+          1950.4347826086957
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -2.52,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 132,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.573,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.272,
+        "compactness": 0.4944,
+        "solidity": 0.793,
+        "area_px": 142.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.3 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 132,
+        "area_px": 142,
+        "perimeter_px": 60.077164466275356,
+        "elongation": 2.272157563059045,
+        "compactness": 0.4944010168136936,
+        "solidity": 0.7932960893854749,
+        "orientation_deg": -84.14511334047906,
+        "centroid_rc": [
+          1061.7112676056338,
+          827.669014084507
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.24,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 135,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.633,
+      "needs_review": true,
+      "terms": {
+        "elongation": 1.674,
+        "compactness": 0.5044,
+        "solidity": 0.762,
+        "area_px": 253.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.7 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 135,
+        "area_px": 253,
+        "perimeter_px": 79.39087296526012,
+        "elongation": 1.6737477915823311,
+        "compactness": 0.5044164373604166,
+        "solidity": 0.7620481927710844,
+        "orientation_deg": -71.15392878237128,
+        "centroid_rc": [
+          1086.2529644268775,
+          1065.0592885375495
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -2.3,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 137,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.632,
+      "needs_review": true,
+      "terms": {
+        "elongation": 1.684,
+        "compactness": 0.6034,
+        "solidity": 0.858,
+        "area_px": 694.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.7 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 137,
+        "area_px": 694,
+        "perimeter_px": 120.22539674441617,
+        "elongation": 1.6843015785441056,
+        "compactness": 0.6033605301121758,
+        "solidity": 0.857849196538937,
+        "orientation_deg": -3.005587948263046,
+        "centroid_rc": [
+          1125.99855907781,
+          993.1829971181556
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.41,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 155,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.542,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.582,
+        "compactness": 0.3617,
+        "solidity": 0.669,
+        "area_px": 429.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.6 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 155,
+        "area_px": 429,
+        "perimeter_px": 122.08935777509511,
+        "elongation": 2.58156354322897,
+        "compactness": 0.36166921018875203,
+        "solidity": 0.6692667706708268,
+        "orientation_deg": 89.33335353310801,
+        "centroid_rc": [
+          1263.1025641025642,
+          673.981351981352
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.26,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 159,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.618,
+      "needs_review": true,
+      "terms": {
+        "elongation": 1.815,
+        "compactness": 0.6662,
+        "solidity": 0.879,
+        "area_px": 376.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.8 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 159,
+        "area_px": 376,
+        "perimeter_px": 84.2193000900063,
+        "elongation": 1.8152952763512458,
+        "compactness": 0.6661537134829048,
+        "solidity": 0.8785046728971962,
+        "orientation_deg": -87.13284985964263,
+        "centroid_rc": [
+          1434.4175531914893,
+          57.58244680851064
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -2.79,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 161,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.676,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.243,
+        "compactness": 0.7995,
+        "solidity": 0.87,
+        "area_px": 356.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.2 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 161,
+        "area_px": 356,
+        "perimeter_px": 74.80508652763322,
+        "elongation": 1.2429181409839312,
+        "compactness": 0.7994615895687815,
+        "solidity": 0.8704156479217604,
+        "orientation_deg": 41.892695194083274,
+        "centroid_rc": [
+          1498.1685393258426,
+          109.17415730337079
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -3.31,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 168,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.572,
+      "needs_review": true,
+      "terms": {
+        "elongation": 2.282,
+        "compactness": 0.3908,
+        "solidity": 0.659,
+        "area_px": 116.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 2.3 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 168,
+        "area_px": 116,
+        "perimeter_px": 61.07716446627535,
+        "elongation": 2.282208689644902,
+        "compactness": 0.3907600173029488,
+        "solidity": 0.6590909090909091,
+        "orientation_deg": -0.841510973902904,
+        "centroid_rc": [
+          1565.698275862069,
+          1630.6206896551723
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -2.34,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 175,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.657,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.431,
+        "compactness": 0.5888,
+        "solidity": 0.79,
+        "area_px": 132.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.4 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 175,
+        "area_px": 132,
+        "perimeter_px": 53.07716446627535,
+        "elongation": 1.431085692333004,
+        "compactness": 0.5888007684160691,
+        "solidity": 0.7904191616766467,
+        "orientation_deg": -25.303508039827683,
+        "centroid_rc": [
+          1594.1060606060605,
+          1884.840909090909
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -2.63,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 182,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.658,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.424,
+        "compactness": 0.7201,
+        "solidity": 0.833,
+        "area_px": 115.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.4 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 182,
+        "area_px": 115,
+        "perimeter_px": 44.79898987322333,
+        "elongation": 1.4236085406683927,
+        "compactness": 0.7200642692881274,
+        "solidity": 0.8333333333333334,
+        "orientation_deg": -1.8991964140136992,
+        "centroid_rc": [
+          1634.2,
+          1907.6782608695653
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -2.75,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 195,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.689,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.114,
+        "compactness": 0.8006,
+        "solidity": 0.859,
+        "area_px": 79.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.1 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 195,
+        "area_px": 79,
+        "perimeter_px": 35.21320343559643,
+        "elongation": 1.1144094883679256,
+        "compactness": 0.800618984140797,
+        "solidity": 0.8586956521739131,
+        "orientation_deg": 73.64757722786399,
+        "centroid_rc": [
+          1693.6708860759493,
+          1948.0
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -2.37,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    },
+    {
+      "label": 235,
+      "proposed_class": "slick_unknown",
+      "confidence": 0.673,
+      "needs_review": false,
+      "terms": {
+        "elongation": 1.269,
+        "compactness": 0.9115,
+        "solidity": 0.875,
+        "area_px": 91.0,
+        "bright_target_distance_px": -1.0
+      },
+      "reasons": [
+        "elongation 1.3 <= 3.0: compact and irregular rather than a discharge trail"
+      ],
+      "morphology": {
+        "label": 235,
+        "area_px": 91,
+        "perimeter_px": 35.42031021678297,
+        "elongation": 1.2689321087786476,
+        "compactness": 0.9114787233237613,
+        "solidity": 0.875,
+        "orientation_deg": 26.12654893034652,
+        "centroid_rc": [
+          1916.2637362637363,
+          1968.1978021978023
+        ]
+      },
+      "confirmed_class": null,
+      "confirmed_by": null,
+      "evidence": {
+        "contrast_db": -2.7,
+        "nearest_target_px": null,
+        "nearest_target_m": null,
+        "target_at_end": null
+      },
+      "review_decision": null,
+      "confirmed_confidence": null,
+      "notes": ""
+    }
+  ],
+  "image_sha256": "abe3d3304638cda716f2af17d0c38bf5b413600d79568c5f7b13a4f7c08a3a08",
+  "mask_sha256": "0622008f15c5fc362d005c762d718781c5acbe1706d61a83e9190f73882d2d34",
+  "original_image": "data/interim/datasets/zenodo/13761290/02_Test_images_and_ground_truth/Images/Oil/00004.tif",
+  "original_mask": "data/interim/datasets/zenodo/13761290/02_Test_images_and_ground_truth/Mask/Oil/00004_segmentation.tif",
+  "split": "train",
+  "cfar": {
+    "status": "run",
+    "band": 2,
+    "params": {
+      "guard_px": 4,
+      "train_px": 8,
+      "pfa": 1e-06,
+      "min_area_px": 4
+    },
+    "targets": []
+  },
+  "pixel_spacing_m": [
+    8.11,
+    9.93
+  ],
+  "background_db": -22.26,
+  "wind": {
+    "status": "unknown",
+    "reason": "the corpus records no acquisition time, so ERA5 wind cannot be looked up"
+  }
+}
