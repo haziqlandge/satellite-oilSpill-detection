@@ -46,7 +46,7 @@ under demo pressure. **Each is a correctness requirement, not a style preference
 | **SAHI required for full scenes** | S1 IW scenes are far larger than 1024 px; downscaling loses small slicks |
 | **Rotation augmentation forbidden on geocoded imagery** | Invalidates the pixel↔geo mapping. Mirroring only (as P004 used) |
 | **Weights must declare their class scheme** | `backend/detect` refuses mismatched weights (`INTERFACES.md` §6) |
-| **API is read-only** | No pipeline execution behind an HTTP request — demo reliability |
+| **API is read-only** | No pipeline execution behind an HTTP request — demo reliability. **Amended 2026-09-24: one write endpoint, `POST /api/v1/runs`.** The demo needs a live path for an uploaded raster (FUTURE_WORK §3), and the console already ran detection on the visitor's GPU, so the choice was between a pipeline behind the API and none at all. What the rule protects -- nothing expensive while someone watches, and a request that cannot hang the server -- is kept by what the endpoint does NOT do: it never runs the pipeline inside the request. It validates the raster (readable, EPSG:4326; with `use_precomputed`, that a stored segmentation exists for these exact bytes and this model, else 409), queues a separate process (`python -m backend.pipeline.run`, one at a time) and answers 202 at once; progress streams over server-sent events from the run's own event log, and a process that dies is reported as such by the API. Every GET stays read-only. The API reads the pipeline's files, not PostGIS (the hosted database is unreachable from the session machine, ISSUES X1), so "pipeline to API through PostGIS" (`ARCHITECTURE.md`) is also not how it runs today |
 
 ## Performance targets (demo scope, not production SLAs)
 

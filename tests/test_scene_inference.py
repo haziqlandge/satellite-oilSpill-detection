@@ -107,3 +107,45 @@ def test_matched_recall_uses_saved_confidence_and_reports_unattainable():
     assert measured["recall"] == 0.5
     assert measured["lookalike_fp_instances"] == 1
     assert matched_recall(rows, 0.75) == {"unattainable": True}
+
+
+def test_the_second_pass_reads_only_the_tiles_it_is_given(tmp_path, monkeypatch):
+    # Two-pass detection (backend/pipeline/screen.py): tiles the overview screen
+    # did not select are never read or segmented, and are counted, not hidden.
+    scene = tmp_path / "window.tif"
+    data = np.full((1, 64, 140), -10, dtype=np.float32)
+    data[0, 15:50, 50:85] = -25
+    with rasterio.open(scene, "w", driver="GTiff", width=140, height=64, count=1, dtype="float32",
+                       crs="EPSG:4326", transform=from_origin(-90, 30, 0.0001, 0.0001)) as dst:
+        dst.write(data)
+    weights = tmp_path / "research.pt"
+    weights.write_bytes(b"fixture")
+    weights.with_suffix(".json").write_text(json.dumps(dict(
+        classes=["slick"], sha256=sha256(weights), inference=dict(imgsz=64, batch=2, conf=0.2, retina_masks=True),
+        raster=dict(band=2, db_window=[-35, 0]), tiling=dict(tile_size=64, overlap=0.25, merge_threshold=0.5),
+    )))
+    oil_value = db_to_uint8(np.array([-25]))[0]
+    predicted = []
+
+    class FakeYOLO:
+        def __init__(self, *args, **kwargs):
+            self.names = {0: "slick"}
+            self.model = SimpleNamespace(state_dict=lambda: {})
+
+        def predict(self, images, **kwargs):
+            predicted.extend(images)
+            return [SimpleNamespace(masks=SimpleNamespace(data=torch.tensor((image[:, :, 0] == oil_value)[None])),
+                                    boxes=SimpleNamespace(conf=torch.tensor([0.9]), cls=torch.tensor([0.0])))
+                    for image in images]
+
+    monkeypatch.setattr("ultralytics.YOLO", FakeYOLO)
+    # A single-band window: the manifest's band 2 does not exist, so the caller names band 1.
+    with pytest.raises(ValueError, match="explicitly named"):
+        infer_scene(scene, weights, research=True, device="cpu")
+    only_left = infer_scene(scene, weights, research=True, device="cpu", band=1, assume_vv_db_band=1,
+                            select=lambda tile: tile.window.col_off == 0)
+    assert only_left["properties"]["tiles"] == 1 and only_left["properties"]["unselected_tiles"] == 2
+    assert only_left["properties"]["band"] == 1 and len(predicted) == 1
+    none = infer_scene(scene, weights, research=True, device="cpu", band=1, assume_vv_db_band=1,
+                       select=lambda tile: False)
+    assert none["features"] == [] and none["properties"]["unselected_tiles"] == 3

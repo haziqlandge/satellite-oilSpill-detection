@@ -73,8 +73,25 @@ def _merge_pass(detections, threshold):
 
 
 def infer_scene(
-    scene, weights, *, research=False, device="0", progress=None, assume_vv_db_band=None
+    scene,
+    weights,
+    *,
+    research=False,
+    device="0",
+    progress=None,
+    assume_vv_db_band=None,
+    band=None,
+    select=None,
 ):
+    """Segment every tile of a scene, or the tiles `select` admits, and merge the seams.
+
+    `band` overrides the manifest's band for a raster that carries one band
+    cut from a scene (a window), and `select` is the second pass of the live
+    pipeline's two-pass detection (`backend/pipeline/screen.py`): a predicate on
+    `Tile` that keeps only the tiles its overview screen found candidates in.
+    Both default to the full-scene sweep this was written for; tiles `select`
+    rejects are counted in `properties.unselected_tiles`, never read.
+    """
     started = time.perf_counter()
     expected = ("slick",) if research else ("oos", "slick_unknown")
     manifest = read_manifest(weights, expected_classes=expected)
@@ -95,9 +112,10 @@ def infer_scene(
     detections = []
     tile_count = 0
     skipped = 0
+    unselected = 0
     with rasterio.open(scene) as source:
         require_wgs84(source.crs)
-        band = manifest["raster"]["band"]
+        band = manifest["raster"]["band"] if band is None else band
         if source.count < band:
             raise ValueError("Expected an explicitly named VV sigma0 dB band")
         description = (source.descriptions[band - 1] or "").upper()
@@ -110,6 +128,10 @@ def infer_scene(
             raise ValueError("Expected sigma0 dB, not linear power")
         tile_options = {k: manifest["tiling"][k] for k in ("tile_size", "overlap")}
         tiles = list(iter_tiles(source.width, source.height, **tile_options))
+        if select is not None:
+            chosen = [tile for tile in tiles if select(tile)]
+            unselected = len(tiles) - len(chosen)
+            tiles = chosen
         for chunk in batched(tiles, batch_size):
             images, windows, valid_masks = [], [], []
             for tile in chunk:
@@ -182,6 +204,8 @@ def infer_scene(
                 assumed_vv_db_band=assume_vv_db_band,
                 tiles=tile_count,
                 skipped_empty_tiles=skipped,
+                unselected_tiles=unselected,
+                band=band,
                 predictions_before_merge=unmerged_count,
                 seconds=elapsed,
                 under_60_seconds=elapsed < 60,

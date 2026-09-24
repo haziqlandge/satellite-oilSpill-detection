@@ -1,0 +1,77 @@
+[
+ {
+  "scene": "S1A_IW_GRDH_1SDV_20230409T000206_20230409T000231_048012_05C552_27F2_s0db",
+  "screen": {
+   "rule": "overview at 1/16; a region at least 2.0 dB below the mean of the sea within 10 km, at least 4 overview pixels; every tile its box (+2 px) touches goes to the model",
+   "factor": 16,
+   "overview": [
+    1339,
+    2037
+   ],
+   "regions": 736,
+   "darkFraction": 0.03247,
+   "tilesSelected": 204,
+   "tiles": 864
+  },
+  "screenSeconds": 27.7,
+  "detections": 86,
+  "areaReachedPct": 98.12,
+  "seedReachedPct": 100.0,
+  "inferSeconds": 38.5,
+  "tilesRun": 204,
+  "twoPassDetections": 77,
+  "areaRecoveredPct": 97.51,
+  "areaNotInSweepPct": 0.0,
+  "seedIoU": 0.9995
+ },
+ {
+  "scene": "S1A_IW_GRDH_1SDV_20230515T000208_20230515T000233_048537_05D69B_35AF_s0db",
+  "screen": {
+   "rule": "overview at 1/16; a region at least 2.0 dB below the mean of the sea within 10 km, at least 4 overview pixels; every tile its box (+2 px) touches goes to the model",
+   "factor": 16,
+   "overview": [
+    1338,
+    2037
+   ],
+   "regions": 2286,
+   "darkFraction": 0.07151,
+   "tilesSelected": 372,
+   "tiles": 864
+  },
+  "screenSeconds": 27.9,
+  "detections": 240,
+  "areaReachedPct": 99.52,
+  "seedReachedPct": 100.0,
+  "inferSeconds": 55.4,
+  "tilesRun": 372,
+  "twoPassDetections": 212,
+  "areaRecoveredPct": 99.33,
+  "areaNotInSweepPct": 0.0,
+  "seedIoU": 0.9995
+ },
+ {
+  "scene": "S1A_IW_GRDH_1SDV_20231205T000214_20231205T000239_051512_0637C7_66B8_s0db",
+  "screen": {
+   "rule": "overview at 1/16; a region at least 2.0 dB below the mean of the sea within 10 km, at least 4 overview pixels; every tile its box (+2 px) touches goes to the model",
+   "factor": 16,
+   "overview": [
+    1339,
+    2037
+   ],
+   "regions": 712,
+   "darkFraction": 0.02145,
+   "tilesSelected": 150,
+   "tiles": 864
+  },
+  "screenSeconds": 27.4,
+  "detections": 40,
+  "areaReachedPct": 99.15,
+  "seedReachedPct": 100.0,
+  "inferSeconds": 20.7,
+  "tilesRun": 150,
+  "twoPassDetections": 35,
+  "areaRecoveredPct": 99.14,
+  "areaNotInSweepPct": 0.0,
+  "seedIoU": 0.9999
+ }
+]
