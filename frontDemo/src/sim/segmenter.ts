@@ -276,7 +276,16 @@ export interface SegmentOptions {
   onTile?: (done: number, total: number) => void;
   /** 1 where the source holds data (`GeoRaster.valid`); null when all of it does. */
   valid?: Uint8Array | null;
+  /**
+   * Stops the run between tiles, rejecting with an `AbortError`: the operator
+   * chose the precomputed result. A tile already in `session.run` finishes
+   * first -- onnxruntime cannot be interrupted -- so the queue frees within a tile.
+   */
+  signal?: AbortSignal;
 }
+
+/** The rejection `segment` gives when its signal aborts it. */
+export const isAbort = (error: unknown) => error instanceof DOMException && error.name === "AbortError";
 
 /**
  * One scene at a time per session.
@@ -308,7 +317,7 @@ export function segment(
 async function segmentNow(
   model: Segmenter,
   rgba: Uint8ClampedArray, width: number, height: number,
-  { onTile, valid = null }: SegmentOptions,
+  { onTile, valid = null, signal }: SegmentOptions,
 ): Promise<Segmentation> {
   const started = performance.now();
   const { manifest, session, tensor } = model;
@@ -326,6 +335,7 @@ async function segmentNow(
   let done = 0;
   for (const y0 of rows) {
     for (const x0 of cols) {
+      if (signal?.aborted) throw new DOMException("segmentation stopped", "AbortError");
       const tw = Math.min(tile, width - x0);
       const th = Math.min(tile, height - y0);
       if (valid && tileEmpty(valid, width, x0, y0, tw, th)) {
@@ -357,6 +367,23 @@ async function segmentNow(
 }
 
 let loading: Promise<Segmenter> | null = null;
+let manifestLoading: Promise<SegmenterManifest> | null = null;
+
+/**
+ * The release manifest alone: the model's name and hash, without the 13 MB
+ * model. A precomputed result is checked against this hash before anything
+ * decides whether the model needs loading at all.
+ */
+export function loadManifest(): Promise<SegmenterManifest> {
+  if (manifestLoading) return manifestLoading;
+  manifestLoading = (async () => {
+    const response = await fetch("models/L1-ciou-research.json");
+    if (!response.ok) throw new Error(`model manifest not found (${response.status})`);
+    return (await response.json()) as SegmenterManifest;
+  })();
+  manifestLoading.catch(() => { manifestLoading = null; });
+  return manifestLoading;
+}
 
 /**
  * The release model, fetched and started once per page.
@@ -369,9 +396,7 @@ export function loadSegmenter(): Promise<Segmenter> {
   loading = (async () => {
     // Relative, like `landmask/` and `runs/`: served from `public/models/`.
     const base = "models/";
-    const response = await fetch(`${base}L1-ciou-research.json`);
-    if (!response.ok) throw new Error(`model manifest not found (${response.status})`);
-    const manifest = (await response.json()) as SegmenterManifest;
+    const manifest = await loadManifest();
     const gpu = typeof navigator !== "undefined" && "gpu" in navigator;
     const ort = gpu ? await import("onnxruntime-web/webgpu") : await import("onnxruntime-web/wasm");
     const url = `${base}${manifest.file}`;

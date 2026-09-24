@@ -48,6 +48,11 @@ export interface UploadAssertions {
   /** Where the position came from. Only ever "operator" until GeoTIFF lands. */
   positionSource: "operator" | "geotiff";
   fileName: string;
+  /**
+   * How the segmentation behind the outline was made -- live in this browser,
+   * or precomputed and used at the operator's request -- as a sentence.
+   */
+  segmentation?: string;
 }
 
 /** Ground length of a projected path, km. */
@@ -138,6 +143,7 @@ export function buildUploadSpec(ribbon: Ribbon, a: UploadAssertions): ScenarioSp
         "natural film, so the class is slick_unknown. ";
   const provenance =
     outline +
+    (a.segmentation ?? "") +
     "The dB figure assumes the corpus window " +
     `${dbLow} to ${dbHigh} dB. Acquisition time ${a.acquisitionSource === "filename" ? "parsed from the file name" : "asserted by the operator"}. ` +
     (assertedPosition
