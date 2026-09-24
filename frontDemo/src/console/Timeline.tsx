@@ -114,12 +114,9 @@ export function Timeline({
   /**
    * The marks on the scale.
    *
-   * The span starts at the satellite pass now, so everything that used to live
-   * to the left of it -- the release start, the discharge end, the estimated
-   * release window -- has no position on this ruler and has been taken off it.
-   * That is a real loss of information from the timeline and a deliberate one:
-   * a scale that opens deep in negative hours makes the forecast, the part of
-   * the event that has not happened yet, a sliver at the right-hand end.
+   * The span runs from the hindcast horizon to the forecast horizon
+   * (`eventSpan`). The release start, the discharge end and the estimated
+   * release window are not marked on it: the hindcast frames carry them.
    *
    * What replaces them is the forecast's own checkpoints, from the same
    * `checkpointsFor` the home page's transport uses, so the two surfaces cannot
@@ -152,7 +149,10 @@ export function Timeline({
 
   /* --- transport --------------------------------------------------- */
 
-  const rewind = useCallback(() => setHour(h0), [setHour, h0]);
+  // The pass, not the start of the span. The span opens at the hindcast
+  // horizon (`eventSpan`), and this used to jump there, so "t0" read T-36h on
+  // an authored run and T-72h on a real one (ISSUES F15).
+  const rewind = useCallback(() => setHour(Math.min(h1, Math.max(h0, 0))), [setHour, h0, h1]);
 
   /**
    * Play and pause. Nothing else, and the "nothing else" is the whole point.

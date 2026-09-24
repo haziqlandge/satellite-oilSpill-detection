@@ -525,7 +525,9 @@ function StackReadout({
 export function OriginFieldPlate({ run }: { run: Run }) {
   const display = run;
   const uid = useId().replace(/[^a-zA-Z0-9]/g, "");
-  const hours = useMemo(() => [-run.drift.backwardHours, -Math.round(run.drift.backwardHours * 0.66), -Math.round(run.drift.backwardHours * 0.33), ...[-run.drift.backwardHours, -Math.round(run.drift.backwardHours / 2), ...forecastHours(run, 7)]], [run]);
+  // Deduplicated: the list names the horizon twice, and a repeated hour is a
+  // repeated React key (`row--36` on a 36 h run) and a ring drawn twice.
+  const hours = useMemo(() => [...new Set([-run.drift.backwardHours, -Math.round(run.drift.backwardHours * 0.66), -Math.round(run.drift.backwardHours * 0.33), ...[-run.drift.backwardHours, -Math.round(run.drift.backwardHours / 2), ...forecastHours(run, 7)]])], [run]);
   /**
    * The map, biased to the left of the neat line.
    *

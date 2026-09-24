@@ -36,6 +36,8 @@ export interface RealDriftFrame {
   area50Km2: number;
   area90Km2: number;
   spreadKm: number;
+  /** Forward frames only: share of all parcels OpenDrift stranded on the coast by this hour, percent. */
+  strandedPct?: number;
 }
 
 export interface RealDriftRun {
@@ -60,7 +62,12 @@ export interface RealDriftRun {
   particlesPerMember: number;
   particlesRendered: number;
   backwardHours: number;
+  /** 0 for a run exported before the forecast existed. */
   forwardHours: number;
+  /** How the parcels were placed at the pass. */
+  seeding?: string;
+  forwardForcingNote?: string;
+  forwardMemberFailures?: string[];
   stepMinutes: number;
   memberFailures: string[];
   /** Share of every parcel position on OpenDrift's own GSHHG land, percent. */

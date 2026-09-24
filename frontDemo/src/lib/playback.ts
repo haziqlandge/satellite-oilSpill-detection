@@ -184,18 +184,13 @@ export function momentAt(
 }
 
 /**
- * The span the event playback covers: the satellite pass to the forecast
- * horizon.
+ * The span the event playback covers: the hindcast horizon to the forecast
+ * horizon, with the satellite pass (hour 0) inside it.
  *
- * It used to open at the first parcel in the water, which put the whole
- * backward horizon and a long approach leg on the scale. That is the wrong
- * subject for a transport control. What a reader or an operator scrubs through
- * is the forecast -- the part of the event that has not happened yet and that
- * the system is actually asserting something about -- and everything before the
- * pass is a reconstruction whose figures say so in their own frames.
- *
- * T0 is therefore the floor on both surfaces, and `checkpointsFor` supplies the
- * marks along it.
+ * This said the span opened at the pass. It does not, and has not since the
+ * hindcast came back onto the scale; the "t0" button trusted the old comment
+ * and jumped to the span's start instead of the pass (ISSUES F15). The pass is
+ * marked, not the floor, and `checkpointsFor` supplies the steps along it.
  */
 export function eventSpan(run: Run): [number, number] {
   return [-run.drift.backwardHours, run.drift.forwardHours];

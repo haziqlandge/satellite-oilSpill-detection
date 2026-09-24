@@ -466,6 +466,7 @@ export function dataLayers(paint: MapPaint): LayerSpecification[] {
         "line-blur": 3,
       },
     },
+    // A real scene draws its seed detection alone (`detectionView.ts`).
     {
       id: "slick-fill",
       type: "fill",
@@ -482,6 +483,7 @@ export function dataLayers(paint: MapPaint): LayerSpecification[] {
       paint: {
         "line-color": slickInk(paint),
         "line-width": 1.4 * k,
+        "line-opacity": 1,
       },
     },
     {

@@ -45,7 +45,9 @@ for (const scene of scenes) {
   assert.equal(run.engine, 'OpenDrift OpenOil', `${scene}: not an OpenDrift run`);
 
   const hours = run.frames.map(f => f.hour);
-  assert.equal(Math.max(...hours), 0, `${scene}: the observation hour is missing`);
+  assert.ok(hours.includes(0), `${scene}: the observation hour is missing`);
+  assert.ok(run.forwardHours > 0, `${scene}: re-export -- the run has no forecast`);
+  assert.equal(Math.max(...hours), run.forwardHours, `${scene}: the forecast stops at T+${Math.max(...hours)}, not +${run.forwardHours} h`);
   assert.equal(
     Math.min(...hours), -run.backwardHours,
     `${scene}: frames stop at T${Math.min(...hours)}, not the ${run.backwardHours} h horizon`,
@@ -79,6 +81,16 @@ for (const scene of scenes) {
   const widening = earliest.area90Km2 / Math.max(1e-9, zero.area90Km2);
   // Diffusion is irreversible: the origin field is widest furthest back.
   assert.ok(widening > 1, `${scene}: backward field did not widen (x${widening.toFixed(2)})`);
+  // And the forecast spreads forward from the same parcels; oil that strands stays stranded.
+  const ahead = run.frames.filter(f => f.hour > 0);
+  const last = ahead[ahead.length - 1];
+  assert.ok(last.spreadKm > zero.spreadKm, `${scene}: the forecast did not spread (${last.spreadKm} km at +${last.hour} h)`);
+  let stranded = 0;
+  for (const f of ahead) {
+    assert.ok(f.strandedPct !== undefined && f.strandedPct >= 0 && f.strandedPct <= 100, `${scene}: +${f.hour} h has no stranded share`);
+    assert.ok(f.strandedPct! >= stranded, `${scene}: stranded oil came back afloat at +${f.hour} h`);
+    stranded = f.strandedPct!;
+  }
 
   // Whether the physics stayed on its coast is OpenDrift's own answer, measured
   // on its GSHHG polygons at export: 0.00-0.26% so far. This used to be judged
@@ -98,6 +110,8 @@ for (const scene of scenes) {
     forcing: run.forcing,
     failures: run.memberFailures.length,
     widening: +widening.toFixed(1),
+    'spread +72 km': +last.spreadKm.toFixed(2),
+    'stranded +72 %': stranded,
     spreadAtHorizonKm: +earliest.spreadKm.toFixed(2),
     inCoastalCellPct: +(100 * coastal / parcels).toFixed(2),
     deepAshorePct: +(100 * deep / parcels).toFixed(2),
@@ -107,4 +121,4 @@ for (const scene of scenes) {
   });
 }
 console.table(rows);
-console.log(`PASS: ${scenes.length} real OpenDrift run(s) parse, span their horizon, widen backward, and agree with the coastline.`);
+console.log(`PASS: ${scenes.length} real OpenDrift run(s) parse, span both horizons, widen backward, spread forward, and agree with the coastline.`);

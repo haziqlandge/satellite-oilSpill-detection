@@ -22,6 +22,7 @@ import type { LayerToggles } from "../map/basemap";
 import { useAnimeScope, useReducedMotion } from "../lib/motion";
 import { ageStatement, provenanceFlag, refusalLabel, stamp } from "../lib/format";
 import { WEIGHTS_VERSION } from "../sim/scoring";
+import { verdictFor } from "../sim/verdict";
 import type { MapPaint } from "../theme";
 import type { Run, Suspect } from "../sim/types";
 import { Alarm, Btn, Caret, Flag } from "./components";
@@ -174,7 +175,7 @@ function transcript(run: Run): { text: string; tone: "ok" | "dim" | "warn" | "al
     { text: "slicktrace // analysis node 04 · link established", tone: "ok" },
     { text: `scene ${run.detection.sceneId} · ${stamp(run.meta.acquiredAt)}`, tone: "dim" },
     {
-      text: `detect.instance  ${run.detection.parts.length} instance · ${run.detection.className} · conf ${run.detection.confidence.toFixed(2)}`,
+      text: `detect.instance  ${run.detection.parts.length} instance · slick · conf ${run.detection.confidence.toFixed(2)} · verdict ${verdictFor(run).verdict}`,
       tone: "dim",
     },
     {

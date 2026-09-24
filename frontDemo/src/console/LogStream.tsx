@@ -26,6 +26,7 @@ import { WEIGHTS_VERSION } from "../sim/scoring";
 import { scenarioListing } from "../sim/scenarios";
 import { PROVENANCE } from "../content";
 import type { Run } from "../sim/types";
+import { verdictFor } from "../sim/verdict";
 import { SCROLL, TONE, type Tone } from "./components";
 
 export interface LogEntry {
@@ -61,7 +62,7 @@ function seedLines(run: Run): LogEntry[] {
       at,
       0,
       "det",
-      `${run.detection.parts.length} instance · ${run.detection.className} · conf ${run.detection.confidence.toFixed(2)}`,
+      `${run.detection.parts.length} instance · slick · conf ${run.detection.confidence.toFixed(2)} · verdict ${verdictFor(run).verdict}`,
     ),
     entry(
       at,

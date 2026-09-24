@@ -72,10 +72,11 @@ export const REAL_CADENCE_S = 300;
 const files = new Map<string, RealTrafficFile>();
 const pending = new Map<string, Promise<void>>();
 
-export type TrafficLoader = (scene: string) => Promise<RealTrafficFile>;
+/** `url` is set for a run the live API made; the exports live at `ais/<scene>.json`. */
+export type TrafficLoader = (scene: string, url?: string) => Promise<RealTrafficFile>;
 
-let loader: TrafficLoader = async (scene) => {
-  const response = await fetch(`ais/${scene}.json`);
+let loader: TrafficLoader = async (scene, url) => {
+  const response = await fetch(url ?? `ais/${scene}.json`);
   // A dev server answers a missing file with its own index page and a 200, so
   // `ok` alone cannot tell "here is the data" from "there is no data".
   const type = response.headers.get("content-type") ?? "";
@@ -93,6 +94,30 @@ export function setTrafficLoader(next: TrafficLoader): void {
   loader = next;
 }
 
+/*
+  A run the live API made carries its own traffic file, or none at all (outside
+  US waters there is no free AIS, ISSUES F14). Registered with its URL, or null:
+  a null source loads as a file with no vessels, which the view reports as
+  "no AIS on this machine" rather than as an empty sea.
+*/
+const SOURCES = new Map<string, string | null>();
+
+export function registerTrafficSource(scene: string, url: string | null): void {
+  SOURCES.set(scene, url);
+}
+
+function loadRegistered(scene: string, url: string | null): Promise<RealTrafficFile> {
+  if (url === null) {
+    return Promise.resolve({
+      scene, source: "none", note: "no AIS on this machine for this place and time", acquiredAt: "1970-01-01T00:00:00Z",
+      centre: [0, 0], box: [0, 0, 0, 0], window: { startS: 0, endS: 0, dataEndsS: 0 },
+      simplification: { method: "none", toleranceKm: 0, gapMin: 0 },
+      rows: { inBoxAndWindow: 0, afterClean: 0, kept: 0 }, identities: "none held", vessels: [],
+    });
+  }
+  return loader(scene, url);
+}
+
 export function hasRealTraffic(scene: string): boolean {
   return files.has(scene);
 }
@@ -103,10 +128,11 @@ export function realTrafficFile(scene: string): RealTrafficFile | undefined {
 
 /** Load a scene's real traffic if it has any. Concurrent calls share one fetch. */
 export async function ensureRealTraffic(scene: string): Promise<void> {
-  if (!(REAL_AIS_SCENES.has(scene) || REAL_RUN_AIS_SCENES.has(scene)) || files.has(scene)) return;
+  const registered = SOURCES.has(scene);
+  if (!(REAL_AIS_SCENES.has(scene) || REAL_RUN_AIS_SCENES.has(scene) || registered) || files.has(scene)) return;
   const inFlight = pending.get(scene);
   if (inFlight) return inFlight;
-  const work = loader(scene).then((file) => {
+  const work = (registered ? loadRegistered(scene, SOURCES.get(scene) ?? null) : loader(scene)).then((file) => {
     files.set(scene, file);
   });
   pending.set(scene, work);

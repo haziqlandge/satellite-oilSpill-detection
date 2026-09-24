@@ -17,11 +17,13 @@ import { useMemo, type ReactNode } from "react";
 import { SarTile, boundsFor } from "../components/SarTile";
 import { SampleEvidenceImages, UploadEvidenceImages } from "./SampleImagePanel";
 import { isSample } from "../sim/samples";
+import { isRealRun } from "../sim/realRun";
 import { distanceKm, polygonsOf } from "../sim/geo";
 import { ageStatement, formatHour, refusalLabel, stamp } from "../lib/format";
 import { CONTACT_RADIUS_KM, PHASE_LABEL, type Moment } from "../lib/playback";
 import type { DriftVariant } from "../sim/scoring";
 import type { Run } from "../sim/types";
+import { verdictFor } from "../sim/verdict";
 import {
   Alarm,
   Block,
@@ -98,7 +100,10 @@ export function Detect({ run }: { run: Run }) {
     [d.parts],
   );
 
-  const unknown = d.className === "slick_unknown";
+  // The class shown is the verdict, decided after detection from evidence the
+  // model cannot see (`sim/verdict.ts`); the model itself has one class.
+  const verdict = useMemo(() => verdictFor(run), [run]);
+  const unknown = verdict.verdict === "slick_unknown";
 
   return (
     <Pane
@@ -128,18 +133,50 @@ export function Detect({ run }: { run: Run }) {
         </Block>
 
         <Block label="Classify" right={`${d.parts.length} part`}>
-          <Row label="class" value={d.className} tone={unknown ? "warn" : "ok"} />
+          <Row label="detector" value="slick · one class" />
           <Meter
             label="conf"
             value={d.confidence}
             display={d.confidence.toFixed(2)}
             tone={d.confidence > 0.7 ? "ok" : "warn"}
           />
+          <Row label="verdict" value={verdict.verdict} tone={unknown ? "warn" : "ok"} />
+          <Meter
+            label="support"
+            value={verdict.support}
+            display={verdict.support.toFixed(2)}
+            tone={unknown ? "warn" : "ok"}
+            title="Evidence for an operational discharge after the wind gate; oos at 0.50 or more"
+          />
+          <div className="mt-1.5" data-verdict-terms>
+            {verdict.terms.map((t) =>
+              t.value === null ? (
+                <Row key={t.key} label={t.label} value="not measured" />
+              ) : (
+                <Meter
+                  key={t.key}
+                  label={t.label}
+                  value={t.value}
+                  display={t.value.toFixed(2)}
+                  tone={t.key === "diverge" ? (t.value >= 0.5 ? "warn" : "ok") : t.value >= 0.5 ? "ok" : "warn"}
+                  title={t.detail}
+                />
+              ),
+            )}
+          </div>
+          {verdict.caution && (
+            <Note tone="warn" label="possible wake">
+              {verdict.caution}
+            </Note>
+          )}
           <Note>
-            Two foreground classes, not one: an operational discharge and a slick
-            whose origin is unknown. The second is the class a look-alike lands
-            in, and keeping it separate is what stops a biogenic film being
-            counted as a spill further down the pipeline.
+            {verdict.summary} The model has one class, slick: it outlines
+            slick-like water and cannot tell a discharge from a natural film or a
+            wake. Discharge or unknown origin is decided here, after detection,
+            from the slick's shape, a radar target at its end, whether it opens
+            in a V, the wind gate, contrast and the drift field; hover a term for
+            its measurement. support = linear × target at an end × (1 − V) ×
+            wind × contrast × drift.
           </Note>
         </Block>
 
@@ -176,6 +213,7 @@ export function Detect({ run }: { run: Run }) {
         <Block label="Damping">
           <Row label="ratio" value={Number.isFinite(c.dampingRatioDb) ? `${c.dampingRatioDb.toFixed(1)} dB` : "not measured"} />
           <Row label="confidence" value={c.dampingConfidence} tone="warn" />
+          {c.backend?.dampingNote && <Note tone="faint" label="measured">{c.backend.dampingNote}</Note>}
           <Note tone="warn" label="not a thickness">
             A relative backscatter contrast index between the slick and the water
             around it. There is no field in this system for microns and none for
@@ -189,6 +227,7 @@ export function Detect({ run }: { run: Run }) {
             figure={<WindGatePlot ms={c.windSpeedMs} value={c.windGateMultiplier} />}
           >
           <Row label="wind" value={`${c.windSpeedMs.toFixed(1)} m/s`} />
+          {c.backend?.windNote && <Note tone="faint" label="read">{c.backend.windNote}</Note>}
           <Row
             label="multiplier"
             value={`x${c.windGateMultiplier.toFixed(2)}`}
@@ -204,10 +243,21 @@ export function Detect({ run }: { run: Run }) {
           </Split>
         </Block>
 
-        {/* Generated from the damping ratio, so a run that measured none -- a
-            real scene -- has nothing to generate it from, and a synthetic
-            picture beside real data would read as the scene. */}
-        {Number.isFinite(c.dampingRatioDb) && <Block label="Radar tile" right="synthesised">
+        {c.backend && (
+          <Block label="Age prior" right="Fay, a ceiling">
+            <Row
+              label="spreading time"
+              value={`${c.backend.agePrior.lowHours.toFixed(1)} / ${c.backend.agePrior.bestHours.toFixed(1)} / ${c.backend.agePrior.highHours.toFixed(1)} h`}
+            />
+            <Row label="width read" value={`${c.backend.agePrior.widthM.toFixed(0)} m`} />
+            <Note tone="warn" label="not an age">{c.backend.agePrior.explanation}</Note>
+          </Block>
+        )}
+
+        {/* Generated from the damping ratio. A real scene now has a measured
+            one, but a synthetic picture beside real data would read as the
+            scene, so real runs never get it. */}
+        {Number.isFinite(c.dampingRatioDb) && !isRealRun(run.meta.id) && <Block label="Radar tile" right="synthesised">
           <Split
             figure={
               /* `data-fig` and `--fig-w` sit on the frame rather than on the
@@ -324,7 +374,7 @@ export function Drift({
           <div className="mb-3">
             <Alarm
               code={refusalLabel(d.insufficientEvidence).code}
-              title={d.insufficientEvidence.kind === "no_age"
+              title={d.insufficientEvidence.kind
                 ? refusalLabel(d.insufficientEvidence).title
                 : "field too diffuse to discriminate"}
               compact>

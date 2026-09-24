@@ -25,11 +25,14 @@
  * is the result, not a gap in the view.
  */
 
-import { centroid, dissolveCells, kmPerDegLon, KM_PER_DEG_LAT } from "./geo";
-import { realVessels, ensureRealTraffic } from "./realAis";
-import { sceneLabel, type RealDriftRun } from "./realDrift";
-import { characterise, type SlickGeometry } from "./slick";
-import type { LngLat, Run, ScenarioId } from "./types";
+import { contour, densityGrid, levelForMass, massTable } from "./field";
+import { centroid, distanceKm, kmPerDegLon, KM_PER_DEG_LAT, ringAreaKm2 } from "./geo";
+import { ensureLandmask } from "./landmask";
+import { realVessels, ensureRealTraffic, registerTrafficSource } from "./realAis";
+import { deepAshore, sceneLabel, type RealDriftRun } from "./realDrift";
+import { positionAt } from "./ais";
+import { characterise, windGate, type SlickGeometry } from "./slick";
+import type { Characterisation, DetectionPartKind, LngLat, Run, ScenarioId } from "./types";
 
 export type RealRunId = Extract<ScenarioId, `real-${string}`>;
 
@@ -42,30 +45,100 @@ export interface RealRunListing {
   tests: string;
 }
 
-const SCENES: Record<RealRunId, string> = {
+/** Where a real run's files are: the static exports, or a run the live API made. */
+interface RealRunSource {
+  scene: string;
+  /** Directory URL holding `drift.json` and `scene.json`. */
+  base: string;
+  /** `POST /api/v1/runs` run id, for a run the live pipeline made. */
+  apiRun: string | null;
+}
+
+const EXPORTED: Record<string, string> = {
   "real-20230409": "S1A_IW_GRDH_1SDV_20230409T000206_20230409T000231_048012_05C552_27F2_s0db",
   "real-20230515": "S1A_IW_GRDH_1SDV_20230515T000208_20230515T000233_048537_05D69B_35AF_s0db",
   "real-20231205": "S1A_IW_GRDH_1SDV_20231205T000214_20231205T000239_051512_0637C7_66B8_s0db",
 };
 
-export const REAL_RUN_LISTINGS: RealRunListing[] = (Object.keys(SCENES) as RealRunId[]).map((id) => ({
+const SOURCES = new Map<string, RealRunSource>(
+  Object.entries(EXPORTED).map(([id, scene]) => [id, { scene, base: `runs/${scene}`, apiRun: null }]),
+);
+
+export const REAL_RUN_LISTINGS: RealRunListing[] = (Object.keys(EXPORTED) as RealRunId[]).map((id) => ({
   id,
-  scene: SCENES[id],
-  name: `Real · ${sceneLabel(SCENES[id]).replace("Sentinel-1 ", "")}`,
+  scene: EXPORTED[id],
+  name: `Real · ${sceneLabel(EXPORTED[id]).replace("Sentinel-1 ", "")}`,
   short: "Real detections · OpenDrift −72 h · real AIS",
   region: "gulf-of-mexico",
   tests: "Real detections, real OpenDrift, real AIS — and the refusal the physics forces.",
 }));
 
+/*
+  Runs the live pipeline made (`POST /api/v1/runs`, `lib/api.ts`), registered
+  as the console learns of them. The pipeline writes the same three files the
+  exports are, so they are read by this same view; only where the files live,
+  and what the detection stage was, differ.
+*/
+let apiListings: RealRunListing[] = [];
+const apiListeners = new Set<() => void>();
+
+export function apiRunListings(): RealRunListing[] {
+  return apiListings;
+}
+
+export function subscribeApiRuns(listener: () => void): () => void {
+  apiListeners.add(listener);
+  return () => { apiListeners.delete(listener); };
+}
+
+export function apiRunId(id: string): string | null {
+  return SOURCES.get(id)?.apiRun ?? null;
+}
+
+/** Make a finished API run selectable. Idempotent; returns its scenario id. */
+export function registerApiRun(run: { id: string; source: string; hasAis: boolean }): RealRunId {
+  const id = `real-api-${run.id}` as RealRunId;
+  if (SOURCES.has(id)) return id;
+  const files = `api/v1/runs/${run.id}/files`;
+  SOURCES.set(id, { scene: run.source, base: files, apiRun: run.id });
+  registerTrafficSource(id, run.hasAis ? `${files}/ais.json` : null);
+  const when = /(\d{8})T(\d{6})/.exec(run.source);
+  apiListings = [...apiListings, {
+    id,
+    scene: run.source,
+    name: `API · ${when ? sceneLabel(run.source).replace("Sentinel-1 ", "") : run.source}`,
+    short: `Live pipeline run ${run.id.slice(0, 15)} · real detections · OpenDrift ±72 h`,
+    region: "gulf-of-mexico",
+    tests: "The live pipeline on this machine: two-pass detection, real OpenDrift, AIS where it is on disk.",
+  }];
+  apiListeners.forEach((listener) => listener());
+  return id;
+}
+
 export function isRealRun(id: string | null): id is RealRunId {
-  return id !== null && id in SCENES;
+  return id !== null && SOURCES.has(id);
 }
 
 /** The export beside each drift run: detections and the wind it ran on. */
 export interface RealSceneFile {
   scene: string;
-  detections: { ring: LngLat[]; confidence: number; seed: boolean }[];
+  /**
+   * One entry per polygon part. `feature` is the detection it belongs to: a
+   * detection can be a MultiPolygon, so there are more rings than detections.
+   * Absent from exports written before it was added.
+   */
+  detections: { ring: LngLat[]; feature?: number; confidence: number; seed: boolean; boxCut?: boolean }[];
   detectionSource: string;
+  /**
+   * CA-CFAR on the processed scene within `radiusKm` of the seed
+   * (`export_real_scenes.cfar_near_seed`). Absent from exports made before it.
+   */
+  cfar?: {
+    status: "run" | "not_run";
+    reason?: string;
+    radiusKm?: number;
+    targets: { position: LngLat; peakDb: number; areaPx: number }[];
+  };
   wind: {
     source: string;
     gridPoint: LngLat;
@@ -73,6 +146,22 @@ export interface RealSceneFile {
     ms: number[];
     fromDeg: number[];
     current: string;
+  };
+  /**
+   * The backend's PHASE-03 record for the seed detection
+   * (`export_real_scenes.characterise_seed`): geometry from the unsimplified
+   * polygon, damping on the scene's own band 2, the wind gate at the pass.
+   * Null damping means not measured. Absent from exports made before it, and
+   * then the view measures the simplified ring itself.
+   */
+  characterisation?: Omit<Characterisation, "dampingRatioDb" | "windSpeedMs" | "windGateMultiplier" | "backend"> & {
+    dampingRatioDb: number | null;
+    windSpeedMs: number | null;
+    windGateMultiplier: number | null;
+    source: string;
+    damping: { note: string } | null;
+    wind: { speedMs: number; fromDeg: number; gridPoint: LngLat; validTime: string; offsetS: number; source: string } | null;
+    agePrior: NonNullable<Characterisation["backend"]>["agePrior"] & { confidence: string };
   };
 }
 
@@ -102,13 +191,20 @@ export async function ensureRealRun(id: string): Promise<void> {
   const inFlight = pending.get(id);
   if (inFlight) return inFlight;
   const job = (async () => {
-    const base = `runs/${SCENES[id]}`;
+    const base = SOURCES.get(id)!.base;
     const [drift, scene] = await Promise.all([
       readJson(`${base}/drift.json`) as Promise<RealDriftRun>,
       readJson(`${base}/scene.json`) as Promise<RealSceneFile>,
       ensureRealTraffic(id),
     ]);
     if (!drift.frames?.length) throw new Error(`${id}: the exported drift has no frames`);
+    // The outlines are smoothed here and masked to water (`densityGrid`), so
+    // the coastline has to be in hand for everywhere the cloud reaches.
+    let reach = 0;
+    for (const frame of drift.frames)
+      for (let k = 0; k < frame.particles.length; k += 2)
+        reach = Math.max(reach, distanceKm(drift.seed, [frame.particles[k], frame.particles[k + 1]]));
+    await ensureLandmask(drift.seed, reach + 20);
     loaded.set(id, { drift, scene });
   })();
   pending.set(id, job);
@@ -170,42 +266,150 @@ export function buildRealRun(id: RealRunId): Run {
   const seedRing = scene.detections.find((d) => d.seed) ?? scene.detections[0];
   const windAtPass = scene.wind.ms[scene.wind.hours.indexOf(0)] ?? scene.wind.ms[scene.wind.ms.length - 1];
 
-  const axis = medialAxis(seedRing.ring);
-  const geom: SlickGeometry = { parts: [seedRing.ring], centreline: axis, head: axis[0], tail: axis[axis.length - 1] };
-  const characterisation = characterise(`${id}-det`, geom, {
-    windSpeedMs: windAtPass,
-    // No backscatter reaches the console for these scenes; NaN renders as
-    // "not measured" rather than as a contrast nobody measured.
-    dampingRatioDb: Number.NaN,
-    headResolved: false,
-  });
+  const measured = scene.characterisation;
+  let characterisation: Characterisation;
+  if (measured) {
+    // The backend's numbers, field by field (not spread: the export carries
+    // more than the console's type, and the extras belong in `backend`).
+    characterisation = {
+      detectionId: `${id}-det`,
+      areaKm2: measured.areaKm2,
+      lengthKm: measured.lengthKm,
+      widthMMean: measured.widthMMean,
+      widthMProfile: measured.widthMProfile,
+      orientationDeg: measured.orientationDeg,
+      elongation: measured.elongation,
+      compactness: measured.compactness,
+      fragmentation: measured.fragmentation,
+      head: measured.head,
+      tail: measured.tail,
+      headTailResolvedBy: "ambiguous",
+      medialAxis: measured.medialAxis,
+      // NaN renders as "not measured", which is what a null from the export means.
+      dampingRatioDb: measured.dampingRatioDb ?? Number.NaN,
+      dampingConfidence: "low",
+      windSpeedMs: measured.windSpeedMs ?? windAtPass,
+      windGateMultiplier: measured.windGateMultiplier ?? windGate(windAtPass),
+      backend: {
+        source: measured.source,
+        dampingNote: measured.damping?.note ?? null,
+        windNote: measured.wind
+          ? `${measured.wind.source}, ${Math.abs(measured.wind.offsetS / 60).toFixed(0)} min from the pass`
+          : null,
+        agePrior: measured.agePrior,
+      },
+    };
+  } else {
+    const axis = medialAxis(seedRing.ring);
+    const geom: SlickGeometry = { parts: [seedRing.ring], centreline: axis, head: axis[0], tail: axis[axis.length - 1] };
+    characterisation = characterise(`${id}-det`, geom, {
+      windSpeedMs: windAtPass,
+      // No backscatter reached the console for exports made before the
+      // backend characterisation; NaN renders as "not measured".
+      dampingRatioDb: Number.NaN,
+      headResolved: false,
+    });
+  }
+  const measuredNote = measured
+    ? `Characterisation: ${measured.source}` +
+      (measured.dampingRatioDb === null ? "; damping not measured. " : `; damping ${measured.dampingRatioDb.toFixed(1)} dB, a relative contrast (C2). `)
+    : "Characterisation: measured in the console from the simplified ring; damping not measured. ";
 
-  const frames = drift.frames.map((f) => ({
-    hour: f.hour,
-    at: acquiredAt + f.hour * HOUR,
-    particles: Float64Array.from(f.particles),
-    // The export's cell boxes, merged into the outline of the same cells.
-    contour50: dissolveCells(f.contour50),
-    contour90: dissolveCells(f.contour90),
-    area50Km2: f.area50Km2,
-    area90Km2: f.area90Km2,
-    spreadKm: f.spreadKm,
-  }));
+  /*
+    The 50% and 90% outlines, smoothed from OpenDrift's own parcels -- all of
+    them, every member -- by the blur and contour the authored scenes use
+    (`sim/field.ts`), so a real run and an authored one are drawn the same way.
+    The export also holds the backend's answer on its 0.01 degree grid, as cell
+    boxes (`contour_geojson`); drawn as they are, those read as pixel art next
+    to an authored scene (ISSUES F18). They stay in the file and are quoted in
+    the provenance; the areas printed are the outlines drawn.
+  */
+  const frames = drift.frames.map((f) => {
+    const particles = Float64Array.from(f.particles);
+    // Masked on deep land only: see `densityGrid` for why the raster coast is not enough here.
+    const grid = densityGrid(particles, particles.length / 2, undefined, undefined, undefined, deepAshore);
+    const table = massTable(grid);
+    const contour50 = contour(grid, levelForMass(table, 0.5));
+    const contour90 = contour(grid, levelForMass(table, 0.9));
+    return {
+      hour: f.hour,
+      at: acquiredAt + f.hour * HOUR,
+      particles,
+      contour50,
+      contour90,
+      area50Km2: contour50.reduce((sum, r) => sum + ringAreaKm2(r), 0),
+      area90Km2: contour90.reduce((sum, r) => sum + ringAreaKm2(r), 0),
+      spreadKm: f.spreadKm,
+    };
+  });
+  // Frames run from the hindcast horizon through the pass to the forecast
+  // horizon; the pass is hour 0, not the last frame.
+  const passIndex = frames.findIndex((f) => f.hour === 0);
+  const pass = frames[passIndex];
+  const cellsAtHorizon = drift.frames[0].area90Km2;
+  const cellsAtPass = drift.frames[passIndex].area90Km2;
   const horizon = frames[0];
+  const ahead = frames.filter((f) => f.hour > 0);
+  const lastAhead = drift.frames[drift.frames.length - 1];
+  // The forecast envelope, drawn the way an authored scene's is: the 90% outline every 12 h.
+  const forwardImpact = ahead.filter((f) => f.hour % 12 === 0).flatMap((f) => f.contour90);
   const vessels = realVessels(id);
   // A loop, not Math.min(...): tens of thousands of reports overflow the stack.
   let firstReport = acquiredAt;
   for (const v of vessels) for (const p of v.points) if (p.t < firstReport) firstReport = p.t;
   const aisHours = Math.round((acquiredAt - firstReport) / HOUR);
-  const reasons =
-    `No age and no ranking. The backward field never converges -- its 90% contour widens ` +
-    `from ${frames[frames.length - 1].area90Km2.toFixed(1)} km2 at the pass to ` +
-    `${horizon.area90Km2.toFixed(0)} km2 at ${horizon.hour} h -- so convergence gives no age ` +
-    `(${drift.age.status ?? "monotonic"}), and the field is wind-only: there is no current ` +
-    "field (ISSUES X2), and a wind-only field cannot carry an attribution. " +
-    `${vessels.length} real vessels are shown; none is scored.`;
 
-  const count = scene.detections.length;
+  // The scene's own radar returns near the seed, each matched to a real vessel
+  // that reported within 10 minutes and 0.5 km of it at the pass. An unmatched
+  // return is a dark vessel or an installation: CFAR cannot tell which.
+  const MATCH_KM = 0.5;
+  const reportedAtPass = vessels.filter((v) => v.points.some((p) => Math.abs(p.t - acquiredAt) <= 10 * 60_000));
+  const passPositions = reportedAtPass.map((v) => positionAt(v, acquiredAt)).filter((p): p is LngLat => p !== null);
+  const radar = scene.cfar?.status === "run" ? scene.cfar.targets : [];
+  const cfarTargets = radar.map((t, i) => ({
+    id: `cfar-${i}`,
+    position: t.position,
+    // An extent from the target's area on the 10 m grid, not a measured length.
+    lengthM: Math.round(Math.sqrt(t.areaPx) * 10),
+    matched: passPositions.some((p) => distanceKm(p, t.position) <= MATCH_KM),
+  }));
+  const matched = cfarTargets.filter((t) => t.matched).length;
+  const radarNote = scene.cfar?.status === "run"
+    ? `Radar: CA-CFAR on the scene within ${scene.cfar.radiusKm ?? 15} km of the seed, ${cfarTargets.length} bright ` +
+      `target${cfarTargets.length === 1 ? "" : "s"}, ${matched} matched to AIS at the pass. `
+    : `Radar: CFAR not run (${scene.cfar?.reason ?? "exported before it existed"}). `;
+  // The age is the export's own (`estimate_age`), a triple with its method
+  // (C1), when the backward field has a convergence minimum; otherwise a
+  // refusal. Either way nothing is ranked: the field is wind-only.
+  const triple = drift.age.age_hours;
+  const aged = drift.age.status === "converged" && !!triple &&
+    [triple.low, triple.best, triple.high].every((v) => v !== null && Number.isFinite(v));
+  const ageHours: [number, number, number] = aged
+    ? [triple!.low!, triple!.best!, triple!.high!]
+    : [0, drift.backwardHours, drift.backwardHours];
+  const windOnly =
+    "the field is wind-only: there is no current field (ISSUES X2), and a wind-only field cannot " +
+    `carry an attribution. ${vessels.length} real vessels are shown; none is scored.`;
+  const reasons = aged
+    ? `An age but no ranking. The backward field is tightest ${ageHours[1].toFixed(1)} h before the ` +
+      `pass (${ageHours[0].toFixed(1)} / ${ageHours[1].toFixed(1)} / ${ageHours[2].toFixed(1)} h, convergence ` +
+      `minimum: ${drift.age.explanation ?? "OpenDrift ensemble spread"}); its 90% contour is ` +
+      `${pass.area90Km2.toFixed(1)} km2 at the pass and ${horizon.area90Km2.toFixed(0)} km2 at ${horizon.hour} h. ` +
+      `But ${windOnly}`
+    : `No age and no ranking. The backward field never converges -- its 90% contour widens ` +
+      `from ${pass.area90Km2.toFixed(1)} km2 at the pass to ` +
+      `${horizon.area90Km2.toFixed(0)} km2 at ${horizon.hour} h -- so convergence gives no age ` +
+      `(${drift.age.status ?? "monotonic"}), and ${windOnly}`;
+
+  // Detections, not rings: a MultiPolygon detection is several rings. An
+  // export without the feature index can only be counted in rings, and says so.
+  const rings = scene.detections.length;
+  const features = scene.detections.every((d) => d.feature !== undefined)
+    ? new Set(scene.detections.map((d) => d.feature)).size
+    : null;
+  const counted = features === null
+    ? `${rings} slick polygon${rings === 1 ? "" : "s"}`
+    : `${features} detection${features === 1 ? "" : "s"} (${rings} polygon${rings === 1 ? "" : "s"})`;
   const pick = drift.seedDetection;
   // Say which detection was hindcast and what was passed over for it. The
   // largest detections in these scenes are boxes the model filled (ISSUES Q5);
@@ -215,29 +419,50 @@ export function buildRealRun(id: RealRunId): Run {
       `${pick.confidence.toFixed(2)}; ${pick.passedOver.frameCut} larger box-cut and ` +
       `${pick.passedOver.ashore} ashore detection${pick.passedOver.ashore === 1 ? "" : "s"} passed over)`
     : `the drift is seeded from the largest (confidence ${seedRing.confidence.toFixed(2)})`;
+  const apiRun = SOURCES.get(id)?.apiRun ?? null;
+  // A live pipeline run says how it detected: two-pass on the raster it was
+  // given, or a PRECOMPUTED segmentation of that exact file (§1.5).
+  const detected = apiRun
+    ? `REAL · Live pipeline run ${apiRun} (POST /api/v1/runs). Detections: ${scene.detectionSource}, `
+    : `REAL · Detections: the release model (L1-ciou research) on the full Sentinel-1 scene, `;
+  const aisNote = vessels.length
+    ? `AIS: marinecadastre.gov, identities withheld; it covers the last ${aisHours} h of the ` +
+      `${drift.backwardHours} h hindcast. `
+    : "AIS: none on this machine for this place and time (marinecadastre covers US waters only, ISSUES F14); " +
+      "no vessel is shown. ";
   const provenance =
-    `REAL · Detections: the release model (L1-ciou research) on the full Sentinel-1 scene, ` +
-    `${count} slick polygon${count === 1 ? "" : "s"}; ${seedNote}. SAR alone cannot tell oil ` +
+    detected +
+    `${counted}; ${seedNote}. SAR alone cannot tell oil ` +
     `from a natural film (ISSUES Q2). Drift: ${drift.engine}, ${drift.members} members x ` +
     `${drift.particlesPerMember} particles, ${drift.backwardHours} h backward, ${drift.forcingNote} ` +
-    `AIS: marinecadastre.gov, identities withheld; it covers the last ${aisHours} h of the ` +
-    `${drift.backwardHours} h hindcast. Wind: ${scene.wind.source}. ` +
+    `The 50% and 90% outlines are smoothed from OpenDrift's ${drift.members * drift.particlesPerMember} parcels ` +
+    `the way the authored scenes are; on the export's own 0.01 degree grid the 90% region is ` +
+    `${cellsAtPass.toFixed(1)} km2 at the pass and ${cellsAtHorizon.toFixed(0)} km2 at ${-drift.backwardHours} h. ` +
+    `Every member starts from the same parcels, spread over the seed slick itself. ` +
+    (drift.forwardHours > 0 && ahead.length
+      ? `Forecast: the same parcels run forward ${drift.forwardHours} h on the ERA5 wind after the pass` +
+        (lastAhead.strandedPct !== undefined ? `; ${lastAhead.strandedPct.toFixed(1)}% reach the coast by +${lastAhead.hour} h. ` : ". ")
+      : "No forecast was exported for this run. ") +
+    `${aisNote}${radarNote}${measuredNote}Wind: ${scene.wind.source}. ` +
     "Nothing here is simulated, and nobody is ranked -- see the drift pane for why.";
 
   const hours = scene.wind.hours;
   return {
     meta: {
       id,
-      name: REAL_RUN_LISTINGS.find((l) => l.id === id)!.name,
+      name: [...REAL_RUN_LISTINGS, ...apiListings].find((l) => l.id === id)!.name,
       region: "gulf-of-mexico",
-      place: "off the Mississippi delta, Gulf of Mexico",
+      place: apiRun
+        ? `at ${Math.abs(drift.seed[1]).toFixed(3)}°${drift.seed[1] >= 0 ? "N" : "S"} ` +
+          `${Math.abs(drift.seed[0]).toFixed(3)}°${drift.seed[0] >= 0 ? "E" : "W"}`
+        : "off the Mississippi delta, Gulf of Mexico",
       provenance,
       acquiredAt,
       centre: drift.seed,
       zoom: 9,
       sceneId: drift.scene,
       summary:
-        `The model's ${count} detections in a real Sentinel-1 scene, OpenDrift's backward field ` +
+        `The model's ${counted} in a real Sentinel-1 scene, OpenDrift's backward field ` +
         "from the largest one at sea with a slick's edge, and the real traffic around it.",
       tests: "Real detections, real OpenDrift, real AIS — and the refusal the physics forces.",
       expectedTop1: "Nobody: the field never converges and has no currents, so no candidate is ranked.",
@@ -248,6 +473,8 @@ export function buildRealRun(id: RealRunId): Run {
       className: "slick_unknown",
       confidence: seedRing.confidence,
       parts: scene.detections.map((d) => d.ring),
+      partKinds: scene.detections.map((d): DetectionPartKind => (d.seed ? "seed" : d.boxCut ? "box" : "other")),
+      partConfidence: scene.detections.map((d) => d.confidence),
       acquiredAt,
     },
     characterisation,
@@ -261,17 +488,18 @@ export function buildRealRun(id: RealRunId): Run {
       frames,
       convergence: drift.convergence,
       // C1: a triple and a method even when there is nothing to put in it.
-      ageHours: [0, drift.backwardHours, drift.backwardHours],
-      ageMethod: "no_convergence",
-      temporalState: "indeterminate",
-      insufficientEvidence: { area90Km2: horizon.area90Km2, reason: reasons, kind: "no_age" },
+      ageHours,
+      ageMethod: aged ? "drift_convergence" : "no_convergence",
+      // The authored engine's rule (`drift.ts`), so both read an age the same way.
+      temporalState: aged ? (ageHours[1] <= 6 ? "ongoing" : ageHours[1] <= 24 ? "recent" : "legacy") : "indeterminate",
+      insufficientEvidence: { area90Km2: horizon.area90Km2, reason: reasons, kind: aged ? "wind_only" : "no_age" },
       diffuseThresholdKm2: DIFFUSE_THRESHOLD_KM2,
     },
     vessels,
     suspects: [],
     infrastructure: [],
-    cfarTargets: [],
-    forwardImpact: [],
+    cfarTargets,
+    forwardImpact,
     // Nobody knows when this oil entered the water; there is no release to play.
     release: [],
     releaseStartHour: -drift.backwardHours,

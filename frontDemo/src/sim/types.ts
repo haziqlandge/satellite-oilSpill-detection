@@ -39,7 +39,9 @@ export type ScenarioId =
    */
   | "real-20230409"
   | "real-20230515"
-  | "real-20231205";
+  | "real-20231205"
+  /** A run the live pipeline made (`POST /api/v1/runs`), read with the same view. */
+  | `real-api-${string}`;
 
 export type SlickClass = "oos" | "slick_unknown";
 
@@ -65,8 +67,18 @@ export interface Detection {
   confidence: number;
   /** Outer ring per part. EPSG:4326. */
   parts: LngLat[][];
+  /**
+   * What each part is, when the parts are a real scene's detections rather
+   * than one authored slick: the one the drift was seeded from, a mask that
+   * filled its inference box (ISSUES Q5), or any other. Absent for authored runs.
+   */
+  partKinds?: DetectionPartKind[];
+  /** Each part's own model confidence, when the parts are separate detections. */
+  partConfidence?: number[];
   acquiredAt: number;
 }
+
+export type DetectionPartKind = "seed" | "box" | "other";
 
 /** INTERFACES.md section 2 -- Characterisation. */
 export interface Characterisation {
@@ -91,6 +103,25 @@ export interface Characterisation {
   windSpeedMs: number;
   /** Continuous in [0,1]. C9 forbids a hard cut. */
   windGateMultiplier: number;
+  /**
+   * Present when the backend measured this detection (`backend/characterize`,
+   * PHASE-03) rather than the console: what it measured on, and the
+   * morphology age prior, which is a ceiling to check a drift age against and
+   * never an age (C1: a triple and a method).
+   */
+  backend?: {
+    source: string;
+    dampingNote: string | null;
+    windNote: string | null;
+    agePrior: {
+      lowHours: number;
+      bestHours: number;
+      highHours: number;
+      widthM: number;
+      method: "morphology_prior";
+      explanation: string;
+    };
+  };
 }
 
 /** One backward or forward timestep of the ensemble. */
@@ -131,8 +162,12 @@ export interface DriftRun {
   insufficientEvidence: {
     area90Km2: number;
     reason: string;
-    /** Absent means the C3 diffuse test. */
-    kind?: "no_age";
+    /**
+     * Absent means the C3 diffuse test. `no_age`: the field never converges,
+     * so there is no age (C1) to rank against. `wind_only`: it converges and
+     * has an age, but carries no currents (ISSUES X2), so nothing is ranked.
+     */
+    kind?: "no_age" | "wind_only";
   } | null;
   /**
    * The area the origin contour must come inside for the run to discriminate.

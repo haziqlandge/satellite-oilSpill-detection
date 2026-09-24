@@ -37,7 +37,7 @@ import { score, type DriftVariant } from "./scoring";
 import { buildSlick, characterise, seedPoints, windGate, type SlickGeometry } from "./slick";
 import { SAMPLE_SPECS, SAMPLE_LISTINGS } from "./samples";
 import { hasRealTraffic, publishedVesselId, realVessels } from "./realAis";
-import { buildRealRun, isRealRun, REAL_RUN_LISTINGS, type RealRunId } from "./realRun";
+import { apiRunListings, buildRealRun, isRealRun, REAL_RUN_LISTINGS, type RealRunId } from "./realRun";
 import type {
   Environment,
   LngLat,
@@ -1262,19 +1262,28 @@ function assemble(id: Exclude<ScenarioId, RealRunId>, variant: DriftVariant): Ru
   // put a radar target where no ship was.
   const present = (v: Vessel) =>
     v.points.some((p) => Math.abs(p.t - acquiredAt) <= 10 * 60_000);
-  const cfarTargets = vessels
-    .filter(present)
-    .filter((_, i) => i % 4 === 0)
-    .slice(0, 22)
-    .map((v, i) => {
-      const p = positionAt(v, acquiredAt) ?? [v.points[0].lon, v.points[0].lat];
-      return {
-        id: `cfar-${i}`,
-        position: p as LngLat,
-        lengthM: v.lengthM,
-        matched: true,
-      };
-    });
+  // Every ship there at the pass returns a target within 30 km of the slick;
+  // only the ones farther out are thinned for the map. This used to keep every
+  // fourth ship everywhere, so whether the scene's own vessel returned a target
+  // was an accident of list order: the named tanker at the tip of its slick
+  // (gom-moving) and the moored vessel at its head (gom-berthed) had none, and
+  // the radar evidence `verdict.ts` reads said no vessel was there.
+  const NEAR_SLICK_KM = 30;
+  const atPass = vessels.filter(present).map((v) => ({
+    v,
+    p: (positionAt(v, acquiredAt) ?? [v.points[0].lon, v.points[0].lat]) as LngLat,
+  }));
+  const nearSlick = ({ p }: { p: LngLat }) =>
+    Math.min(distanceKm(p, characterisation.head), distanceKm(p, characterisation.tail)) <= NEAR_SLICK_KM;
+  const cfarTargets = [
+    ...atPass.filter(nearSlick),
+    ...atPass.filter((x) => !nearSlick(x)).filter((_, i) => i % 4 === 0).slice(0, 22),
+  ].map(({ v, p }, i) => ({
+    id: `cfar-${i}`,
+    position: p,
+    lengthM: v.lengthM,
+    matched: true,
+  }));
   for (const d of darkTargets) {
     cfarTargets.push({
       id: d.id,
@@ -1496,7 +1505,7 @@ const UPLOAD_LISTING: ScenarioListing = {
 
 export function scenarioListing(id: ScenarioId): ScenarioListing {
   return (
-    [...SCENARIOS, ...SAMPLE_LISTINGS, ...REAL_RUN_LISTINGS, UPLOAD_LISTING].find((s) => s.id === id) ?? SCENARIOS[0]
+    [...SCENARIOS, ...SAMPLE_LISTINGS, ...REAL_RUN_LISTINGS, ...apiRunListings(), UPLOAD_LISTING].find((s) => s.id === id) ?? SCENARIOS[0]
   );
 }
 

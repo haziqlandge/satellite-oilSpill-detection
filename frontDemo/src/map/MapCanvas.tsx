@@ -43,6 +43,8 @@ import type { LngLat, Run, Suspect } from "../sim/types";
 import { positionAt } from "../sim/ais";
 import { trackSegments } from "../sim/realAis";
 import { pointInPolygon, distanceToPathKm, polygonsOf } from "../sim/geo";
+import { detectionFeatures } from "./detectionView";
+import { verdictFor } from "../sim/verdict";
 
 interface Props {
   run: Run;
@@ -597,31 +599,18 @@ export function MapCanvas({
 
     const src = (id: string) => map.getSource(id) as maplibregl.GeoJSONSource;
 
-    const lons = run.detection.parts.flatMap((r) => r.map((p) => p[0]));
-    const lats = run.detection.parts.flatMap((r) => r.map((p) => p[1]));
+    // A loop, not Math.min(...): a real scene's detections are tens of
+    // thousands of vertices, which a spread passes as arguments.
+    let west = Infinity, south = Infinity, east = -Infinity, north = -Infinity;
+    for (const ring of run.detection.parts)
+      for (const [lon, lat] of ring) {
+        if (lon < west) west = lon;
+        if (lon > east) east = lon;
+        if (lat < south) south = lat;
+        if (lat > north) north = lat;
+      }
     src(SOURCE.graticule).setData(
-      graticule(
-        [
-          Math.min(...lons) - 1.2,
-          Math.min(...lats) - 1.2,
-          Math.max(...lons) + 1.2,
-          Math.max(...lats) + 1.2,
-        ],
-        paint.graticuleStepDeg,
-      ),
-    );
-
-    src(SOURCE.slick).setData(
-      collection(
-        run.detection.parts.map((ring) => ({
-          type: "Feature",
-          properties: {
-            class: run.detection.className,
-            confidence: run.detection.confidence,
-          },
-          geometry: { type: "Polygon", coordinates: [ring] },
-        })),
-      ),
+      graticule([west - 1.2, south - 1.2, east + 1.2, north + 1.2], paint.graticuleStepDeg),
     );
 
     src(SOURCE.axis).setData(collection([line(run.characterisation.medialAxis)]));
@@ -999,6 +988,24 @@ export function MapCanvas({
     overlayRef.current?.setVisible(toggles.particles);
     overlayRef.current?.setReleaseVisible(toggles.release);
   }, [toggles, ready, hour, showHindcastAreas]);
+
+  /* --- detections -------------------------------------------------- */
+
+  // Separate from the scenario effect, so a verdict change redraws the
+  // polygons without moving the camera. A real scene draws its seed alone.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    (map.getSource(SOURCE.slick) as maplibregl.GeoJSONSource).setData(
+      collection(
+        detectionFeatures(run.detection).map(({ ring, confidence }) => ({
+          type: "Feature",
+          properties: { class: verdictFor(run).verdict, confidence },
+          geometry: { type: "Polygon", coordinates: [ring] },
+        })),
+      ),
+    );
+  }, [run, ready]);
 
   /* --- picking ----------------------------------------------------- */
 

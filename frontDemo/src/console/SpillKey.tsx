@@ -15,7 +15,8 @@
 
 import { SCENARIOS, type ScenarioId, scenarioListing } from "../sim/scenarios";
 import { SAMPLE_LISTINGS, isSample } from "../sim/samples";
-import { REAL_RUN_LISTINGS } from "../sim/realRun";
+import { apiRunListings, REAL_RUN_LISTINGS, subscribeApiRuns } from "../sim/realRun";
+import { useSyncExternalStore } from "react";
 import type { DemoSampleKey } from "../site/demoData";
 import { Flag } from "./components";
 import { Popover, usePopover } from "./Popover";
@@ -34,6 +35,8 @@ export function SpillKey({
   onSampleSelect?: (id: DemoSampleKey) => void;
 }) {
   const pop = usePopover();
+  // Runs the live pipeline made on this machine, as the console learns of them.
+  const apiRuns = useSyncExternalStore(subscribeApiRuns, apiRunListings, apiRunListings);
   // Through the shared lookup, not a local copy of it: an uploaded raster is
   // not in SCENARIOS or SAMPLE_LISTINGS, and a private `find` over those two
   // silently fell back to the first scenario -- so the header announced
@@ -125,6 +128,24 @@ export function SpillKey({
               <span className="mt-0.5 block text-[9.5px] leading-[1.5]" style={{ color: "var(--ink-faint)" }}>{s.short}</span>
             </button></li>;
           })}
+          {apiRuns.length ? <>
+            <li className="mt-1 border-t px-2.5 pt-1.5 text-[9px] tracking-[0.18em] uppercase" style={{ borderColor: "var(--line)", color: "var(--accent)" }}>
+              live pipeline · this machine
+            </li>
+            {apiRuns.map((s) => {
+              const on = s.id === scenario;
+              return <li key={s.id}><button type="button" role="option" aria-selected={on}
+                onClick={() => { setScenario(s.id); pop.close(); }}
+                className="w-full cursor-pointer px-2.5 py-1.5 text-left transition-colors"
+                style={{ background: on ? "color-mix(in oklab, var(--accent) 14%, transparent)" : "transparent", boxShadow: on ? "inset 2px 0 0 var(--accent)" : undefined }}>
+                <span className="flex items-center gap-1.5">
+                  <span className="text-[10.5px] tracking-[0.1em] uppercase" style={{ color: on ? "var(--accent)" : "var(--ink)" }}>{s.name}</span>
+                  <Flag tone="warn">real</Flag>
+                </span>
+                <span className="mt-0.5 block text-[9.5px] leading-[1.5]" style={{ color: "var(--ink-faint)" }}>{s.short}</span>
+              </button></li>;
+            })}
+          </> : null}
           {unlockedSamples?.length ? (
             <>
               <li className="mt-1 border-t px-2.5 pt-1.5 text-[9px] tracking-[0.18em] uppercase" style={{ borderColor: "var(--line)", color: "var(--accent)" }}>

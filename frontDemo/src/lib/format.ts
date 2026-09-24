@@ -73,9 +73,11 @@ export function refusalLabel(halt: NonNullable<DriftRun["insufficientEvidence"]>
   /** Whether the contour area is the reason, and so worth leading with. */
   areaIsReason: boolean;
 } {
-  return halt.kind === "no_age"
-    ? { code: "E-C1", title: "no convergence, no currents: nothing ranked", short: "no age", areaIsReason: false }
-    : { code: "E-C3", title: "insufficient evidence", short: "diffuse", areaIsReason: true };
+  if (halt.kind === "no_age")
+    return { code: "E-C1", title: "no convergence, no currents: nothing ranked", short: "no age", areaIsReason: false };
+  if (halt.kind === "wind_only")
+    return { code: "E-X2", title: "wind-only field, no currents: nothing ranked", short: "no currents", areaIsReason: false };
+  return { code: "E-C3", title: "insufficient evidence", short: "diffuse", areaIsReason: true };
 }
 
 /**

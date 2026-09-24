@@ -130,6 +130,14 @@ export interface DensityGrid {
  * Three box-blur passes approximate a Gaussian closely enough and are linear in
  * cell count rather than kernel area, which matters because this runs once per
  * timestep for every scenario.
+ *
+ * `dry` decides which cells are zeroed after the blur (`dropLand`). The
+ * authored scenes use the raster coast itself: their integrator never steps a
+ * parcel onto a raster land cell, so nothing real is lost. OpenDrift's parcels
+ * answer to GSHHG's polygons instead, and in a delta pass narrower than one
+ * 1/240 degree cell a parcel in the water sits in a raster "land" cell; masking
+ * those deleted a quarter of the real December ensemble's mass at -72 h. The
+ * real runs therefore pass `deepAshore` -- land with no water beside it.
  */
 export function densityGrid(
   particles: Float64Array,
@@ -137,6 +145,7 @@ export function densityGrid(
   nx = 128,
   ny = 128,
   padRatio = 0.28,
+  dry: (lon: number, lat: number) => boolean = isLand,
 ): DensityGrid {
   let minLon = Infinity;
   let maxLon = -Infinity;
@@ -178,7 +187,7 @@ export function densityGrid(
   boxBlur(values, nx, ny, 3);
   boxBlur(values, nx, ny, 3);
   boxBlur(values, nx, ny, 2);
-  dropLand(values, { minLon, minLat, dLon, dLat, nx, ny });
+  dropLand(values, { minLon, minLat, dLon, dLat, nx, ny }, dry);
 
   const midLat = minLat + ((ny - 1) * dLat) / 2;
   const cellAreaKm2 = dLon * kmPerDegLon(midLat) * dLat * KM_PER_DEG_LAT;
@@ -203,12 +212,13 @@ export function densityGrid(
 function dropLand(
   values: Float64Array,
   spec: { minLon: number; minLat: number; dLon: number; dLat: number; nx: number; ny: number },
+  dry: (lon: number, lat: number) => boolean = isLand,
 ) {
   const { minLon, minLat, dLon, dLat, nx, ny } = spec;
   for (let y = 0; y < ny; y++) {
     const lat = minLat + y * dLat;
     for (let x = 0; x < nx; x++) {
-      if (isLand(minLon + x * dLon, lat)) values[y * nx + x] = 0;
+      if (dry(minLon + x * dLon, lat)) values[y * nx + x] = 0;
     }
   }
 }
