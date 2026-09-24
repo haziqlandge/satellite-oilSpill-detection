@@ -48,6 +48,9 @@ import {
 } from "../site/demoData";
 import { buildRun, scenarioListing, type ScenarioId } from "../sim/scenarios";
 import { isSample } from "../sim/samples";
+import { apiRunId } from "../sim/realRun";
+import { onRunFinished, refreshApi, watchRun } from "../lib/api";
+import { registerIfComplete, ServerRunTimings } from "./ServerRun";
 import type { Run } from "../sim/types";
 
 /** Layer switches, in the order they stack on the map. */
@@ -207,6 +210,25 @@ export default function ConsoleShell() {
     });
   }, [sampleSession.key, sampleSession.state, sampleSession.runs]);
 
+  /*
+    The live pipeline (FUTURE_WORK §3). Runs it has already made are listed as
+    soon as the console learns the API is there; a run finishing while the
+    console is open is listed then -- and when it is the one this upload
+    started, it opens, as the browser's own run did.
+  */
+  const uploadServerRun = useRef<string | null>(null);
+  uploadServerRun.current = sampleSession.server.id;
+  useEffect(() => {
+    // A run still going when the console opened is followed, so it is listed when it ends.
+    void refreshApi().then((api) => api.runs.forEach((r) => {
+      if (!registerIfComplete(r) && (r.status === "running" || r.status === "queued")) watchRun(r.id);
+    }));
+    return onRunFinished((finished) => {
+      const id = registerIfComplete(finished);
+      if (id && finished.id === uploadServerRun.current) scenarioChangeRef.current(id);
+    });
+  }, []);
+
   const panelState = useMemo(() => activeRun
     ? { ...state, run: activeRun, scenario: activeRun.meta.id, listing: scenarioListing(activeRun.meta.id) }
     : state, [state, activeRun]);
@@ -355,6 +377,14 @@ export default function ConsoleShell() {
     }
 
     if (id === "modelTiming") {
+      // A run the live pipeline made: its own stages, as the pipeline timed them.
+      const liveRun = activeRun ? apiRunId(activeRun.meta.id) : null;
+      if (liveRun) {
+        return <div data-pane-narrow className="min-h-0 flex-1 overflow-y-auto px-2 py-2" style={SCROLL}>
+          <GroupHead right={<Flag tone="ok">measured · pipeline</Flag>}>pipeline time</GroupHead>
+          <ServerRunTimings runId={liveRun} />
+        </div>;
+      }
       // The latest upload, live, whenever it is what the console is showing or
       // is still being processed; otherwise the scenario's own figures.
       const uploadLive = !sampleSession.key && sampleSession.timings.length > 0 &&

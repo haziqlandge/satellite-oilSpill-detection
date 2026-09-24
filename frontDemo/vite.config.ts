@@ -2,11 +2,20 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
+/*
+  The live pipeline's API (`backend/app`, FUTURE_WORK §3) on this machine. Proxied
+  rather than called cross-origin, so the console reaches it as `/api/v1/...`
+  whichever port the dev server landed on. `API_ORIGIN` moves it.
+*/
+const API_PROXY = { "/api": { target: process.env.API_ORIGIN || "http://127.0.0.1:8000", changeOrigin: true } };
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   // 5180 by default, but overridable from the environment so a second dev
   // server can run alongside the first without either of them moving.
-  server: { port: Number(process.env.PORT) || 5180, open: false },
+  server: { port: Number(process.env.PORT) || 5180, open: false, proxy: API_PROXY },
+  // `vite preview` serves the build; it needs the same route to the API.
+  preview: { proxy: API_PROXY },
   // onnxruntime-web locates its .wasm beside its own module URL; pre-bundling
   // it into .vite/deps moves the module and the runtime then 404s its binary.
   optimizeDeps: { exclude: ["onnxruntime-web"] },

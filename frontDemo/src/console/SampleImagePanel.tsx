@@ -34,12 +34,15 @@ import { Flag, GroupHead, SCROLL } from "./components";
 import { DEMO_PRESETS, DEMO_SAMPLE_KEYS, type DemoSampleKey } from "../site/demoData";
 import { DB_WINDOW, parseAcquisitionTime, ribbonFromMask, type Ribbon } from "../sim/ingest";
 import { decodeGeoTiff, looksLikeTiff, type GeoRaster } from "../sim/geotiff";
-import { loadSegmenter, segment } from "../sim/segmenter";
+import { isAbort, loadManifest, loadSegmenter, segment, type Segmentation } from "../sim/segmenter";
+import { findPrecomputed, sha256Hex, toSegmentation, type PrecomputedEntry } from "../sim/precomputed";
 import { despeckle } from "../sim/despeckle";
 import { buildUploadSpec } from "../sim/uploadSpec";
 import { registerUpload } from "../sim/scenarios";
 import { ensureLandmask, isLand, LANDMASK_SOURCE, type LandmaskBuild } from "../sim/landmask";
 import { PositionPicker } from "./PositionPicker";
+import { ApiProblem, refreshApi, startRun, watchRun } from "../lib/api";
+import { ServerRunTimings } from "./ServerRun";
 import { RasterViewer } from "./RasterViewer";
 import type { LngLat, ScenarioId } from "../sim/types";
 
@@ -251,7 +254,30 @@ export interface SampleSession {
   coastline: LandmaskBuild | null;
   /** Bumped each time an upload scene is registered, so the console can select it. */
   runs: number;
+  /** Whether a precomputed result exists for this file, and whether it is the one shown. */
+  precomputed: PrecomputedState;
+  /**
+   * The same GeoTIFF sent to the live pipeline (`POST /api/v1/runs`): its run
+   * id once the API accepted it, or why it was not sent or was refused.
+   */
+  server: { id: string | null; note: string };
 }
+
+/**
+ * The "Use precomputed result" state for the upload on screen (FUTURE_WORK.md
+ * §1.5; `sim/precomputed.ts`). The button is always there; this says whether it
+ * can be pressed and, once it has been, what the result on screen is.
+ */
+export interface PrecomputedState {
+  status: "idle" | "checking" | "available" | "none" | "used";
+  /** Why it cannot be used, or what the stored result is. */
+  reason: string;
+  computedAt: string | null;
+  engine: string;
+  sha256: string | null;
+}
+
+const NO_PRECOMPUTED: PrecomputedState = { status: "idle", reason: "", computedAt: null, engine: "", sha256: null };
 
 export type StageStatus = "pending" | "running" | "done" | "failed";
 
@@ -297,7 +323,7 @@ let session: SampleSession = {
   key: null, state: "idle", step: -1, startedAt: 0, completedAt: null,
   sourceName: "", sourceUrl: null, cleanUrl: null, maskUrl: null, markUrl: null, maskPresented: false, completed: [], error: "",
   ribbon: null, measured: null, parsedAcquiredAt: null, geo: null, tiles: null,
-  timings: [], preparing: "", coastline: null, runs: 0,
+  timings: [], preparing: "", coastline: null, runs: 0, precomputed: NO_PRECOMPUTED, server: { id: null, note: "" },
 };
 const listeners = new Set<() => void>();
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
@@ -310,6 +336,39 @@ export function useSampleSession() {
 }
 
 let uploadSequence = 0;
+
+/** Set while an upload runs: switches it to its precomputed result. */
+let choosePrecomputed: (() => void) | null = null;
+
+/** The button's action. Does nothing unless a usable precomputed result was found. */
+export function takePrecomputedResult() {
+  choosePrecomputed?.();
+}
+
+/**
+ * Look for a stored result for exactly this file under exactly this model,
+ * while the live run starts. Publishes what it found either way, so the button
+ * can say why it is not available rather than simply being grey.
+ */
+async function lookUpPrecomputed(file: File, sequence: number): Promise<PrecomputedEntry | null> {
+  publish({ precomputed: { ...NO_PRECOMPUTED, status: "checking", reason: "checking for a precomputed result" } });
+  try {
+    const [sha256, manifest] = await Promise.all([file.arrayBuffer().then(sha256Hex), loadManifest()]);
+    const found = await findPrecomputed(sha256, manifest.sha256);
+    if (sequence !== uploadSequence) return null;
+    if (!found.ok) {
+      publish({ precomputed: { ...NO_PRECOMPUTED, status: "none", reason: found.reason, sha256 } });
+      return null;
+    }
+    const { computedAt, engine } = found.entry;
+    publish({ precomputed: { status: "available", reason: `computed ${computedAt.slice(0, 10)} for this exact file and model`, computedAt, engine, sha256 } });
+    return found.entry;
+  } catch (error) {
+    if (sequence === uploadSequence)
+      publish({ precomputed: { ...NO_PRECOMPUTED, status: "none", reason: `could not check for one (${(error as Error).message})` } });
+    return null;
+  }
+}
 
 /**
  * Stage bookkeeping for the Model Timing panel.
@@ -339,8 +398,24 @@ function failRunning() {
   const running = session.timings.find((t) => t.status === "running");
   if (running) stageEnd(running.label as UploadStage, "failed");
 }
-/** Yield a frame, so a stage marked running is painted before synchronous work blocks. */
-export const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+/**
+ * Yield a frame, so a stage marked running is painted before synchronous work blocks.
+ *
+ * The paint is a courtesy, not a dependency. A background tab stops
+ * `requestAnimationFrame` altogether, and an upload that awaited it alone sat
+ * at "tile 9 of 9" until somebody looked at the tab again. The timer settles it
+ * anyway; a visible tab paints long before the timer is due.
+ */
+export const nextFrame = () => new Promise<void>((resolve) => {
+  let settled = false;
+  const go = () => {
+    if (settled) return;
+    settled = true;
+    setTimeout(resolve, 0);
+  };
+  requestAnimationFrame(go);
+  setTimeout(go, 100);
+});
 
 /**
  * Put the traced slick on the map and run it: coastline first, then the scene.
@@ -387,8 +462,71 @@ export async function runUpload(a: { centre: LngLat; acrossKm: number; acquiredA
     acquisitionSource: session.parsedAcquiredAt ? "filename" : "operator",
     positionSource: session.geo ? "geotiff" : "operator",
     fileName: session.sourceName,
+    segmentation: segmentationNote(session),
   }));
   publish({ state: "complete", completedAt: Date.now(), preparing: "", runs: session.runs + 1 });
+}
+
+/**
+ * Send the upload to the live pipeline (FUTURE_WORK §3), when it is running.
+ *
+ * Only a georeferenced GeoTIFF: the pipeline needs a position it can read and a
+ * time (a Sentinel-1 product name, or TIFFTAG_DATETIME). The browser's own run
+ * goes on regardless; the real one streams its stages into the Model Timing
+ * pane and opens as its own view when it finishes (`ConsoleShell`).
+ */
+async function sendToPipeline(file: File, usePrecomputed: boolean, sequence: number) {
+  const api = await refreshApi();
+  if (sequence !== uploadSequence) return;
+  if (!api.up) {
+    publish({ server: { id: null, note: "The live pipeline is not running on this machine, so this raster ran in the browser only. Start the api server (uvicorn backend.app.main:app) to run the real pipeline on it." } });
+    return;
+  }
+  try {
+    const run = await startRun(file, { usePrecomputed });
+    if (sequence !== uploadSequence) return;
+    publish({ server: { id: run.id, note: "" } });
+    watchRun(run.id);
+  } catch (error) {
+    if (sequence !== uploadSequence) return;
+    publish({ server: { id: null, note: error instanceof ApiProblem
+      ? `The live pipeline did not take this file: ${error.detail}`
+      : `The live pipeline could not be reached (${(error as Error).message}).` } });
+  }
+}
+
+/** The provenance sentence saying where this upload's segmentation came from. */
+function segmentationNote(s: SampleSession): string {
+  const p = s.precomputed;
+  if (p.status === "used")
+    return `The segmentation is PRECOMPUTED, not run in this browser: made ${p.computedAt?.slice(0, 10)} by ${p.engine}, ` +
+      `for this exact file (SHA-256 ${p.sha256?.slice(0, 12)}) and this model, and used at the operator's request. `;
+  return s.measured ? `The segmentation ran live in this browser (${s.measured.backend}). ` : "";
+}
+
+/**
+ * "Use precomputed result", always on screen while an upload is (FUTURE_WORK.md
+ * §1.5). Pressable only while the live run is still going and a stored result
+ * exists for this exact file and model; otherwise it stays in view, disabled,
+ * with the reason beside it.
+ */
+function PrecomputedControl({ s }: { s: SampleSession }) {
+  const p = s.precomputed;
+  const running = s.state === "processing";
+  const usable = running && p.status === "available";
+  const note =
+    p.status === "used" ? `Showing a precomputed result, ${p.reason}, made by ${p.engine}. The segmentation on screen was not made in this browser.`
+      : p.status === "available" && !running ? "The live run finished first; the stored result was not needed."
+        : p.reason;
+  return <div className="flex flex-wrap items-center gap-2" data-precomputed={p.status}>
+    <button type="button" disabled={!usable} onClick={takePrecomputedResult}
+      className="border px-2 py-1 text-[10px] uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-45"
+      style={{ borderColor: usable ? "var(--accent)" : "var(--line)", color: usable ? "var(--accent)" : "var(--ink-dim)", cursor: usable ? "pointer" : undefined }}
+      title={usable ? "Stop the live run and show the stored result for this file" : note}>
+      Use precomputed result</button>
+    {p.status === "used" && <Flag tone="warn">precomputed</Flag>}
+    {note && <span className="min-w-0 flex-1 text-[10px] leading-[1.45]" style={{ color: "var(--ink-faint)" }}>{note}</span>}
+  </div>;
 }
 
 /** Only by name now. The pixel fingerprint was what refused every real tile. */
@@ -415,9 +553,21 @@ export async function uploadSample(file: File) {
     key: namedSample(file), state: "processing", step: 0, startedAt, completedAt: null,
     sourceName: file.name, sourceUrl: url, cleanUrl: null, maskUrl: null, markUrl: null, maskPresented: false, error: "",
     ribbon: null, measured: null, geo: null, tiles: null, parsedAcquiredAt: parseAcquisitionTime(file.name),
-    timings: pendingStages(), preparing: "", coastline: null,
+    timings: pendingStages(), preparing: "", coastline: null, server: { id: null, note: "" },
   });
   stageStart("Decode raster", tiff ? "GeoTIFF" : file.type.replace("image/", "").toUpperCase());
+
+  // The precomputed result, if there is one, is looked up alongside the live
+  // run; the operator's choice of it can cut in at any point before inference ends.
+  const stored = lookUpPrecomputed(file, sequence);
+  const skipper = new AbortController();
+  let chosen!: () => void;
+  const choice = new Promise<"precomputed">((resolve) => { chosen = () => resolve("precomputed"); });
+  choosePrecomputed = () => {
+    if (sequence !== uploadSequence || session.precomputed.status !== "available" || skipper.signal.aborted) return;
+    skipper.abort();
+    chosen();
+  };
 
   try {
     let pixels: Uint8ClampedArray;
@@ -461,34 +611,77 @@ export async function uploadSample(file: File) {
       model cannot run, the operator is told why rather than handed a worse
       answer that looks the same.
     */
-    let model;
-    stageStart("Load segmenter", "L1-ciou research release");
-    try {
-      model = await loadSegmenter();
-    } catch (error) {
-      if (sequence !== uploadSequence) return;
-      failRunning();
-      publish({
-        state: "idle", step: -1,
-        error: `The trained segmenter could not be loaded (${(error as Error).message}). ` +
-          "Produce it with .venv/Scripts/python.exe -m ml.export.onnx_export.",
-      });
-      return;
-    }
-    if (sequence !== uploadSequence) return;
-    stageEnd("Load segmenter", "done", model.backend);
-    stageStart("Segmenter inference", "starting");
-    const segmented = await segment(model, pixels, width, height, {
-      valid: geo?.valid ?? null,
-      onTile: (done, total) => {
+    let segmented: Segmentation | null = null;
+    let backend = "";
+    if (!skipper.signal.aborted) {
+      stageStart("Load segmenter", "L1-ciou research release");
+      let model;
+      try {
+        model = await Promise.race([loadSegmenter(), choice.then(() => null)]);
+      } catch (error) {
         if (sequence !== uploadSequence) return;
-        publish({ tiles: [done, total] });
-        stageDetail("Segmenter inference", `tile ${done} of ${total} · ${model.backend}`);
-      },
-    });
-    if (sequence !== uploadSequence) return;
-    stageEnd("Segmenter inference", "done",
-      `${segmented.detections.length} detection${segmented.detections.length === 1 ? "" : "s"} · ${segmented.tiles} tiles · ${model.backend}`);
+        failRunning();
+        publish({
+          state: "idle", step: -1,
+          error: `The trained segmenter could not be loaded (${(error as Error).message}). ` +
+            "Produce it with .venv/Scripts/python.exe -m ml.export.onnx_export.",
+        });
+        return;
+      }
+      if (sequence !== uploadSequence) return;
+      if (model) {
+        backend = model.backend;
+        stageEnd("Load segmenter", "done", backend);
+        stageStart("Segmenter inference", "starting");
+        const live = segment(model, pixels, width, height, {
+          valid: geo?.valid ?? null,
+          signal: skipper.signal,
+          onTile: (done, total) => {
+            if (sequence !== uploadSequence || skipper.signal.aborted) return;
+            publish({ tiles: [done, total] });
+            stageDetail("Segmenter inference", `tile ${done} of ${total} · ${backend}`);
+          },
+        });
+        // A stopped run rejects once its tile finishes, after the choice has moved on.
+        live.catch((error) => { if (!isAbort(error)) console.error(error); });
+        const first = await Promise.race([live, choice]);
+        if (sequence !== uploadSequence) return;
+        if (first !== "precomputed") {
+          segmented = first;
+          stageEnd("Segmenter inference", "done",
+            `${segmented.detections.length} detection${segmented.detections.length === 1 ? "" : "s"} · ${segmented.tiles} tiles · ${backend}`);
+        }
+      }
+    }
+    choosePrecomputed = null;
+    if (!segmented) {
+      // The operator chose the stored result. Only the segmentation is replaced:
+      // everything after this runs live on the file in hand.
+      const entry = await stored;
+      if (sequence !== uploadSequence) return;
+      if (!entry || entry.width !== width || entry.height !== height) {
+        failRunning();
+        publish({ state: "idle", step: -1, error: "The precomputed result does not fit this raster; upload it again to run live." });
+        return;
+      }
+      segmented = toSegmentation(entry);
+      backend = "precomputed";
+      const row = (label: UploadStage) => session.timings.find((t) => t.label === label)?.status;
+      const load = row("Load segmenter");
+      if (load !== "done") stageEnd("Load segmenter", "done", load === "running" ? "stopped · precomputed result used" : "not needed · precomputed result");
+      // Say how far the live run got before it was stopped; its tiles are discarded.
+      const stopped = row("Segmenter inference") === "running"
+        ? `live run stopped at tile ${session.tiles?.[0] ?? 0} of ${session.tiles?.[1] ?? segmented.tiles}, discarded`
+        : "not run in this browser";
+      stageEnd("Segmenter inference", "done",
+        `PRECOMPUTED ${entry.computedAt.slice(0, 10)} · ${segmented.detections.length} detection` +
+        `${segmented.detections.length === 1 ? "" : "s"} · ${segmented.tiles} tiles · ${stopped}`);
+      publish({ precomputed: { ...session.precomputed, status: "used" }, tiles: null });
+    }
+
+    // A georeferenced raster also goes to the live pipeline, with the same
+    // choice the operator made here: a precomputed segmentation, or a live one.
+    if (geo) void sendToPipeline(file, backend === "precomputed", sequence);
 
     stageStart("Trace outline");
     await nextFrame();
@@ -534,7 +727,7 @@ export async function uploadSample(file: File) {
         score: outcome.ribbon.score ?? 0,
         markedFraction: marked / segmented.mask.length,
         tiles: segmented.tiles,
-        backend: model.backend,
+        backend: backend === "precomputed" ? "precomputed offline (WASM)" : backend,
         inferMs: segmented.ms,
       },
     });
@@ -703,7 +896,8 @@ export function UploadTimings() {
   const total = current.timings.reduce((sum, t) => sum + elapsed(t), 0);
   return <>
     <p className="num mt-2 px-2 text-[10px]" style={{ color: "var(--ink-faint)" }}>
-      pipeline timings for {current.sourceName || "this upload"}</p>
+      in this browser · pipeline timings for {current.sourceName || "this upload"}</p>
+    {current.sourceUrl && <div className="mt-2 px-2"><PrecomputedControl s={current} /></div>}
     <ul className="mt-2 border" style={{ borderColor: "var(--line)" }} data-upload-timings>
       {current.timings.map((t) =>
         <li key={t.label} data-stage-status={t.status}
@@ -732,6 +926,11 @@ export function UploadTimings() {
     <p className="mt-2 px-2 text-[9.5px] leading-[1.5]" style={{ color: "var(--ink-faint)" }}>
       Measured in this browser for this upload, as it runs. Drift, traffic and scores are
       simulated physics; the time they take to compute is real.</p>
+    {current.server.id && <div className="mt-3 border-t pt-1" style={{ borderColor: "var(--line)" }}>
+      <ServerRunTimings runId={current.server.id} />
+    </div>}
+    {current.server.note && <p className="mt-3 border-t px-2 pt-2 text-[10px] leading-[1.5]"
+      style={{ borderColor: "var(--line)", color: "var(--ink-faint)" }} data-server-note>{current.server.note}</p>}
   </>;
 }
 
@@ -841,6 +1040,7 @@ export function SampleImagePanel({ onSelect }: { onSelect: (id: ScenarioId) => v
         <span>{message}</span>
       </div>
       <p className="num text-[10px]" style={{ color: "var(--ink-faint)" }}>{current.sourceName}</p>
+      <PrecomputedControl s={current} />
 
       {current.cleanUrl && <div className="grid grid-cols-2 gap-2" data-upload-pair>
         {[["Model input", "band 2 as the segmenter saw it", current.sourceUrl],
