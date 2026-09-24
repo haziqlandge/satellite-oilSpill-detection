@@ -78,6 +78,26 @@ on the training machine, generate it once from `weights/L1-ciou-research.pt`:
 It checks the export against PyTorch before writing it. Without it, an upload
 says the segmenter could not be loaded rather than falling back to anything.
 
+### The live pipeline (API)
+
+```bash
+.venv/Scripts/python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+```
+
+Also the `api` launch configuration. `PLAN/INTERFACES.md` §3 over the pipeline's
+own files (the hosted database is not in its request path, `ISSUES.md` X1), plus
+one write: `POST /api/v1/runs` takes a georeferenced sigma-0 dB GeoTIFF (its bytes
+as the body, `?name=`) or `{"source": "<repo-relative path>"}` for a raster on
+disk, answers 202 at once, and runs the whole chain in a separate process --
+two-pass detection, seed, ERA5 wind, characterisation, CFAR, OpenDrift backward
+and forward, origin field and age, AIS, verdict, attribution (which refuses:
+PHASE-06 is not built and the field is wind-only). Each stage streams over
+`GET /api/v1/runs/{id}/events` (server-sent events) as it happens. Docs at
+`http://127.0.0.1:8000/api/v1/docs`. The dev server proxies `/api` to it, so the
+console sends every georeferenced upload there too, shows the stages live in the
+Model Timing pane, and opens the finished run as a view. A full scene takes about
+five minutes on the session machine's CPU, most of it OpenDrift.
+
 `npm install --prefix frontDemo` does **not** work on npm 10+ — it resolves
 `package.json` from the current directory, not the prefix, and fails at the
 repository root. `npm run --prefix` is unaffected.
@@ -127,7 +147,7 @@ Heavy dependencies are optional groups so they can fail independently:
 .venv/Scripts/python.exe -m ruff check . && .venv/Scripts/python.exe -m mypy ml backend scripts
 ```
 
-Baseline is **515 passed, 9 skipped**. A drop below that is a regression.
+Baseline is **630 passed, 9 skipped**. A drop below that is a regression.
 
 ---
 
@@ -138,8 +158,10 @@ backend/
   ingest/     SAR download + SNAP preprocessing, AIS, dataset assembly, metocean cache
   detect/     YOLO-seg + LSK inference (SAHI over full scenes); CFAR bright targets
   drift/      OpenDrift OpenOil ensemble, origin probability field, convergence/age
+  characterize/  geometry, damping ratio, wind gate, Fay age prior, the oos verdict (PHASE-03)
   db/         SQLAlchemy models; integrity constraints enforced in the schema
-  app/        the REST API — specced in PLAN/INTERFACES.md, not yet built
+  app/        the REST API (FastAPI): INTERFACES.md §3 over the artifacts, POST /runs + SSE
+  pipeline/   the live chain behind POST /runs; two-pass detection's overview screen
 ml/
   models/     LSK block, MPDIoU, the YOLO-seg variants
   datasets/   corpus assembly, the fixed dB window, split assignment
@@ -153,9 +175,9 @@ detection, drift, forecast, cause and suspects, and an **operations console**
 (`#/console`) with a map, dockable panels and a shared timeline. It is React 19 + Vite 6 +
 Tailwind v4 + MapLibre GL + anime.js v4.
 
-`src/sim/` currently generates its own data — the frontend is not yet wired to the backend.
-The shapes already mirror `PLAN/INTERFACES.md`, so connecting them is a transport change
-rather than a rewrite.
+The authored scenarios in `src/sim/` generate their own data, and say so. The three
+real runs are static files the backend exported (`frontDemo/public/runs/`), and a run
+the live pipeline makes is read from the API (`src/lib/api.ts`) with the same view.
 
 ---
 

@@ -115,11 +115,11 @@ freshly frozen, independently labelled holdout.
 .venv/Scripts/python.exe -m ruff check . && .venv/Scripts/python.exe -m mypy ml backend scripts
 ```
 
-Baseline is **515 passed, 9 skipped** — six database tests skip because the
+Baseline is **630 passed, 9 skipped** — six database tests skip because the
 Supabase session pooler returns tenant/user not found, and the rest need
-hardware this machine lacks. A drop below 515 is a regression. ruff and mypy
-are both clean as of 2026-09-23; keep them that way. For the frontend,
-`cd frontDemo && npx tsc -b && npm run check` (11 scripts; the corpus and
+hardware this machine lacks. A drop below 630 is a regression. ruff and mypy
+are both clean as of 2026-09-24 (mypy: 130 files); keep them that way. For the frontend,
+`cd frontDemo && npx tsc -b && npm run check` (14 scripts; the corpus and
 real-run checks skip on a machine without their data or the exported model).
 
 **Use the trained model for every slick outline** (`frontDemo/src/sim/segmenter.ts`).

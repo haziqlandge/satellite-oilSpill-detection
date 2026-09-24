@@ -82,6 +82,29 @@ routed, varied simulated voyages. Real AIS exposed a reversed course in Case 2
 and a one-degree coordinate error in Case 3. See §2.14. Tests: 506 passed,
 9 skipped.
 
+**2026-09-23, evening — the session machine again.** The upload viewer and the
+real views verified in the browser; "use precomputed result" (§1.5); the real
+views redrawn (four detection views, smoothed fields) after the user found them
+chaotic; the real runs seeded over the slick's own shape and given a 72 h
+forecast. See §2.17. Tests: 522 passed, 9 skipped.
+
+**2026-09-23, late evening — the session machine.** The labelling pipeline
+(plan §2.1-§2.4): CFAR on the pilot, a review pack a person can use, the
+rubric, and the oos verdict moved downstream into the console. See §2.18.
+Tests: 534 passed, 9 skipped.
+
+**2026-09-23/24, night — the session machine.** PHASE-03 in the backend
+(`backend/characterize`: geometry, damping, wind gate, a Fay age prior, the
+verdict's twin), measured on the three real seeds and shown in their views;
+the Real views' detection switch removed for the seed alone, at the user's
+request. See §2.19. Tests: 599 passed, 9 skipped.
+
+**2026-09-24 — the session machine.** The API and the live pipeline
+(`POST /api/v1/runs` + SSE, two-pass detection, the 14-stage chain), see
+§2.20; then the three console fixes the user asked for (upload panel, Model
+Timing, a live decode clock) and the upload -> pipeline -> auto-open flow seen
+end to end, see §2.21. Tests: 630 passed, 9 skipped.
+
 ### Results
 
 Screening, 12 cells at 60 epochs, mask metrics, single `slick` class:
@@ -545,6 +568,249 @@ Recorded 2026-09-23 while wiring the three real OpenDrift runs into the console
   wore SIM on real runs; the map strip said "simulated traffic" on the Gulf
   scenes, which run on real AIS. All three now come from `provenanceFlag`
   (`lib/format.ts`).
+
+## 2.17 Uploads, precomputed results and the real views (2026-09-23, session machine)
+
+- **A pipeline must not wait on paint.** `nextFrame()` (yield so a stage label
+  paints) awaited `requestAnimationFrame` alone, and a background tab -- or the
+  desktop app's hidden browser pane -- never fires it: a GeoTIFF upload sat at
+  "tile 9 of 9" indefinitely. It now settles on the frame or a 100 ms timer.
+- **A precomputed result is the live result, stored, or it is nothing.** Keyed
+  by the file's SHA-256, stamped with the model's, made by the browser's own
+  `segment` in Node (with a lossless PNG decoder; colour-managed or transparent
+  PNGs are refused, JPEG is flagged as decoder-dependent). A live WebGPU run on
+  a canvas decode and the stored WASM entry agreed on all 4,194,304 pixels of a
+  2048² tile. `FUTURE_WORK.md` §1.5.
+- **Rings are not detections.** A detection can be a MultiPolygon; April's 86
+  detections are 366 rings, and the view said "366 detections". The scene export
+  now records each ring's `feature`.
+- **Most of a real scene's detected area is rectangles.** Parts with a straight
+  axis-aligned edge of 1.2 km or more (the box-fill of `ISSUES.md` Q5) hold 80%,
+  93% and 91% of all detected area in the three scenes. Drawn alike with the
+  seed, they read as the spill (`ISSUES.md` F18). The export flags them
+  (`boxCut`) and the map offered four views (focus / seed only / no boxes /
+  all), until the user asked for the seed alone on 2026-09-24.
+- **A raster coast can delete real oil.** Smoothing the real parcels with the
+  authored scenes' blur and zeroing every raster-land cell left the December
+  90% outline holding 76% of the parcels at -72 h: they sit in delta passes
+  narrower than one 1/240° cell, water on GSHHG, land on the raster. The real
+  runs zero only *deep* land (`deepAshore`), and their outlines hold 91-97% and
+  53-70% of the parcels at every frame.
+- **Seed the shape, not the centre.** The real runs were seeded as a 500 m disc
+  at the seed's centroid, so a 9 km streak began -- and the view's T0 showed --
+  a point. Parcels are now drawn uniformly over the seed polygon
+  (`backend/drift/seeding.py`), the same positions for every member. OpenDrift
+  stores elements in reverse seeding order; compare sets, not sequences.
+- **The shape changes the age.** Seeded as a point, every real field widened
+  from T0 and returned `monotonic`. Seeded over the slick, April and May have a
+  convergence minimum 0.5 h and 1.7 h before the pass (ages 0.0 / 0.5 / 4.2 h and
+  0.0 / 1.7 / 7.3 h: fresh oil); December still never converges. Still nobody
+  is ranked: the fields are wind-only (X2), and the view now says so as E-X2
+  where it has an age and E-C1 where it has none.
+- **The forecast is OpenDrift's, forward.** The same parcels and members run
+  72 h forward on ERA5 wind fetched for the hours after each pass, with
+  `stranding`: April and May stay afloat (0%), December puts 60% of its oil on
+  the delta coast by +72 h. `forwardImpact` is the 90% outline every 12 h, as in
+  the authored scenes.
+- **Harness traps in the browser pane** (they cost an hour between them): with
+  the pane hidden, screenshots are stale or black and rAF never fires; the key
+  tool sends `shift+equal` and `minus` with an empty `e.key`, and `type` fires
+  no keydown at all; clicks by coordinate miss once a layout shifts (use refs);
+  an in-page `import('/src/...')` after HMR builds a second WebGPU session, and
+  a run on it can hang -- reload before comparing.
+
+## 2.18 Labelling pipeline and the oos verdict (2026-09-23, late evening)
+
+- **Vessel adjacency means distance to the slick, not its centroid.** With
+  CFAR finally run on the pilot (33 targets on the 16 calibrated tiles), the
+  proposer still proposed 0 `oos`: it measured target to centroid, and a long
+  trail's centroid is half a trail from the vessel at its end. Three pilot
+  trails with targets 150-215 m from the trail were deferred as "no bright
+  target within 300 px". `relabel.propose_all` now uses one distance transform
+  per mask; 3 `oos` proposals result. The same rule governs any adjacency test.
+- **Refined SOS cannot be CFAR'd.** Its PNGs are display-scaled 8-bit (D6);
+  CA-CFAR's threshold is derived for linear power. The pack says so per tile
+  rather than running a detector on the wrong quantity.
+- **The corpus has no acquisition times** (no GeoTIFF tags, no names), so the
+  rubric's wind gate cannot use ERA5 for any pilot tile; the pack shows the
+  median band-2 background as a sea-state hint and says it is not a wind.
+- **A simulated radar that thins by list position can drop the culprit.**
+  `cfarTargets` kept every fourth ship present at the pass; the named tanker at
+  its own slick's tip (gom-moving) and the moored vessel at its head
+  (gom-berthed) had no radar return. Every ship within 30 km of the slick now
+  returns one. Scoring never read `cfarTargets`, so no ranking moved.
+- **CFAR cannot tell a ship from a platform.** The Gulf around the delta is
+  dense with installations; 71 of the 85 December targets near the seed match no
+  AIS vessel. The verdict counts a target on a listed installation as nothing
+  and names an unmatched one "a dark vessel or an unlisted installation".
+- **Dark SAR wakes are narrow-V, not Kelvin.** A 19.47° Kelvin yardstick would
+  call almost nothing a wake; the verdict's V band is width slope 0.03-0.10
+  (half-angle up to ~3°) -- a project choice, recorded as uncalibrated (F19).
+- **The T0 button jumped to the span's start.** `eventSpan` had been widened
+  back into the hindcast while its docstring still said the pass was the floor;
+  `rewind` trusted the comment (F15). A stale comment is a bug with a delay.
+- **X10 reproduced exactly** (tz-aware start dies in pandas); `naive_utc` in
+  `opendrift_runner.run_drift` converts at the engine's entry.
+- **Harness:** Bash turns `'\\'` inside a heredoc'd Python string into `'\'`;
+  use `os.path.basename`. Long multi-line Python edits go in a scratch `.py`
+  file run with `python`, not a heredoc (the heredoc parser has failed on
+  backticks/quotes twice).
+
+## 2.19 Characterisation in the backend (PHASE-03, 2026-09-23/24, night)
+
+- **`skimage.morphology.medial_axis` is random unless seeded.** It breaks ties
+  in a random pixel order (`rng`, since 0.19). Unseeded, May's real seed
+  measured 8.45 km on one run and 8.12 km on the next. `rng=0` makes a
+  measurement repeat; it does not make it right.
+- **Pruning alone does not hold the ends, and neither does end-trimming
+  alone.** kutch-dark's second part measured 4.72 km on nine tie-break orders
+  and 5.61 km on the tenth: that order dropped one of a flat end's two corner
+  branches, so the survivor had no junction to be pruned back to, the path
+  ended in the corner, and the extension aimed at the end cap ran back across
+  the slick. What holds, all three together: thin to one pixel and remove
+  every end branch shorter than two half-widths at its junction, all at once,
+  until none is left; cut each end of the path back to the first point two
+  half-widths along it; carry each end on to the outline toward the middle of
+  its end cap, never more than 60° from the axis's outward direction. Across
+  ten tie-break orders the authored slicks now move 0.0-0.6% in length (they
+  moved up to 9.4%); `test_length_does_not_hang_on_the_skeleton_tie_break`.
+- **Aim the ends at the end cap, not along the skeleton.** On a wide, curving
+  part the skeleton's last pixels point ~20° off the ribbon, and the end landed
+  253 m along a 900 m end edge on mumbai-null. The middle of the end cap (the
+  pixels nearer the path's end than to any other point of it) puts the ends
+  3-15 m from the authored source tips (100 m on mumbai-null).
+- **An 8-connected pixel path overstates a line at 22.5° by 8%.** Simplify at
+  1.5 px before measuring length.
+- **The console's width mean counts gaps as zero** (`ISSUES.md` F20): 4-8
+  zero stations of 48 on the fragmented authored slicks.
+- **Ragged real seeds carry real ambiguity.** Tie-break sensitivity with the
+  final code: April 0.2%, December 1.0%, May 5.4% in length and 6.6% in mean
+  width -- May's seed is a blob in a 2.5 m/s sea whose axis is ill-defined. The
+  axis is traced on the outline closed then opened at a quarter of the typical
+  width: that cut May's width spread from 22% to 6.6% but moved April from 12.0
+  to 10.4 km, because its thin filaments drop out of the axis's route. Area and
+  widths stay on the exact outline. A person's measurement (Q6) is what would
+  say which is nearer.
+- **The real seeds, measured** (`scene.json` `characterisation`): April 10.4 km
+  x 300 m, damping -2.7 dB, 3.7 m/s (gate 1.0); May 8.4 km x 772 m, -1.9 dB,
+  2.5 m/s (gate 0.33); December 9.6 km x 318 m, -4.6 dB, 6.2 m/s (gate 1.0).
+  May's contrast is the weakest and its wind the lowest; both are also what a
+  natural film shows, and nothing here decides between them.
+- **December's oos verdict did not survive a better measurement.** On the
+  backend's geometry its unmatched bright target is 1.80 km from the nearest
+  end instead of ~1.6, and support falls from 0.51 to 0.45: unknown (F19).
+- **A real run must never get a synthetic radar tile.** The detect pane drew a
+  "synthesised" SAR tile whenever the damping was finite, and it stayed off
+  real runs only because their damping was NaN. With a measured damping it
+  would have appeared beside real data; it is now gated on the run not being
+  real (`panes.tsx`).
+- **Fay's surface-tension law is the only spreading law that needs no
+  volume.** The gravity stages need the oil volume per unit length, which C2
+  forbids reading off the damping. Solving l = 1.33 (sigma^2 t^3 / rho^2 nu)^(1/4)
+  (Fay 1971, one-dimensional; confirmed against EPA's *Oil Slick Dispersal
+  Mechanics* table) for t at the widest third of the slick gives the prior:
+  3.0-6.2 h April, 9.9-20.7 h May, 2.9-6.1 h December. Everything Fay leaves
+  out spreads oil faster, so it is a ceiling. It is never an age and never
+  goes in `DriftRun.age_*`. The 0.01-0.03 N/m spreading coefficient range is
+  the usual assumption for crude, not verified here.
+- **The TS verdict and its Python twin are pinned to one fixture.**
+  `check:verdict` asserts the TypeScript still gives the outputs recorded in
+  `tests/fixtures/characterise/verdict_cases.json`; `tests/test_verdict.py`
+  asserts the Python gives the same. Regenerate with
+  `npm run export:characterise-fixtures`, and only on purpose.
+- **A rounded speed moves a recomputed gate.** The export rounds wind to 0.01
+  m/s and the ramp moves 1/1.6 per m/s, so `check:realruns` allows 0.0032
+  between the exported gate and one recomputed from the rounded speed.
+- **Harness:** heredocs failed again on backticks (write the script with the
+  Write tool) and on `'\\'` (use `os.path.normpath`).
+
+## 2.20 The API and the live pipeline (FUTURE_WORK §3, 2026-09-24, session machine)
+
+Summary of what exists is in `FUTURE_WORK.md` §0; these are the findings.
+
+- **X4 is closed: the API exists** (`backend/app/`), file-backed because the
+  pooler is unreachable (X1, X12). Every `INTERFACES.md` §3 endpoint answers,
+  plus `POST /api/v1/runs` + SSE. Cold first reads took 0.4-1.5 s (parsing
+  12 MB GeoJSON, dissolving 146 contour features); `create_app` warms the
+  caches in a background thread, after which reads are 2-140 ms.
+- **The pipeline must run outside the API process.** A subprocess per run,
+  one at a time, writing `events.jsonl`; the API only reads that file. That is
+  what makes a late subscriber get the whole history (replay, then tail) and
+  what lets the API report a run whose process died (`"by": "api"`).
+- **CDS snaps a requested area inward to its 0.25° grid.** April's cached file
+  stops at 30.50 N for a request to 30.62 N. A "covering file" test with no
+  tolerance therefore rejects even the file fetched for the scene the window
+  was cut from. One grid step of tolerance matches what an exact fetch returns.
+- **The seed rule needed a size floor.** On the April window (one detection,
+  a filled box at the coast) every part was box-cut or ashore except a
+  1-pixel sliver, and the rule chose it. `MIN_SEED_KM2 = 0.05`; the window now
+  refuses at seed, which is the right answer for that window.
+- **Two-pass detection costs ~2% of area, not seeds** (the table in §0): the
+  missed area is small detections in tiles with no 2 dB region at 1/16; all
+  three seeds are found (IoU >= 0.9995). The screen reads the whole band once
+  (~27 s for a 3.6 GB scene) -- on this CPU that is as long as the model pass.
+- **CPU inference is ~0.15 s per 1024 px tile** after a ~1.7 s first-tile
+  warm-up (torch 2.11 CPU, 8 threads), so even a full 864-tile sweep is a few
+  minutes here; OpenDrift (~10-11 s per member) dominates a run.
+- **JSON has no NaN, and a refused age is a NaN triple.** `drift.json` was
+  already written through `json_safe`; the event writer was not, and the first
+  December run died at `origin_field` writing an event. Every event now goes
+  through `json_safe`.
+- **The refactor is byte-identical.** Moving the seed rule, frame builder and
+  on-raster helpers into `backend/` and re-running `export_real_scenes`'
+  functions reproduced all three committed `scene.json` files byte for byte.
+- **Harness:** editing a module Vite cannot hot-swap (`realAis.ts`) full-reloads
+  the console and drops an upload session in flight -- do not edit frontend
+  code while verifying a long upload. The browser pane was hidden this session,
+  so verification was DOM-only (no screenshots). A native file picker cannot be
+  driven; a GeoTIFF was staged temporarily in `public/` and dropped onto the
+  add-image zone as a real `File` (then deleted).
+
+## 2.21 Upload panel and a stage clock that ticks (2026-09-24, session machine)
+
+The three console fixes the §3 session left (ISSUES F21-F23, now closed).
+
+- **An async function can still hold the page.** `decodeGeoTiff` awaits
+  throughout, but geotiff.js on an ArrayBuffer source resolves every strip
+  read at once, so the whole decode -- every strip of every band, then the band
+  statistics and the 8-bit mapping over every pixel -- is one chain of
+  microtasks, and no timer fires until it ends. The Model Timing pane's clock
+  is a 100 ms interval, so "Decode raster" showed a few ms and then its final
+  figure. A `nextFrame()` after `stageStart` would only have painted the start.
+  The decode now runs in a module worker (`sim/geotiff.worker.ts`, started by
+  `sim/decodeOffThread.ts`, which falls back to the main thread if a worker
+  cannot start or dies). Measured on the December 2048 window, sampling the
+  row every 50 ms: the clock advanced every ~100 ms for the whole decode (6.6 s
+  that first time, on a freshly started dev server transforming the worker and
+  geotiff.js cold); the longest gap between samples was 75 ms. Idle and warm the
+  decode takes ~0.45 s on either thread, so the worker costs nothing: timed
+  back to back, the page got 0 timer ticks during a main-thread decode and 4
+  during a worker decode of 0.48 s.
+- **Time an upload on an idle machine.** With `npm run check` running (ONNX
+  in Node on every core) a dataset PNG's "Decode raster" read 11.3 s; idle it
+  is 83 ms. A slow stage figure measured beside another job is not a finding.
+- **geotiff.js's own `pool` would have lost the LZW fix.** Its workers keep
+  their own decoder registry, so the 4,096-entry decoder registered on the
+  main thread (`lzw.ts`, F16) would not be in them. The project's worker runs
+  `decodeGeoTiff` whole, which registers the fix on the worker's copy.
+- **Vite's default worker format cannot code-split,** and geotiff.js loads its
+  decompressors by dynamic import: `worker: { format: "es" }` in
+  `vite.config.ts`, or the build refuses the worker.
+- **`toDataURL` is a blocking PNG encode** (a 2048 square canvas, inside the
+  same stage). The GeoTIFF preview is now `canvas.toBlob` to an object URL.
+- **The add-image panel shows the uploaded image and the mask, nothing else.**
+  The mask is drawn over the uploaded image (which the model ran on) instead
+  of the despeckled copy. The user chose to keep the despeckled copy in the
+  detect pane and the full-size viewer, so the "Despeckle (display only)"
+  stage stays. The detect pane's mask figure now sits on the model input too.
+- **Every upload fronts Model Timing,** through the same `front()` the number
+  keys use (docked: select its tab; closed: reopen; floating: raise). Once per
+  upload, as it starts, so the operator can still switch away.
+- **Harness:** the browser pane's native width (~800 px) is under the console's
+  1,024 px narrow breakpoint, so it shows the phone layout with no dock;
+  `resize_window` 1280 x 880 gives the desktop layout. A dock tab clicked by
+  coordinate missed; `.click()` on its `[role=tab]` element works. The pane
+  does not support region zoom.
 
 ## Where the detailed evidence lives
 
