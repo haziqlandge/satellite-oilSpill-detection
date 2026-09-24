@@ -19,6 +19,10 @@ export default defineConfig({
   // onnxruntime-web locates its .wasm beside its own module URL; pre-bundling
   // it into .vite/deps moves the module and the runtime then 404s its binary.
   optimizeDeps: { exclude: ["onnxruntime-web"] },
+  // The GeoTIFF decode worker (`sim/geotiff.worker.ts`) imports geotiff.js,
+  // which loads its decompressors with dynamic imports; the default "iife"
+  // worker format cannot code-split, so the build would refuse it.
+  worker: { format: "es" },
   build: {
     rollupOptions: {
       output: {

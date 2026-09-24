@@ -243,24 +243,36 @@ export default function ConsoleShell() {
 
   /* --- panel keys --------------------------------------------------- */
 
+  // Front a pane wherever it currently lives. If it was closed, reopen it -- a
+  // shortcut that silently does nothing because the panel is not docked is
+  // worse than no shortcut.
+  const front = useCallback((id: PanelId) => {
+    const place = dock.layout[id];
+    if (place.kind === "dock") dock.setActive(place.side, id);
+    else if (place.kind === "closed") dock.reopen(id);
+    else dock.raise(id);
+  }, [dock]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (el && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const hit = PANELS.find((p) => p.key && p.key === e.key);
-      if (!hit) return;
-      const place = dock.layout[hit.id];
-      // The number keys front a pane wherever it currently lives. If it was
-      // closed, reopen it -- a shortcut that silently does nothing because the
-      // panel is not docked is worse than no shortcut.
-      if (place.kind === "dock") dock.setActive(place.side, hit.id);
-      else if (place.kind === "closed") dock.reopen(hit.id);
-      else dock.raise(hit.id);
+      if (hit) front(hit.id);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [dock]);
+  }, [front]);
+
+  // Every upload brings the Model Timing pane forward, once, as it starts, so
+  // its stages are seen running without a click (the user, 2026-09-24).
+  const frontedUpload = useRef(0);
+  useEffect(() => {
+    if (sampleSession.state !== "processing" || sampleSession.startedAt === frontedUpload.current) return;
+    frontedUpload.current = sampleSession.startedAt;
+    front("modelTiming");
+  }, [sampleSession.state, sampleSession.startedAt, front]);
 
   /* --- panel bodies -------------------------------------------------- */
 

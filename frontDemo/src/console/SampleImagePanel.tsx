@@ -33,7 +33,8 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactN
 import { Flag, GroupHead, SCROLL } from "./components";
 import { DEMO_PRESETS, DEMO_SAMPLE_KEYS, type DemoSampleKey } from "../site/demoData";
 import { DB_WINDOW, parseAcquisitionTime, ribbonFromMask, type Ribbon } from "../sim/ingest";
-import { decodeGeoTiff, looksLikeTiff, type GeoRaster } from "../sim/geotiff";
+import { looksLikeTiff, type GeoRaster } from "../sim/geotiff";
+import { decodeGeoTiffOffThread } from "../sim/decodeOffThread";
 import { isAbort, loadManifest, loadSegmenter, segment, type Segmentation } from "../sim/segmenter";
 import { findPrecomputed, sha256Hex, toSegmentation, type PrecomputedEntry } from "../sim/precomputed";
 import { despeckle } from "../sim/despeckle";
@@ -157,6 +158,25 @@ function greyToDataUrl(rgba: Uint8ClampedArray, width: number, height: number): 
   frame.data.set(rgba);
   ctx.putImageData(frame, 0, 0);
   return canvas.toDataURL("image/png");
+}
+
+/**
+ * The same picture as `greyToDataUrl`, as an object URL, encoded by
+ * `canvas.toBlob` so the page keeps painting. `toDataURL` encodes a 2048
+ * square PNG in one blocking call, and inside "Decode raster" that stalled the
+ * stage's live clock (ISSUES.md F23) just as the decode itself used to.
+ */
+async function greyToObjectUrl(rgba: Uint8ClampedArray, width: number, height: number): Promise<string> {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "";
+  const frame = ctx.createImageData(width, height);
+  frame.data.set(rgba);
+  ctx.putImageData(frame, 0, 0);
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  return blob ? URL.createObjectURL(blob) : canvas.toDataURL("image/png");
 }
 
 /**
@@ -577,7 +597,8 @@ export async function uploadSample(file: File) {
     let previewUrl = url;
 
     if (tiff) {
-      const decoded = await decodeGeoTiff(file);
+      // In a worker, so the stage's clock keeps ticking while it decodes.
+      const decoded = await decodeGeoTiffOffThread(file);
       if (sequence !== uploadSequence) return;
       if (!decoded.ok) {
         failRunning();
@@ -591,7 +612,8 @@ export async function uploadSample(file: File) {
       // A browser cannot render a TIFF in an <img>, so the preview is the
       // 8-bit raster this panel just derived -- which is also exactly what the
       // screen saw, so the figure cannot disagree with the measurement.
-      previewUrl = greyToDataUrl(geo.rgba, width, height);
+      previewUrl = await greyToObjectUrl(geo.rgba, width, height);
+      if (sequence !== uploadSequence) { URL.revokeObjectURL(previewUrl); return; }
       publish({ sourceUrl: previewUrl, geo, parsedAcquiredAt: geo.acquiredAt ?? session.parsedAcquiredAt });
       URL.revokeObjectURL(url);
     } else {
@@ -696,6 +718,8 @@ export async function uploadSample(file: File) {
 
     // Despeckled for the eye, through the dB window the grey was rendered with:
     // the GeoTIFF's own mapping, or the corpus window a PNG was written through.
+    // The detect pane and the full-size viewer offer it; the add-image panel
+    // shows only the uploaded image and the mask.
     stageStart("Despeckle (display only)", "Lee 7x7");
     await nextFrame();
     const [lowDb, highDb] = geo?.scaledThroughWindow ? [geo.mappedLow, geo.mappedHigh] : DB_WINDOW;
@@ -704,7 +728,8 @@ export async function uploadSample(file: File) {
     stageEnd("Despeckle (display only)", "done", "Lee 7x7");
     publish({ cleanUrl });
 
-    const preview = await overlay(cleanUrl, outcome.ribbon, segmented);
+    // Over the uploaded image the model ran on, not the despeckled copy.
+    const preview = await overlay(previewUrl, outcome.ribbon, segmented);
     if (sequence !== uploadSequence) return;
     const markUrl = maskLayer(segmented, outcome.ribbon);
 
@@ -816,11 +841,11 @@ export function UploadEvidenceImages() {
   const current = useSampleSession();
   const [open, setOpen] = useState<ViewerTarget | null>(null);
   if (!current.sourceUrl) return null;
-  const drawn = current.ribbon?.method === "segmenter" ? "Segmented slick · over the despeckled copy" : "Screened boundary";
+  const drawn = current.ribbon?.method === "segmenter" ? "Segmented slick · over the model input" : "Screened boundary";
   const figures: [string, string | null, ViewerTarget][] = [
     ["Uploaded raster · model input, as the segmenter saw it", current.sourceUrl, { layer: "input", mask: false }],
     ["Despeckled · Lee 7x7, display only", current.cleanUrl, { layer: "clean", mask: false }],
-    [drawn, current.maskUrl, { layer: "clean", mask: true }],
+    [drawn, current.maskUrl, { layer: "input", mask: true }],
   ];
   return <div className="grid gap-2 p-2" data-upload-evidence>
     {figures.map(([label, url, target]) =>
@@ -1042,28 +1067,30 @@ export function SampleImagePanel({ onSelect }: { onSelect: (id: ScenarioId) => v
       <p className="num text-[10px]" style={{ color: "var(--ink-faint)" }}>{current.sourceName}</p>
       <PrecomputedControl s={current} />
 
-      {current.cleanUrl && <div className="grid grid-cols-2 gap-2" data-upload-pair>
-        {[["Model input", "band 2 as the segmenter saw it", current.sourceUrl],
-          ["Despeckled", "Lee 7x7 · display only", current.cleanUrl]].map(([title, note, url]) =>
-          <figure key={title} className="border" style={{ borderColor: "var(--line)" }}>
-            <figcaption className="px-2 py-1 text-[10px] uppercase">{title}
-              <span className="block normal-case" style={{ color: "var(--ink-faint)" }}>{note}</span></figcaption>
-            {url && <img src={url} alt={title ?? ""} className="mx-auto block max-h-40 object-contain"
-              style={{ background: "var(--ink-void, #0b0f12)" }} />}
-          </figure>)}
+      {/* Only the uploaded image and the mask here (the user, 2026-09-24): the
+          despeckled copy is display-only and lives in the detect pane and the
+          full-size viewer. The image shows once decoded -- a TIFF has no
+          picture before that -- and the mask once the model has run. */}
+      {(current.step >= 1 || current.maskUrl) && <div className="grid gap-2" data-upload-pair>
+        <figure className="border" style={{ borderColor: "var(--line)" }} data-upload-input>
+          <figcaption className="px-2 py-1 text-[10px] uppercase">Uploaded image
+            <span className="block normal-case" style={{ color: "var(--ink-faint)" }}>
+              {current.geo ? `band ${current.geo.band}` : "the raster"} as the segmenter saw it</span></figcaption>
+          <img src={current.sourceUrl} alt="uploaded image" className="mx-auto block max-h-56 object-contain"
+            style={{ background: "var(--ink-void, #0b0f12)" }} />
+        </figure>
+        {current.geo && current.geo.noDataFraction > 0.001 &&
+          <p className="text-[10px]" style={{ color: "var(--ink-faint)" }} data-no-data-note>
+            {(current.geo.noDataFraction * 100).toFixed(0)}% of this frame is no data — outside the
+            satellite's swath, stored as zeros in the file. The model is given it as white, exactly as
+            in training, and is told to ignore it.</p>}
+        {current.maskUrl && <figure className="border" style={{ borderColor: "var(--line)" }}>
+          <figcaption className="px-2 py-1 text-[10px] uppercase">Mask · shaded: everything the model marked · outline: the slick drifted
+            <span className="block normal-case" style={{ color: "var(--ink-faint)" }}>drawn over the uploaded image, which is what the model ran on</span></figcaption>
+          <img src={current.maskUrl} alt="segmented slick" className="mx-auto block max-h-56 object-contain"
+            style={{ background: "var(--ink-void, #0b0f12)" }} data-mask-ready />
+        </figure>}
       </div>}
-      {current.cleanUrl && current.geo && current.geo.noDataFraction > 0.001 &&
-        <p className="text-[10px]" style={{ color: "var(--ink-faint)" }} data-no-data-note>
-          {(current.geo.noDataFraction * 100).toFixed(0)}% of this frame is no data — outside the
-          satellite's swath, stored as zeros in the file. The model is given it as white, exactly as
-          in training, and is told to ignore it; the despeckled copy shows it hatched.</p>}
-
-      {current.maskUrl && <figure className="border" style={{ borderColor: "var(--line)" }}>
-        <figcaption className="px-2 py-1 text-[10px] uppercase">Segmented from your pixels · shaded: everything the model marked · outline: the slick drifted
-          <span className="block normal-case" style={{ color: "var(--ink-faint)" }}>drawn over the despeckled copy; the model ran on the input</span></figcaption>
-        <img src={current.maskUrl} alt="segmented slick" className="mx-auto block max-h-56 object-contain"
-          style={{ background: "var(--ink-void, #0b0f12)" }} data-mask-ready />
-      </figure>}
 
       {m && <div className="space-y-1 border p-2" style={{ borderColor: "var(--line)" }}>
         <p className="text-[10px] uppercase" style={{ color: "var(--ink-faint)" }}>measured from this raster</p>
