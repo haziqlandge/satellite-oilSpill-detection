@@ -9,12 +9,27 @@ through, so both are written beside it as `frontDemo/public/runs/<scene>/scene.j
   its confidence. They follow pixel edges, which makes the files 1.6-12 MB; each
   ring is simplified to 0.0002 degrees (~20 m, two Sentinel-1 pixels) with its
   topology preserved, which is invisible at any zoom the console uses. The
-  polygon the drift was seeded from (`choose_seed`) is flagged.
-* **Wind** is read from the SAME cached ERA5 request the drift used, at the
-  seed, hour by hour. `DEMO_OFFLINE=1` is set so this can only read the cache:
+  polygon the drift was seeded from (`choose_seed`) is flagged, and so is every
+  polygon that filled its inference box (`boxCut`, ISSUES Q5), so the view can
+  tell a traced slick from a rectangle.
+* **Radar targets** come from CA-CFAR (`backend/detect/cfar`) on the processed
+  sigma0 scene, band 2, within 15 km of the seed: the bright returns a vessel or
+  an installation makes, which the downstream oos verdict looks for at the ends
+  of the slick (`frontDemo/src/sim/verdict.ts`). Needs the 3.6 GB scene; without
+  it the file says CFAR was not run rather than that nothing was there.
+* **Wind** is read from the SAME cached ERA5 requests the drift used -- the
+  72 h before the pass for the hindcast, the 72 h after it for the forecast
+  (`wind_requests`) -- at the seed, hour by hour. `DEMO_OFFLINE=1` is set so this can only read the cache:
   a wind series that was fetched separately would not be the wind the particles
   felt. There is no current field (ISSUES X2), and the file says so rather than
   writing zeros that look like a measurement.
+* **Characterisation** of the seed detection is the backend's PHASE-03 record
+  (`backend/characterize`): geometry measured from the unsimplified polygon in
+  an equal-area projection, the damping ratio against clean sea on the same
+  processed scene and band (land from GSHHG, every other detection and SNAP's
+  zero fill kept out of the annulus), and the wind gate from the backward
+  request's ERA5 at the seed at the pass. Without the scene the damping is
+  written as not measured, never as a number.
 
     .venv/Scripts/python.exe -m scripts.export_real_scenes
 """
@@ -22,84 +37,67 @@ through, so both are written beside it as `frontDemo/public/runs/<scene>/scene.j
 from __future__ import annotations
 
 import json
-import math
 import os
-from datetime import timedelta
 from pathlib import Path
 
-import numpy as np
-
+from backend.characterize.onraster import (
+    CFAR_RADIUS_KM,
+    cfar_near_seed,
+    characterise_seed_on,
+    seed_damping,
+    wind_series,
+)
+from backend.drift.frames import SIMPLIFY_DEG, detection_rings
 from scripts.export_drift_runs import (
     BACKWARD_HOURS,
+    FORWARD_HOURS,
     OUT,
     SCENES,
     choose_seed,
-    polygon_parts,
     scene_acquired_at,
-    scene_bbox,
+    wind_requests,
 )
 
-SIMPLIFY_DEG = 0.0002
+__all__ = ["CFAR_RADIUS_KM", "cfar_near_seed", "characterise_seed", "detections", "seed_damping", "wind"]
+
+SAR = Path(__file__).resolve().parents[1] / "data" / "processed" / "sar"
+
+
+def characterise_seed(path: Path, *, raster: Path | None = None) -> dict[str, object]:
+    """The backend characterisation (PHASE-03) of the detection the drift was seeded from."""
+
+    from backend.ingest.metocean.cache import fetch_with_cache
+    from backend.ingest.metocean.era5 import fetch_era5_wind
+
+    seed = choose_seed(path)
+    acquired = scene_acquired_at(path.stem)
+    assert acquired is not None
+    raster = raster if raster is not None else SAR / f"{path.stem}.tif"
+    back, _ = wind_requests(path)
+    os.environ["DEMO_OFFLINE"] = "1"
+    return characterise_seed_on(
+        json.loads(path.read_text()), seed, raster=raster,
+        wind_nc=fetch_with_cache(back, fetch_era5_wind), acquired=acquired, detection_id=f"{path.stem}-seed",
+    )
 
 
 def detections(path: Path) -> list[dict[str, object]]:
-    seed = choose_seed(path)
-    out: list[dict[str, object]] = []
-    for fi, pi, polygon, confidence in polygon_parts(json.loads(path.read_text())):
-        simple = polygon.simplify(SIMPLIFY_DEG, preserve_topology=True)
-        if simple.is_empty or simple.geom_type != "Polygon":
-            continue
-        ring = [[round(x, 5), round(y, 5)] for x, y in simple.exterior.coords]
-        out.append({
-            "ring": ring,
-            "confidence": round(confidence, 4),
-            # The same polygon the drift export seeded from, by position.
-            "seed": (fi, pi) == (seed.feature, seed.part),
-        })
-    return out
+    return detection_rings(json.loads(path.read_text()), choose_seed(path), simplify_deg=SIMPLIFY_DEG)
 
 
 def wind(path: Path) -> dict[str, object]:
-    import xarray as xr
-
     from backend.ingest.metocean.cache import fetch_with_cache
-    from backend.ingest.metocean.era5 import fetch_era5_wind, wind_request
+    from backend.ingest.metocean.era5 import fetch_era5_wind
 
     acquired = scene_acquired_at(path.stem)
     assert acquired is not None
-    seed = choose_seed(path).centre
-    bbox, _ = scene_bbox(path)
-    # Exactly the request `export_drift_runs.export_scene` made.
-    request = wind_request(
-        west=bbox[0], south=bbox[1], east=bbox[2], north=bbox[3],
-        start=acquired - timedelta(hours=BACKWARD_HOURS + 1),
-        end=acquired + timedelta(hours=1),
-    )
+    # Exactly the requests `export_drift_runs.export_scene` made.
+    back, ahead = wind_requests(path)
     os.environ["DEMO_OFFLINE"] = "1"
-    nc = fetch_with_cache(request, fetch_era5_wind)
-    with xr.open_dataset(nc) as ds:
-        time_name = "valid_time" if "valid_time" in ds.coords else "time"
-        lat_name = "latitude" if "latitude" in ds.coords else "lat"
-        lon_name = "longitude" if "longitude" in ds.coords else "lon"
-        at = ds.sel({lat_name: seed[1], lon_name: seed[0]}, method="nearest")
-        hours, speed, from_deg = [], [], []
-        for h in range(-BACKWARD_HOURS, 1):
-            instant = np.datetime64(acquired + timedelta(hours=h))
-            row = at.sel({time_name: instant}, method="nearest")
-            u, v = float(row["u10"]), float(row["v10"])
-            hours.append(h)
-            speed.append(round(math.hypot(u, v), 2))
-            # Meteorological convention: the direction the wind blows FROM.
-            from_deg.append(round((math.degrees(math.atan2(-u, -v)) + 360) % 360, 1))
-        grid = [round(float(at[lon_name]), 3), round(float(at[lat_name]), 3)]
-    return {
-        "source": "ERA5 10 m wind (u10, v10), the cached request the drift ran on",
-        "gridPoint": grid,
-        "hours": hours,
-        "ms": speed,
-        "fromDeg": from_deg,
-        "current": "none: no current field (CMEMS has no credentials, ISSUES X2); the drift is wind-driven",
-    }
+    return wind_series(
+        fetch_with_cache(back, fetch_era5_wind), fetch_with_cache(ahead, fetch_era5_wind),
+        choose_seed(path).centre, acquired, hours=BACKWARD_HOURS, forward=FORWARD_HOURS,
+    )
 
 
 def main() -> int:
@@ -110,9 +108,13 @@ def main() -> int:
             continue
         found = detections(path)
         series = wind(path)
+        radar = cfar_near_seed(SAR / f"{path.stem}.tif", choose_seed(path).centre)
+        character = characterise_seed(path)
         payload = {
             "scene": path.stem,
             "detections": found,
+            "cfar": radar,
+            "characterisation": character,
             "detectionSource": "release model (L1-ciou research) on the full scene, eval/final/scenes; "
                                f"rings simplified to {SIMPLIFY_DEG} deg",
             "wind": series,
@@ -122,7 +124,15 @@ def main() -> int:
         seeds = sum(1 for d in found if d["seed"])
         hours = series["hours"]
         assert isinstance(hours, list)
-        print(f"{path.stem[17:32]}: {len(found)} polygons ({seeds} seed), "
+        features = len({d["feature"] for d in found})
+        boxes = sum(1 for d in found if d["boxCut"])
+        print(f"{path.stem[17:32]}: seed {character['lengthKm']} km long, {character['widthMMean']} m wide, "
+              f"damping {character['dampingRatioDb']} dB, wind {character['windSpeedMs']} m/s "
+              f"(gate {character['windGateMultiplier']}), Fay prior "
+              f"{character['agePrior']['lowHours']}-{character['agePrior']['highHours']} h")  # type: ignore[index]
+        print(f"{path.stem[17:32]}: CFAR {radar['status']}, {len(radar['targets'])} targets within "  # type: ignore[arg-type]
+              f"{CFAR_RADIUS_KM:.0f} km of the seed")
+        print(f"{path.stem[17:32]}: {features} detections, {len(found)} polygons ({seeds} seed, {boxes} box-filled), "
               f"{len(hours)} wind hours, {out.stat().st_size / 1024:.0f} KB")
     return 0
 
