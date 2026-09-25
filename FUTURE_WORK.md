@@ -8,7 +8,7 @@ Items marked **[4060 Ti]** needed training; the work now lives on that machine
 
 ---
 
-## 0. Start here (written 2026-09-25, end of the 4060 Ti sessions; the work returns to the session machine)
+## 0. Start here (written 2026-09-25, late night; the work stays on the 4060 Ti)
 
 Read `CLAUDE.md` first, then this section. **Replace this section when its
 contents are done** — do not append a second one.
@@ -18,115 +18,95 @@ contents are done** — do not append a second one.
 A **local** demo plus a public live site
 (`satellite-oil-spill-detection.vercel.app`, built by Vercel from `main`).
 The user is Haziq. Commit as them via `commitskill` and **never add AI
-attribution**; commit only when the user asks. The user verifies in the browser
-pane and wants the same from you: reload (and confirm it), view at about
-**z9**, screenshot.
+attribution**; commit only when the user asks.
 
-**Everything below was done on the RTX 4060 Ti machine and is uncommitted.**
-It reaches the session machine as a zip. Unzip it at the repository root
-(`HANDOFF_README.txt` inside says how), then run
-`.venv/Scripts/python.exe -m scripts.repath_artifacts --check`. The session
-machine keeps all data inside the repository: **point at its own in-repo
-datasets**, not the `E:`/junction paths some docs mention (`CLAUDE.md` §2).
-**No remaining plan item needs the GPU.** Only a retrain would, for example on
-two-class labels if B1 is ever done.
+- **This checkout has no `.git`.** `CLAUDE.md` §1 says how to commit through a
+  side clone.
+- **The user verifies in the browser pane** and wants the same from you:
+  reload (and confirm it), view at about **z9**, screenshot.
+- **The work stays on the RTX 4060 Ti** (user decision, 2026-09-25). The
+  hand-off zip of the previous session is obsolete; nothing needs copying
+  back.
 
-### Progress (counted 2026-09-25)
+### Progress
 
-**All 27 items are done, or done up to a step only the user can take.**
+**All 27 items are done, or done up to a step only the user can take**
+(counted 2026-09-25; the counts are in `PREVIOUS_WORK.md` §2.26).
 
-- §1: 6/6. §3: 6/6.
-- §2: 6/6. §2.6's verified delete list is `eval/cleanup/delete_list.json`
-  (9 archives, 91 GB on the 4060 Ti); deleting is the user's step.
-- §4: 3/3.
-  - §4.2: Vercel serves the static build; the real runs and ONNX are now
-    committable (`.gitignore`), and a git-only `npm ci && npm run build` was
-    verified. It completes on the user's next push.
-  - §4.3: `VITE_API_BASE` + `API_CORS_ORIGINS` let a hosted pipeline plug in
-    unchanged.
-- §5: 6/6.
-  - 03 and 06: done earlier.
-  - 07: all 8 acceptance lines evidenced (reads ≤ 298 ms after warm-up;
-    52,122 AIS points play at ~70 fps).
-  - 08: `eval/RESULTS.md` + `eval/COMPARISON.md`, with the not-met lines
-    reported.
-  - 09: the network-off run and Supabase seeding were superseded by user
-    decisions (always online; no Supabase), recorded in
-    `PLAN/CONSTRAINTS.md` C12.
-  - 10: the region registry, two new zones (Ennore, Paradip) and the INCOIS
-    cross-check.
+- **Everything up to the previous session is pushed**: `f215bec` on `main`.
+- **Vercel was checked after that push.**
+  - The real views load, with the REAL tag, ERA5 / CMEMS flow cards,
+    342 recorded ships and "sourced from" lines.
+  - The ONNX model and every `runs/` file answer 200 (they were 404).
 
-Several acceptance lines are **measured and not met**, and stay reported:
+**Measured and not met, still reported:**
 
 - mAP .36 against .90;
-- Case 3's ablation (Q7);
-- Case 2's source 0.13 km outside the contour;
-- degenerate ages (F5);
-- the Ennore reach about 3.4 times too long (X17).
+- Q7, Case 3's ablation;
+- Case 2's source is 0.13 km outside its contour;
+- F5, degenerate ages;
+- X17, the Ennore reach is 3.4× too long.
 
-### What this last session added (all 2026-09-25)
+### What this session did (2026-09-25, late night)
 
-- **Currents.** `backend/ingest/metocean/cmems.py`. The toolbox logs in
-  through the `CDSE_*` pair (Marine password now equals CDSE). The three real
-  runs are regenerated on ERA5 + CMEMS. **X9** (per-member wind timing) and
-  **F20** are closed.
-- **Map.** A few large wind/current arrows, each a cell's mean
-  (`sim/flow.ts`, `backend/drift/flow.py` → `scene.json` `flow`). A stack of
-  flow cards at top right (SIM-tagged only). "Sourced from …" or SIM tags in
-  the panels. The refusal banner is gone from the map (pane 04 keeps it).
-  Panel prose clamps to 2–3 lines. Real runs with no AIS draw display-only
-  SIM traffic.
-- **MapLibre 6.11.2** (critical XSS fixed). Import it from
-  `frontDemo/src/map/maplibre.ts` only (worker URL).
-- **Tooling.**
-  - `scripts/verify_offline.py`, `export_snapshot.py`, `archive_cleanup.py`,
-    `ennore_crosscheck.py`;
-  - `npm run export:evaluation`;
-  - `demo/WALKTHROUGH.md`;
-  - offline land (`map/offlineLand.ts`).
-- **Regions.** `frontDemo/src/sim/regions.json` (read by `sim/regions.ts` and
-  `backend/regions.py`) drives:
-  - the API's region label;
-  - the AIS footprint;
-  - the bundled landmask;
-  - the evidence-card zone caveats.
+- **Committed and pushed** the 4060 Ti work (`f215bec`).
+- **Full verification**, which turned up two regressions, both fixed:
+  - `check:apiruns` crashed under Node (`import.meta.env`);
+  - mypy flagged one error.
+- **"Add image", end to end** (`PREVIOUS_WORK.md` §2.27):
+  - **Measured forcing in the browser.** A browser upload now drifts on ERA5
+    wind and Copernicus Marine SMOC currents for its own place and time,
+    fetched from Open-Meteo (`sim/metocean.ts`).
+  - **Recorded AIS** when a hosted export covers the upload.
+  - **New check:** `check:metocean` pins the wind/current conventions.
+  - **The local pipeline was re-run** on the same file.
+  - **Timeless GeoTIFFs** (Zenodo tiles) reach the pipeline with the time the
+    operator states. The pipeline used to refuse them.
+- **F25 fixed:** a linked API run opens after a reload.
+- **Then (2026-09-26) the console was re-laid for one view**
+  (`PREVIOUS_WORK.md` §2.28):
+  - moving wind and current streaks, and ships drawn as hulls;
+  - the default view is Real · 2023-05-15 at z 8.24;
+  - denser panels with visible scrolling;
+  - term bars on panel 05's figure;
+  - add image side by side;
+  - Model Timing follows the run;
+  - two more AIS days (72 h for every real run).
+- **A trap:** the browser pane's link keeps whatever `?scenario=` was last
+  picked. Reload on plain `#/console` to see the default, and do so before
+  showing the user anything.
 
-  Scenarios `ennore-anchored` and `paradip-spm` rank their truth first and
-  are in the Python parity fixtures.
+### Verification state
 
-### Verification state at hand-off
+- pytest **677 passed, 8 skipped**.
+- ruff and mypy clean (147 files).
+- `tsc -b` clean.
+- **15** `npm run check` scripts (`check:metocean` is new).
+- The build succeeds.
 
-- **Last full run** (before the Phase 10 and panel-clamp changes): pytest
-  **667 passed, 8 skipped**, ruff and mypy clean (144 files), all 14
-  `npm run check` scripts passed, and the build succeeded.
-- **After those changes, run individually and all passing:**
-  - the attribution / verdict / geometry / landmask / API / AIS-clip tests
-    (114);
-  - `test_attribution` on 7 scenarios (26);
-  - CORS (2);
-  - `tsc -b`;
-  - `check:scenarios`, `check:corridors`, `check:realruns`;
-  - the `vite preview` production build.
-- **First job on the session machine: run the full verification** (below),
-  and fix whatever it turns up before anything else.
+Re-run everything after any further edit.
 
 ### NEXT, in order
 
-1. **Verify** (below). Expected about 670 passed; update the baseline in
-   `CLAUDE.md` §7.
-2. **The user commits and pushes**, then checks the Vercel site's Real views
-   and flow arrows.
-3. **X16**, then ranking a real field. Port the console's `densityGrid` into
-   `backend/attribute/field.py` with parity fixtures. Nothing real is
-   rankable today.
-4. **X17:** try hourly or tidal currents for the Ennore cross-check before
-   trusting forecast reach.
-5. **X14:** move the AIS export into `backend/ingest/ais/`.
+1. **The user commits and pushes** this session's work. The browser upload's
+   measured forcing reaches Vercel only then. After the push, upload the
+   December window there and check that pane 02 says "sourced from ERA5 10 m
+   (Open-Meteo)".
+2. **X16**, then ranking a real field. Port `densityGrid` into
+   `backend/attribute/field.py` with parity fixtures. This is backend work;
+   the user has paused backend work for now.
+3. **X17.** No hourly or tidal current product covers 2017 (CMEMS hourly
+   starts 2022-06; SMOC 2022). The next step is a tidal model (FES or TPXO)
+   added to the daily reanalysis. Ask before downloading one.
+4. **X14:** move the AIS export into `backend/ingest/ais/` (backend).
+5. **AIS for uploads on days not on disk.** For US waters, the pipeline could
+   download the marinecadastre day zip (~300 MB a day). Downloads need the
+   user's yes. Outside US waters there is no free source (F14).
 6. **Waiting on a person:**
    - B1 labels;
    - the Q6 QGIS measurement;
-   - X7 (the Case 3 acquisition);
-   - the §2.6 deletions;
+   - X7, the Case 3 acquisition;
+   - the §2.6 deletions (`eval/cleanup/delete_list.json`);
    - F17;
    - the `PositionPicker` review;
    - paid AIS outside US waters.
@@ -147,13 +127,22 @@ cd frontDemo && npx tsc -b && npm run check && npm run build
 
 - **Vercel ships only what git carries.** Keep `frontDemo/public/runs/` and
   `*.onnx` committed.
-- **MapLibre 6 needs its worker handed over:** import it from
+- **MapLibre 6 needs its worker handed over.** Import it from
   `map/maplibre.ts`.
+- **`import.meta.env` is Vite's.** Code the Node checks import must use
+  `import.meta.env?.`.
+- **Vite serves nothing outside `frontDemo/`** (403 on `/@fs/`).
+  - To drive an upload in the browser pane, copy the file into
+    `frontDemo/public/_uploadtest/`.
+  - Feed it to the panel's file input with a `DataTransfer`.
+  - Delete the copy afterwards.
+- **A deep link needs a reload.** `?scenario=` is read once at start;
+  changing only the hash does nothing.
 - **A real scene's `detection.parts` is the whole 250 km scene.** Use
   `spillParts` for anything about the spill.
-- **The Marine toolbox prompts on stdin without credentials**, and reports a
+- **The Marine toolbox prompts on stdin without credentials.** It reports a
   refused login with an empty message (`PREVIOUS_WORK.md` §2.24).
-- **`realRun.ts` does not hot-swap:** reload and confirm it.
+- **`realRun.ts` does not hot-swap.** Reload and confirm it.
 - **The console's boot screen hides the map under load.** Wait for
   `__map.loaded()`.
 - **Heredocs break on quotes and backslashes.** Write scripts with the Write

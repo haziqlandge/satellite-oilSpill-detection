@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "check": "npm run check:hindcast && npm run check:realdrift && npm run check:realais && npm run check:realruns && npm run check:apiruns && npm run check:ingest && npm run check:geotiff && npm run check:segmenter && npm run check:precomputed && npm run check:verdict && npm run check:release && npm run check:scenarios && npm run check:landmask && npm run check:corridors",
+    "check": "npm run check:hindcast && npm run check:realdrift && npm run check:realais && npm run check:realruns && npm run check:apiruns && npm run check:ingest && npm run check:geotiff && npm run check:segmenter && npm run check:precomputed && npm run check:verdict && npm run check:release && npm run check:scenarios && npm run check:landmask && npm run check:corridors && npm run check:metocean",
     "check:hindcast": "tsx scripts/check-hindcast.ts",
     "check:landmask": "tsx scripts/check-landmask.ts",
     "check:corridors": "tsx scripts/check-corridors.ts",
@@ -28,7 +28,8 @@
     "build:sample-geometry": "tsx scripts/extract-sample-geometry.ts",
     "check:realais": "tsx scripts/check-real-ais.ts",
     "check:realruns": "tsx scripts/check-real-runs.ts",
-    "check:apiruns": "tsx scripts/check-api-runs.ts"
+    "check:apiruns": "tsx scripts/check-api-runs.ts",
+    "check:metocean": "tsx scripts/check-metocean.ts"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.1.0",

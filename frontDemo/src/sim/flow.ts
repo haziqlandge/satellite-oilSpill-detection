@@ -5,9 +5,8 @@
  * One grid per run (`FlowGrid`), sampled once: from the analytic `Forcing` for
  * an authored run (`sampleFlowGrid`, labelled SIM), and from ERA5 and CMEMS for
  * a real one (`backend/drift/flow.py`, written into `scene.json`). The map reads
- * it at a handful of sites on and around the event -- the slick, the hindcast
- * and the forecast -- never across the whole view: arrows everywhere would bury
- * the one thing the view is about.
+ * it only on and around the event -- the slick, the hindcast and the forecast
+ * (`map/FlowStreaks.ts`), never across the whole view.
  *
  * A value the grid does not have (outside its hours or box, or a current node on
  * land) is null and draws no arrow. Nothing is extrapolated.
@@ -21,8 +20,6 @@ export type Bbox = [west: number, south: number, east: number, north: number];
 
 /** Nodes per side of a run's grid. 10 x 10 over the event is finer than any arrow spacing drawn from it. */
 const GRID_NODES = 10;
-/** Arrow cells across the event's longer side: a few arrows, each an average, never a scatter. */
-const CELLS_ACROSS = 3;
 
 /**
  * The spill itself: a real scene's detection holds every polygon in a 250 km
@@ -166,49 +163,6 @@ export function flowAt(grid: FlowGrid, kind: "wind" | "current", p: LngLat, hour
 /** Speed and the bearing the vector points toward, degrees true. */
 export function speedToward([u, v]: [number, number]): { speed: number; towardDeg: number } {
   return { speed: Math.hypot(u, v), towardDeg: (((Math.atan2(u, v) * 180) / Math.PI) % 360 + 360) % 360 };
-}
-
-/**
- * Where the arrows go: a few coarse cells over the event, one arrow per kind in each.
- *
- * The event is every ring given -- the slick, each hour's 90% hindcast and
- * forecast region. Its box is cut into about CELLS_ACROSS cells along its
- * longer side, and a cell is kept when a ring vertex falls in it. Each arrow
- * is that cell's AVERAGE flow (`flowMean`), so a handful of arrows shows the
- * general movement rather than a scatter of point samples. Wind and current
- * sit a quarter cell either side of the centre, so the two never stack.
- */
-export function flowCells(rings: LngLat[][]): { centre: LngLat; bbox: Bbox; wind: LngLat; current: LngLat }[] {
-  const vertices: LngLat[] = [];
-  for (const ring of rings) for (const p of ring) if (Number.isFinite(p[0]) && Number.isFinite(p[1])) vertices.push(p);
-  if (!vertices.length) return [];
-  const [west, south, east, north] = ringsBbox(rings, 0.05);
-  const kx = kmPerDegLon((south + north) / 2);
-  const widthKm = (east - west) * kx;
-  const heightKm = (north - south) * KM_PER_DEG_LAT;
-  const stepKm = Math.max(widthKm, heightKm) / CELLS_ACROSS;
-  const nx = Math.max(1, Math.round(widthKm / stepKm));
-  const ny = Math.max(1, Math.round(heightKm / stepKm));
-  const dLon = (east - west) / nx;
-  const dLat = (north - south) / ny;
-  const touched = new Set<number>();
-  for (const [x, y] of vertices) {
-    const i = Math.min(nx - 1, Math.floor((x - west) / dLon));
-    const j = Math.min(ny - 1, Math.floor((y - south) / dLat));
-    touched.add(j * nx + i);
-  }
-  return [...touched].sort((a, b) => a - b).map((k) => {
-    const i = k % nx;
-    const j = Math.floor(k / nx);
-    const bbox: Bbox = [west + i * dLon, south + j * dLat, west + (i + 1) * dLon, south + (j + 1) * dLat];
-    const centre: LngLat = [west + (i + 0.5) * dLon, south + (j + 0.5) * dLat];
-    return {
-      centre,
-      bbox,
-      wind: [centre[0] - dLon / 4, centre[1]],
-      current: [centre[0] + dLon / 4, centre[1]],
-    };
-  });
 }
 
 /** The mean wind or current over `bbox` at `hour`, from a 4 x 4 sample of it; null where none of it has a value. */

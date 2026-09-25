@@ -33,7 +33,7 @@ import { planCorridors } from "./ais";
 import { bearingDeg, distanceKm, kmPerDegLon, KM_PER_DEG_LAT } from "./geo";
 import type { ScenarioSpec } from "./scenarios";
 import type { SlickGeometry } from "./slick";
-import type { LngLat } from "./types";
+import type { FlowGrid, LngLat } from "./types";
 import { DB_WINDOW, type Ribbon } from "./ingest";
 
 export interface UploadAssertions {
@@ -53,6 +53,10 @@ export interface UploadAssertions {
    * or precomputed and used at the operator's request -- as a sentence.
    */
   segmentation?: string;
+  /** ERA5 wind and SMOC currents for this place and time (`metocean.ts`); null when unavailable. */
+  measured?: FlowGrid | null;
+  /** True when real AIS covers this place and time (`realTrafficForUpload`), installed as the upload's traffic. */
+  realAis?: boolean;
 }
 
 /** Ground length of a projected path, km. */
@@ -124,6 +128,7 @@ export function buildUploadSpec(ribbon: Ribbon, a: UploadAssertions): ScenarioSp
   const dampingRatioDb = +((ribbon.meanInside - ribbon.meanOutside) * perGrey).toFixed(2);
 
   const centre = a.centre;
+  const measured = a.measured ?? undefined;
   // Laid around the coast, so the land mask for this area must already be
   // loaded -- `SampleImagePanel` awaits `ensureLandmask` before calling this.
   const lanes = planCorridors(centre);
@@ -149,10 +154,18 @@ export function buildUploadSpec(ribbon: Ribbon, a: UploadAssertions): ScenarioSp
     (assertedPosition
       ? "POSITION ASSERTED BY OPERATOR — the raster carries no georeferencing, so the map location and scale are stated, not measured. "
       : "Position read from the raster's georeferencing. ") +
-    `Drift field, AIS traffic, infrastructure and all scores are simulated; ${lanes.note}.`;
+    (measured
+      ? `The drift is forced by ${measured.windSource} wind and ${measured.currentSource ?? "SIM currents (none measured for this date)"} ` +
+        "for this place and time. "
+      : "") +
+    (a.realAis ? "Traffic is recorded marinecadastre AIS for this place and day, identities withheld. " : "") +
+    `${[measured ? "The drift engine" : "The drift field (no measured wind for this time)", a.realAis ? null : "AIS traffic",
+      "infrastructure", "all scores"].filter(Boolean).join(", ")} are simulated` +
+    (a.realAis ? "." : `; ${lanes.note}.`);
 
   return {
     geometry,
+    measured,
     meta: {
       id: "upload",
       name: "Uploaded image",
@@ -168,8 +181,11 @@ export function buildUploadSpec(ribbon: Ribbon, a: UploadAssertions): ScenarioSp
       summary:
         `A ${lengthKm.toFixed(1)} km ${ribbon.method === "segmenter" ? "candidate slick segmented" : "dark region traced"} ` +
         "from the uploaded raster, drifted " +
-        "backward 36 h and forward 72 h through a simulated field.",
-      tests: "The geometry is the operator's image; everything downstream is simulated.",
+        "backward 36 h and forward 72 h through " +
+        (measured ? "ERA5 wind and measured currents for this place and time." : "a simulated field."),
+      tests: measured
+        ? "The geometry is the operator's image and the forcing is measured; the drift engine, traffic and scores are simulated."
+        : "The geometry is the operator's image; everything downstream is simulated.",
       expectedTop1: "No ground truth: an uploaded scene has no authored answer to check against.",
     },
     field: {
@@ -212,6 +228,7 @@ export function buildUploadSpec(ribbon: Ribbon, a: UploadAssertions): ScenarioSp
     traffic: {
       vesselCount: 160,
       corridors: lanes.corridors,
+      real: a.realAis === true,
     },
     infrastructure: [
       { id: "upload-installation", label: "Offshore installation (sim)", position: geometry.tail },

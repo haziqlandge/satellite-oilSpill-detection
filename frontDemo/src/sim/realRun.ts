@@ -515,6 +515,8 @@ export function buildRealRun(id: RealRunId): Run {
       acquiredAt,
       centre: drift.seed,
       zoom: 9,
+      // May's view as the user framed it (2026-09-26): the console opens on it.
+      ...(id === "real-20230515" ? { view: { west: -90.28, east: -87.67, south: 27.732, zoom: 8.24 } } : {}),
       sceneId: drift.scene,
       summary:
         `The model's ${counted} in a real Sentinel-1 scene, OpenDrift's backward field ` +

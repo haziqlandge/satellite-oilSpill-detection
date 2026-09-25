@@ -35,7 +35,18 @@ function Compass({ card }: { card: Card }) {
   return (
     <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true" className="shrink-0">
       <circle cx="15" cy="15" r={r} fill="none" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1" />
-      <line x1="15" y1="2" x2="15" y2="5" stroke="currentColor" strokeOpacity="0.7" strokeWidth="1.2" />
+      {card.label !== "Ships" && <line x1="15" y1="2" x2="15" y2="5" stroke="currentColor" strokeOpacity="0.7" strokeWidth="1.2" />}
+      {card.label === "Ships" && (
+        // A cargo ship side on: hull, bridge, funnel, on a waterline.
+        <g fill={card.colour}>
+          <path d="M5.5 16.5 H24.5 L22 20.5 H8.5 Z" />
+          <rect x="17" y="12" width="4.5" height="4.5" />
+          <rect x="18.5" y="9.5" width="2" height="2.5" />
+          <rect x="8" y="13.5" width="3" height="3" opacity="0.75" />
+          <rect x="11.5" y="13.5" width="3" height="3" opacity="0.75" />
+          <line x1="6" y1="22.3" x2="24" y2="22.3" stroke={card.colour} strokeOpacity="0.45" strokeWidth="0.8" />
+        </g>
+      )}
       {card.towardDeg !== null && (
         <g transform={`rotate(${card.towardDeg.toFixed(1)} 15 15)`} style={{ transition: "transform 300ms linear" }}>
           <line x1="15" y1={15 + len} x2="15" y2={15 - len + 3} stroke={card.colour} strokeWidth="1.8" strokeLinecap="round" />
@@ -66,14 +77,14 @@ export function FlowCards({ run, hour, paint }: { run: Run; hour: number; paint:
       label: "Wind",
       ...vector(wind, "m/s", 12, 1),
       detail: "",
-      colour: paint.target,
+      colour: paint.wind,
       sim: isSimulated(flow?.windSource),
     },
     {
       label: "Current",
       ...vector(current, "m/s", 0.8, 2),
       detail: "",
-      colour: paint.contour50,
+      colour: paint.current,
       sim: isSimulated(flow?.currentSource),
     },
     {

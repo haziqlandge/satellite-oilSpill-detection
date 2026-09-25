@@ -1089,6 +1089,114 @@ The three console fixes the §3 session left (ISSUES F21-F23, now closed).
   - The real-engine Ennore cross-check: direction and beaching agree, the reach is 3.4× too long (X17).
   - The authored Ennore field was about 2× the observed reach as well.
 
+## 2.27 "Add image", end to end (2026-09-25, late night, 4060 Ti)
+
+The user asked whether an uploaded image gets a proper mask, a drift on the
+wind and currents of its own place, and its AIS. Tested with the December
+window (`data/processed/sar/windows/*_win2048.tif`) through the real upload
+panel, both ways.
+
+- **Before this session, a browser upload (all Vercel can do) drifted every
+  image through one authored field**: 5.4 m/s from 285°, whatever the place or
+  date. Its traffic was always SIM, and its region always read "Gulf of Mexico".
+- **Now the browser fetches measured forcing** (`sim/metocean.ts`). It pulls
+  ERA5 hourly wind and Copernicus Marine SMOC currents (tides included) on a
+  5 × 5 grid, 220 km across, from Open-Meteo: no key, open CORS, 0.7 s. The
+  upload's drift, wind gate, arrows and flow cards all use it.
+  - The drift engine is still the console's own, tagged SIM. The panels say
+    "sourced from ERA5 10 m (Open-Meteo)".
+  - **Cross-check:** at the December slick the browser's ERA5 wind is
+    6.1 m/s. The pipeline's own ERA5 NetCDF gives 6.17 m/s for the same file.
+  - Currents exist from 2022. ERA5 runs about five days behind real time.
+    Without wind the run is SIM and the stage says why.
+  - `check:metocean` (canned responses) pins the two conventions: wind blows
+    FROM, current flows TOWARD. On its first run it caught an edge-clamp
+    rounding bug.
+- **AIS in the browser.** An upload inside a hosted real export's box and time
+  window uses it: the December window gets its 342 recorded vessels.
+  - Elsewhere the traffic stays SIM. No free AIS feed answers a browser.
+  - The local pipeline reads only days on disk and never downloads (F14).
+- **The mask.** The ONNX model in the browser traced 23 detections, best
+  0.77, in 2.9 s on WebGPU. The pipeline's PyTorch model on CUDA took the same
+  seed at the same confidence: 3.15 km², 7.7 km long.
+- **The local pipeline** (API running) on the same upload:
+  - two-pass detection on the GPU;
+  - ERA5 and CMEMS hourly from the covering cache;
+  - OpenDrift 10 × 200 each way, about 3 min per direction;
+  - real AIS from the parsed day.
+- **Two regressions found by the full verification, both fixed.**
+  - `check:apiruns` crashed under Node: `import.meta.env` does not exist
+    outside Vite.
+  - mypy flagged one error in `archive_cleanup.py`.
+- **F25 fixed.** A linked API run now opens after a reload, once the run list
+  registers it.
+- **A GeoTIFF with no time used to be refused by the pipeline, while the
+  browser ran it on a default date.** Zenodo corpus tiles such as `01268.tif`
+  are like this: neither the name nor `TIFFTAG_DATETIME` carries a time.
+  - Now the upload waits.
+  - Once the operator states a time and presses Re-run, the pipeline gets it
+    as `acquired_at` and records it as "asserted by the operator".
+  - The panel's default date is never sent.
+  - Tested with a timeless copy of the December window.
+
+## 2.28 The console, re-laid for one view (2026-09-26, 4060 Ti)
+
+All at the user's request.
+
+- **Map.**
+  - **Moving streaks replace the icon arrows** (`map/FlowStreaks.ts`, a
+    canvas like the particle overlay). There are 4 wind and 4 current tracers
+    at random places around the slick and its hindcast and forecast regions.
+    Each is carried by the run's own flow grid (`flowAt`) at the playhead
+    hour, with a fading tail it just travelled and a plain `>` head. Each
+    lives 5–8 s, then starts again elsewhere.
+  - **The streak speed is scaled for reading, not the clock:** a typical
+    wind or current crosses a fifth of the event in 3 s.
+  - **Wind and current each have an ink:** `MapPaint.wind` (yellow) and
+    `.current` (cyan). The flow cards use the same inks.
+  - **Ships are hulls turned to their reported COG** (`vessel-icons`): the
+    candidates in the suspect ink, passing traffic faint. The "ship icons"
+    layer switch puts back the dots.
+  - **The Ships card draws a side-view ship.**
+  - **The hindcast/forecast legend** is a stacked pair of colour boxes.
+  - **`flowCells` is gone.** `check:realruns` now asserts a current around
+    the spill at the pass instead.
+- **Default view.** The console opens on Real · 2023-05-15 at z 8.24, its
+  lower edge on 27.732°N, centred between 90.28°W and 87.67°W
+  (`meta.view`, `frameScene`). Home returns there.
+- **Panels.**
+  - **Density:**
+    - `Note` is a one-line "ⓘ" toggle;
+    - short readings sit two to a line (`Rows`, a container query);
+    - a figure and its numbers sit side by side when the pane is 360 px or
+      wider;
+    - reference blocks fold (`Block fold`).
+  - **Scrolling is visible.** `ScrollArea` gives every scroll body an accent
+    scrollbar, a bottom fade and a "more ▾" button while more lies below. It
+    never scrolls sideways.
+  - **Measured at 1440 × 900, content height against the view:**
+    - 01: 1879 → 659 px;
+    - 02: 1719 → 709 px;
+    - 03–06 fit their 617 px (06 was 2983).
+  - **Panel 04** shows the top 10 candidates, with the rest behind "all".
+  - **Panel 05's term bars** are laid over the track-vs-field figure (bar and
+    weighted score, small), with the figure's key as a second overlay.
+    Sum × gate is a readout, and the caveats are behind one line.
+  - **Panel 02:** the refusal code and reason are one line.
+  - **The panel reader below prints every folded block and note open.**
+- **Add image.**
+  - The SAR image and the mask sit side by side.
+  - The readings are in two columns.
+  - The explanatory paragraphs are on hover.
+  - "Read from the raster" is now "Geolocation of slick".
+- **Model Timing** follows the running stage by itself
+  (`useFollowRunning`), in the browser's list and the pipeline's.
+- **Left dock** default 270 px, was 214. A stored 214 counts as the old
+  default, not a choice.
+- **AIS.** Apr 6 and May 12 2023 were downloaded from marinecadastre (329 +
+  352 MB, zip integrity checked). The real runs' AIS now covers the full
+  72 h hindcast: 282 / 617 / 342 vessels.
+
 ## Where the detailed evidence lives
 
 | Artifact | Contents |

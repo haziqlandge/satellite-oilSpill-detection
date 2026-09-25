@@ -59,7 +59,9 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type HTMLAttributes,
   type ReactNode,
+  type RefObject,
 } from "react";
 import { animate, steps } from "animejs";
 import { useReducedMotion } from "../lib/motion";
@@ -236,21 +238,29 @@ export function Block({
   tone = "dim",
   children,
   className = "",
+  fold = false,
 }: {
   label: string;
   right?: ReactNode;
   tone?: Tone;
   children: ReactNode;
   className?: string;
+  /** Starts closed, its header a toggle: reference material that should not cost a scroll. */
+  fold?: boolean;
 }) {
+  const [open, setOpen] = useState(!fold);
   return (
-    <section data-block className={`mt-4 first:mt-0 ${className}`}>
+    <section data-block className={`mt-3 first:mt-0 ${className}`}>
       <header className="flex items-center gap-2">
         <h3
           className="shrink-0 text-[9.5px] tracking-[0.26em] uppercase"
           style={{ color: TONE[tone], fontWeight: 500 }}
         >
-          {label}
+          {fold ? (
+            <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="uppercase tracking-[0.26em]">
+              <span aria-hidden className="num mr-1">{open ? "▾" : "▸"}</span>{label}
+            </button>
+          ) : label}
         </h3>
         <span className="h-px flex-1" style={{ background: "var(--line)" }} />
         {right !== undefined && (
@@ -262,7 +272,7 @@ export function Block({
           </span>
         )}
       </header>
-      <div data-block-body className="mt-2">
+      <div data-block-body className="mt-1.5" hidden={!open}>
         {children}
       </div>
     </section>
@@ -294,9 +304,9 @@ export function Row({
   title?: string;
 }) {
   return (
-    <div className="flex items-baseline gap-2 py-[2.5px]" title={title}>
+    <div className="flex min-w-0 items-baseline gap-2 py-[1.5px]" title={title ?? (typeof value === "string" ? value : undefined)}>
       <span
-        className="shrink-0 text-[10px] tracking-[0.14em] uppercase"
+        className="shrink-0 text-[10px] tracking-[0.12em] uppercase"
         style={{ color: "var(--ink-faint)" }}
       >
         {label}
@@ -306,7 +316,7 @@ export function Row({
         className="min-w-[10px] flex-1 -translate-y-[3px] border-b border-dotted"
         style={{ borderColor: "var(--line)" }}
       />
-      <span className="num shrink-0 text-[11.5px]" style={{ color: TONE[tone] }}>
+      <span className="num min-w-0 truncate text-[11.5px]" style={{ color: TONE[tone] }}>
         {value}
         {unit && (
           <span
@@ -415,16 +425,16 @@ export function Meter({
   title?: string;
 }) {
   return (
-    <div className="flex items-baseline gap-2 py-[2.5px]" title={title}>
+    <div className="flex items-baseline gap-2 py-[1.5px]" title={title ?? label}>
       <span
-        className="w-[7ch] shrink-0 text-[10px] tracking-[0.08em] uppercase"
+        className="min-w-[7ch] flex-1 truncate text-[10px] tracking-[0.08em] uppercase"
         style={{ color: "var(--ink-faint)" }}
       >
         {label}
       </span>
       <AsciiBar value={value} width={width} tone={tone} />
       <span
-        className="num ml-auto shrink-0 text-[11px]"
+        className="num w-[4ch] shrink-0 text-right text-[11px]"
         style={{ color: TONE[tone] }}
       >
         {display}
@@ -667,31 +677,43 @@ export function Note({
   tone?: Tone;
   label?: string;
 }) {
+  // One line until opened (the user, 2026-09-26: the panels are for the data,
+  // and a reader should see a whole pane without scrolling). The prose --
+  // provenance, caveats, how to read a figure -- is still one click away, and
+  // the panel reader below the workstation prints it open.
+  const [open, setOpen] = useState(false);
+  const ink = tone === "faint" ? "var(--ink-faint)" : TONE[tone];
   return (
-    <div
-      className="mt-2 border-l pl-2.5"
-      style={{ borderColor: tone === "faint" ? "var(--line)" : TONE[tone] }}
-    >
-      {label && (
-        <p
-          className="mb-0.5 text-[9px] tracking-[0.22em] uppercase"
-          style={{ color: TONE[tone] }}
-        >
-          {label}
-        </p>
-      )}
-      {/*
-        Prose, and it has to read as prose. It was set at 10.5px -- the same
-        size the pane title used to be -- so a paragraph and the heading three
-        levels above it were indistinguishable by size, and the only thing
-        carrying the hierarchy was letter-spacing. It is a step *below* every
-        label now and a step above nothing, with the leading a paragraph needs.
-      */}
-      <Clamped lines={2} className="text-[11px] leading-[1.65]" style={{ color: "var(--ink-dim)" }}>
+    <div data-note className="mt-1.5">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex items-center gap-1 text-[9px] tracking-[0.18em] uppercase"
+        style={{ color: ink }}
+      >
+        <span aria-hidden className="num">{open ? "▾" : "ⓘ"}</span>
+        {label ?? "note"}
+      </button>
+      <div
+        data-note-body
+        data-prose
+        hidden={!open}
+        className="mt-0.5 border-l pl-2.5 text-[10.5px] leading-[1.6]"
+        style={{ borderColor: tone === "faint" ? "var(--line)" : TONE[tone], color: "var(--ink-dim)" }}
+      >
         {children}
-      </Clamped>
+      </div>
     </div>
   );
+}
+
+/**
+ * Short readings in two columns when the pane is wide enough (a container
+ * query on the pane body), one column in a narrow rail.
+ */
+export function Rows({ children }: { children: ReactNode }) {
+  return <div className="grid grid-cols-1 gap-x-4 @sm:grid-cols-2">{children}</div>;
 }
 
 /**
@@ -936,11 +958,94 @@ export function useNarrow(query = "(max-width: 1023px)"): boolean {
   return narrow;
 }
 
-/** Thin scrollbars, set inline because this direction owns no stylesheet. */
+/** Scrollbars for bodies that are not a `ScrollArea`: visible, in the accent (`[data-scroll]` in index.css). */
 export const SCROLL: CSSProperties = {
-  scrollbarWidth: "thin",
-  scrollbarColor: "var(--line) transparent",
+  scrollbarWidth: "auto",
+  scrollbarColor: "color-mix(in oklab, var(--accent) 60%, transparent) color-mix(in oklab, var(--line) 55%, transparent)",
 };
+
+/**
+ * Keep a stage list's running row in view as each stage starts, so a reader
+ * never scrolls to follow a run (the user, 2026-09-26); at the end, the last
+ * row (the total). Scrolls only the list's own `ScrollArea`, never the page:
+ * the panel reader renders the same list in normal flow.
+ */
+export function useFollowRunning(list: RefObject<HTMLElement | null>, key: string) {
+  useEffect(() => {
+    const row = list.current?.querySelector<HTMLElement>('[data-stage-status="running"]')
+      ?? (list.current?.lastElementChild as HTMLElement | null | undefined);
+    const box = row?.closest<HTMLElement>("[data-scroll]");
+    if (!row || !box || box.scrollHeight <= box.clientHeight) return;
+    const r = row.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    if (r.top < b.top + 8 || r.bottom > b.bottom - 36)
+      box.scrollBy({ top: r.top - b.top - b.height / 3, behavior: "smooth" });
+  }, [list, key]);
+}
+
+/**
+ * A scrolling body that shows it scrolls.
+ *
+ * Thin grey bars went unnoticed: readers did not know a panel held more
+ * (the user, 2026-09-26). So the bar is the accent colour and full width, and
+ * while anything lies below, the bottom fades and a "more" button sits on the
+ * edge -- pressing it scrolls most of a page. Both disappear at the end.
+ */
+export function ScrollArea({
+  className = "",
+  children,
+  ...attrs
+}: { className?: string; children: ReactNode } & HTMLAttributes<HTMLDivElement>) {
+  const box = useRef<HTMLDivElement>(null);
+  const [above, setAbove] = useState(false);
+  const [below, setBelow] = useState(false);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const update = () => {
+      setAbove(el.scrollTop > 2);
+      setBelow(el.scrollTop + el.clientHeight < el.scrollHeight - 2);
+    };
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const resized = new ResizeObserver(update);
+    resized.observe(el);
+    const changed = new MutationObserver(update);
+    changed.observe(el, { childList: true, subtree: true });
+    return () => {
+      el.removeEventListener("scroll", update);
+      resized.disconnect();
+      changed.disconnect();
+    };
+  }, []);
+  return (
+    <div className="relative flex h-full min-h-0 flex-1 flex-col">
+      <div ref={box} data-scroll className={`min-h-0 flex-1 overflow-y-auto overflow-x-hidden ${className}`} {...attrs}>
+        {children}
+      </div>
+      {above && (
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-4"
+          style={{ background: "linear-gradient(var(--base-2), transparent)" }} />
+      )}
+      {below && (
+        <>
+          <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-10"
+            style={{ background: "linear-gradient(transparent, var(--base-2))" }} />
+          <button
+            type="button"
+            data-scroll-more
+            onClick={() => box.current?.scrollBy({ top: box.current.clientHeight * 0.8, behavior: "smooth" })}
+            className="absolute bottom-1.5 left-1/2 -translate-x-1/2 border px-2.5 py-0.5 text-[9.5px] uppercase tracking-[0.2em]"
+            style={{ borderColor: "var(--accent)", color: "var(--accent)", background: "var(--base-2)" }}
+            aria-label="Scroll down for more"
+          >
+            more ▾
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
 
 /* ------------------------------------------------------------------ *
  * Group headers

@@ -18,7 +18,7 @@
 import { useEffect, useRef, useState } from "react";
 import { animate } from "animejs";
 import { MapCanvas } from "../map/MapCanvas";
-import type { LayerToggles } from "../map/basemap";
+import { frameScene, type LayerToggles } from "../map/basemap";
 import { useAnimeScope, useReducedMotion } from "../lib/motion";
 import { ageStatement, provenanceFlag, stamp } from "../lib/format";
 import { WEIGHTS_VERSION } from "../sim/scoring";
@@ -51,6 +51,8 @@ interface MapHandle {
   zoomIn(): void;
   zoomOut(): void;
   jumpTo(opts: { center: [number, number]; zoom: number }): void;
+  panBy(offset: [number, number], opts: { animate: boolean }): void;
+  getContainer(): HTMLElement;
   on(type: string, cb: () => void): void;
   off(type: string, cb: () => void): void;
 }
@@ -593,7 +595,7 @@ export function Workspace({
             </Btn>
             <Btn
               onClick={() =>
-                run && handle?.jumpTo({ center: run.meta.centre, zoom: run.meta.zoom })
+                run && handle && frameScene(handle, run.meta)
               }
               disabled={!handle || !run}
               title="Recentre on the scene"

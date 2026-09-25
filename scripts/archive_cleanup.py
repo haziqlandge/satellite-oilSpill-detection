@@ -127,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
                                "freed_bytes": freed}, indent=1), encoding="utf-8")
     print()
     for r in rows:
-        print(f"{r['verdict'].upper():7} {int(r['bytes']) / 2**30:7.2f} GB  {r['archive']}  -- {r['why']}")  # type: ignore[call-overload]
+        print(f"{str(r['verdict']).upper():7} {int(r['bytes']) / 2**30:7.2f} GB  {r['archive']}  -- {r['why']}")  # type: ignore[call-overload]
     print(f"\n{len(delete)} archive(s) verified deletable, {freed / 2**30:.1f} GB. Nothing was deleted. "
           f"The list: {OUT.relative_to(REPO_ROOT).as_posix()}")
     return 0

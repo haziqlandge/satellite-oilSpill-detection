@@ -25,6 +25,7 @@ import {
 } from "./drift";
 import { makeForcing, type FieldConfig, type Forcing } from "./field";
 import { ringsBbox, sampleFlowGrid } from "./flow";
+import { measuredForcing } from "./metocean";
 import { bearingDeg, centroid, circleRing, destination, distanceKm } from "./geo";
 import { makeRng, seedFrom } from "./rng";
 import {
@@ -41,6 +42,7 @@ import { hasRealTraffic, publishedVesselId, realVessels } from "./realAis";
 import { apiRunListings, buildRealRun, isRealRun, REAL_RUN_LISTINGS, type RealRunId } from "./realRun";
 import type {
   Environment,
+  FlowGrid,
   LngLat,
   Run,
   ScenarioId,
@@ -122,6 +124,12 @@ export interface ScenarioSpec {
   geometry?: SlickGeometry;
   meta: Omit<ScenarioMeta, "acquiredAt"> & { acquiredAtIso: string };
   field: FieldConfig;
+  /**
+   * Measured wind (and currents, when there are any) for this place and time
+   * (`sim/metocean.ts`). When set, the drift runs through it instead of `field`;
+   * only an upload has one.
+   */
+  measured?: FlowGrid;
   /** Where the oil entered the water, before any drift. */
   release: LngLat;
   /**
@@ -1238,7 +1246,8 @@ function assemble(id: Exclude<ScenarioId, RealRunId>, variant: DriftVariant): Ru
   const spec = SPECS[id];
   const rng = makeRng(seedFrom(id));
   const acquiredAt = Date.parse(spec.meta.acquiredAtIso);
-  const forcing = makeForcing(spec.field);
+  const measured = spec.measured;
+  const forcing = measured ? measuredForcing(measured, makeForcing(spec.field)) : makeForcing(spec.field);
 
   // The slick head sits where the last oil entered the water. For a moving
   // discharge that is the far end of the line the vessel drew, not the tip the
@@ -1276,7 +1285,10 @@ function assemble(id: Exclude<ScenarioId, RealRunId>, variant: DriftVariant): Ru
     rng,
   );
 
-  const windSpeedMs = spec.field.windMs;
+  // A measured field's wind at the slick at the pass drives the wind gate.
+  const windSpeedMs = measured
+    ? Math.round(Math.hypot(...forcing.wind(centroid(geom.parts.flat()), 0)) * 100) / 100
+    : spec.field.windMs;
   const characterisation = characterise(`${id}-det`, geom, {
     windSpeedMs,
     dampingRatioDb: spec.slick.dampingRatioDb,
@@ -1546,7 +1558,8 @@ function assemble(id: Exclude<ScenarioId, RealRunId>, variant: DriftVariant): Ru
   // so a reader scrubbing the event and a reader reading the wind chart are
   // looking at the same hours.
   const environment = sampleEnvironment(
-    spec.field,
+    // A measured current carries its tide inside it; there is no separate term to chart.
+    measured ? { ...spec.field, tideMs: 0 } : spec.field,
     forcing,
     centroid(geom.parts.flat()),
     Math.min(releaseStartHour, -spec.drift.backwardHours),
@@ -1557,11 +1570,14 @@ function assemble(id: Exclude<ScenarioId, RealRunId>, variant: DriftVariant): Ru
 
   // The same forcing on a grid over the slick and every hour's 90% region, for
   // the map's arrows and the flow cards (`sim/flow.ts`).
-  const flow = sampleFlowGrid(
+  const sampled = sampleFlowGrid(
     forcing,
     ringsBbox([...geom.parts, ...driftRun.frames.flatMap((f) => f.contour90)]),
     environment.hours,
   );
+  const flow = measured
+    ? { ...sampled, windSource: measured.windSource, currentSource: measured.currentSource ?? "SIM (no current data)" }
+    : sampled;
 
   return {
     meta,

@@ -47,7 +47,7 @@ import { fieldProjection, forecastHours, ringPath } from "../lib/project";
 import { pathLengthKm } from "../sim/geo";
 import { windGate } from "../sim/slick";
 import type { AnomalyFlag, LngLat, Run } from "../sim/types";
-import { Row, Split, TONE, type Tone } from "./components";
+import { TONE, type Tone } from "./components";
 
 /* ------------------------------------------------------------------ *
  * Shared plot chrome
@@ -849,6 +849,7 @@ export function TrackScope({
   matched,
   position,
   hour,
+  terms = [],
 }: {
   run: Run;
   track: LngLat[] | null;
@@ -856,6 +857,12 @@ export function TrackScope({
   position: LngLat;
   /** Hours from the acquisition, off the console clock. Negative is backward. */
   hour?: number;
+  /**
+   * The candidate's score terms, laid over the plot's top-left corner: a bar
+   * and the weighted score each, small (the user, 2026-09-26). Their working
+   * is on hover.
+   */
+  terms?: { key: string; label: string; value: number; weight: number; detail: string }[];
 }) {
   // SVG ids are document-global, and this instrument can be mounted more than
   // once. `useId` emits colons, which are legal in an id but not in the
@@ -1082,74 +1089,64 @@ export function TrackScope({
     </svg>
   );
 
-  return (
-    <Split figure={drawing}>
-      {/* Which case, and over which hours. The docblock's reason for naming the
-          case holds and gets stronger here: in the panel reader the console's
-          own case selector has been scrolled off the top of the page, so this
-          line is the only nearby statement of which scene is drawn. */}
-      <FigLine
-        left={`case ${run.meta.id}`}
-        right={`hindcast + forecast ${formatHour(oldest)} → ${formatHour(newest)}`}
-        toneRight="warn"
-      />
-      {nowLine && (
-        <FigLine
-          left={nowLine}
-          tone={rounded !== null && rounded > 0 ? "warn" : "ok"}
-        />
-      )}
-      {/*
-        The two lengths the plot draws and never states. "Heavy" is a weight on
-        a line until it is a number: sixty kilometres of a two-hundred kilometre
-        track inside the field is a different claim from two kilometres of it,
-        and the drift term is computed from exactly this geometry. Stated here
-        rather than in the drawing because a length is a summary, not a mark
-        pinned to a coordinate.
-      */}
-      {track && track.length > 1 && (
-        <FigLine
-          left={`track ${pathLengthKm(track).toFixed(0)} km`}
-          right={
-            matched && matched.length > 1
-              ? `matched ${pathLengthKm(matched).toFixed(0)} km`
-              : "no matched segment"
-          }
-          toneRight={matched && matched.length > 1 ? "ok" : "dim"}
-        />
-      )}
-      {/* The direction claim, in HTML and therefore in a sentence.
-          It used to be three lines hard-limited to 44 characters, because at
-          7 units inside a 220-unit viewBox a 46th character ran past the edge
-          and the outer `svg` clipped it silently -- which is how the previous
-          single caption lost its right-hand end without anyone noticing. Out
-          here there is no such limit and no such failure mode. */}
-      <p
-        data-prose
-        className="mt-2 text-[10.5px] leading-[1.6]"
-        style={{ color: "var(--ink-dim)" }}
-      >
-        Hindcast and forecast share the live map's hourly geometry and colors:
-        reconstructed history before T0, then forecast after T0.
-      </p>
+  // The key, as marks rather than words: each drawn the way the plot draws it.
+  const key: [string, ReactNode][] = [
+    [matched && matched.length > 1 ? "inside the field" : "no match", <line x1={1} y1={4} x2={15} y2={4} stroke="var(--accent)" strokeWidth={2.4} />],
+    ["this hour", <line x1={1} y1={4} x2={15} y2={4} stroke={paint.forecast} strokeWidth={1.3} strokeDasharray="4 3" />],
+    ["an hour per ring", <line x1={1} y1={4} x2={15} y2={4} stroke={paint.forecast} strokeWidth={0.9} opacity={0.5} />],
+    ["the detection", <rect x={3} y={1} width={10} height={6} fill="var(--ink)" fillOpacity={0.3} stroke="var(--ink)" strokeWidth={0.8} />],
+    ["track end", <circle cx={8} cy={4} r={3} fill="none" stroke="var(--accent)" strokeWidth={1.1} />],
+  ];
+  const overlay = "pointer-events-auto absolute border px-1.5 py-1 text-[9px] leading-[1.35]";
+  const overlayStyle = { borderColor: "var(--line)", background: "color-mix(in oklab, var(--base-2) 82%, transparent)" };
 
-      {/*
-        A key, because this is the one instrument carrying seven distinct kinds
-        of mark and it had a name for exactly one of them. Every line here
-        points at something actually drawn beside it; the meaning of "heavy",
-        which the caption used to carry as a clause, is the first of them.
-      */}
-      <div className="mt-2">
-        <Row
-          label="heavy"
-          value={matched && matched.length > 1 ? "inside the field" : "no match"}
-          tone={matched && matched.length > 1 ? "ok" : "dim"}
-        />
-        <Row label="dashed" value="this hour" tone="ok" />
-        <Row label="faded" value="one hour per ring" />
-        <Row label="filled" value="the detection" />
-        <Row label="crosshair" value="track end" />
+  return (
+    <div data-track-scope>
+      <div className="pointer-events-none relative mx-auto max-w-[300px]" data-fig style={figW(TRACK_FIG)}>
+        {drawing}
+        {terms.length > 0 && (
+          <div className={`${overlay} left-1 top-1 w-[46%]`} style={overlayStyle} data-term-overlay>
+            {terms.map((t) => (
+              <div key={t.key} className="flex items-center gap-1" title={`${t.label}: ${t.value.toFixed(2)} × ${t.weight.toFixed(2)} = ${(t.value * t.weight).toFixed(3)}. ${t.detail}`}>
+                <span className="w-[5.5ch] shrink-0 truncate uppercase" style={{ color: "var(--ink-faint)" }}>{t.label}</span>
+                <span className="min-w-0 flex-1"><TermBar value={t.value} weight={t.weight} /></span>
+                <span className="num w-[4.5ch] shrink-0 text-right" style={{ color: "var(--accent)" }}>{(t.value * t.weight).toFixed(3)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className={`${overlay} bottom-1 left-1`} style={overlayStyle} data-track-key>
+          {key.map(([label, mark]) => (
+            <div key={label} className="flex items-center gap-1.5" style={{ color: "var(--ink-dim)" }}>
+              <svg width={16} height={8} aria-hidden>{mark}</svg>{label}
+            </div>
+          ))}
+        </div>
       </div>
-    </Split>
+      <div className="mt-1">
+        <FigLine
+          left={`case ${run.meta.id}`}
+          right={`${formatHour(oldest)} → ${formatHour(newest)}`}
+          toneRight="warn"
+        />
+        {nowLine && (
+          <FigLine
+            left={nowLine}
+            tone={rounded !== null && rounded > 0 ? "warn" : "ok"}
+          />
+        )}
+        {track && track.length > 1 && (
+          <FigLine
+            left={`track ${pathLengthKm(track).toFixed(0)} km`}
+            right={
+              matched && matched.length > 1
+                ? `matched ${pathLengthKm(matched).toFixed(0)} km`
+                : "no matched segment"
+            }
+            toneRight={matched && matched.length > 1 ? "ok" : "dim"}
+          />
+        )}
+      </div>
+    </div>
   );
 }

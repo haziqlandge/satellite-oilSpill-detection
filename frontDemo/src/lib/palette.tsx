@@ -194,6 +194,8 @@ export const MAP_COLOUR_FIELDS = [
     "The cloud of individual particles the drift model pushes across the map." },
   { key: "forecast", label: "where it will reach", blurb:
     "The shaded footprint of everywhere the oil could get to over the forecast." },
+  { key: "wind", label: "wind arrows", blurb: "The moving wind streaks on the map and the wind card." },
+  { key: "current", label: "current arrows", blurb: "The moving surface-current streaks on the map and the current card." },
   { key: "target", label: "radar contacts and markers", blurb:
     "Ships the radar saw that also match a transponder, plus the slick's head, tail and centre line." },
   { key: "dark", label: "ships with no transponder", blurb:

@@ -80,6 +80,9 @@ export interface MapPaint {
   infrastructure: string;
   forecast: string;
   hindcast: string;
+  /** The map's flow arrows and the flow cards: air and water each keep one ink. */
+  wind: string;
+  current: string;
 
   /** The degree grid. Its own ink rather than a reuse of the traffic colour. */
   graticule: string;
@@ -151,6 +154,8 @@ export const SURFACES: Record<SurfaceKey, SurfaceDef> = {
       infrastructure: "#f0c419",
       hindcast: "#b878d1",
       forecast: "#6b4a2a",
+      wind: "#f2d16b",
+      current: "#5cc8ff",
       strokeScale: 1,
       contourFill: false,
       graticuleStepDeg: 0.25,
@@ -224,6 +229,8 @@ export const SURFACES: Record<SurfaceKey, SurfaceDef> = {
       infrastructure: "#ffc94d",
       hindcast: "#d98b8b",
       forecast: "#3a7458",
+      wind: "#f2d16b",
+      current: "#5cc8ff",
       strokeScale: 0.85,
       contourFill: false,
       graticuleStepDeg: 0.1,

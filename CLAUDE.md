@@ -23,13 +23,26 @@ shorter one.
 `.venv/Scripts/python.exe -c "import torch; print(torch.cuda.get_device_name(0))"`.
 As of 2026-09-23 the work has moved there: training is allowed, and
 `FUTURE_WORK.md` §0 says what comes next (Part II was trained and promoted on
-2026-09-25). Files git does not carry are listed in
+2026-09-25). **The user decided on 2026-09-25 to keep working on the 4060 Ti**
+rather than swap back. Files git does not carry are listed in
 `pasteHere.txt` at the repository root.
 
+**The 4060 Ti's checkout has no `.git`** (it began as a GitHub zip download).
+Commits go through a separate clone pointed at this folder, never by copying a
+`.git` in:
+
+```bash
+git clone --filter=blob:limit=2m https://github.com/haziqlandge/satellite-oilSpill-detection "$TMP/gh"
+GIT_INDEX_FILE="$TMP/commit.index" git --git-dir="$TMP/gh/.git" --work-tree=. read-tree HEAD
+```
+
+Then `status`, `add -A` and `commit` with the same three prefixes, as Haziq
+<haziqlandge@gmail.com>, and push from `$TMP/gh`. The last commit made that
+way is `f215bec` (2026-09-25).
+
 The frontend is authored separately and pushed straight to GitHub, so
-`origin/main` can be ahead on `frontDemo/` while local is ahead on backend/ML.
-Check `git rev-list --left-right --count main...origin/main` before assuming
-either side is current.
+`origin/main` can be ahead on `frontDemo/`. Fetch and compare `origin/main`
+with the commit you are building on before assuming either side is current.
 
 ## 2. Paths from the other machine — fixed, but they come back
 
@@ -137,10 +150,11 @@ freshly frozen, independently labelled holdout.
 .venv/Scripts/python.exe -m ruff check . && .venv/Scripts/python.exe -m mypy ml backend scripts
 ```
 
-Baseline is **667 passed, 8 skipped** as of the last full run (2026-09-25, 4060 Ti; later changes added about 5 tests — re-run and update this) — six database
+Baseline is **677 passed, 8 skipped** as of the last full run (2026-09-25,
+4060 Ti) — six database
 tests skip because the Supabase project is paused (the pooler answers
-tenant/user not found, ISSUES X1), and two need a hybrid CPU. A drop below 667
-is a regression. ruff and mypy are both clean as of 2026-09-25 (mypy: 143
+tenant/user not found, ISSUES X1), and two need a hybrid CPU. A drop below 677
+is a regression. ruff and mypy are both clean as of 2026-09-25 (mypy: 147
 files); keep them that way. For the frontend,
 `cd frontDemo && npx tsc -b && npm run check` (14 scripts; the corpus and
 real-run checks skip on a machine without their data or the exported model).

@@ -82,11 +82,29 @@ export const SOURCE = {
   trackingGap: "tracking-gap",
   trackingPredicted: "tracking-predicted",
   trackingMarkers: "tracking-markers",
-  flow: "flow-arrows",
+  vessels: "vessels",
 } as const;
 
-/** The arrow the flow layers draw, registered by `MapCanvas` as an SDF image so `icon-color` tints it. */
-export const FLOW_ARROW = "flow-arrow";
+/**
+ * Put the camera on a scene: its `view` when it has one (that zoom, the lower
+ * edge on `south`, centred between `west` and `east`), else centre + zoom.
+ * Lives here, not in MapCanvas, so the map and the home button share it.
+ */
+export function frameScene(
+  map: { jumpTo: (o: { center: [number, number]; zoom: number }) => unknown; panBy: (o: [number, number], a: { animate: boolean }) => unknown; getContainer: () => HTMLElement },
+  meta: { centre: [number, number]; zoom: number; view?: { west: number; east: number; south: number; zoom: number } },
+): void {
+  const v = meta.view;
+  if (!v) {
+    map.jumpTo({ center: meta.centre, zoom: meta.zoom });
+    return;
+  }
+  map.jumpTo({ center: [(v.west + v.east) / 2, v.south], zoom: v.zoom });
+  map.panBy([0, -map.getContainer().clientHeight / 2], { animate: false });
+}
+
+/** The ship the `vessel-icons` layer draws: registered by `MapCanvas` as an SDF image so `icon-color` tints it. */
+export const SHIP_ICON = "ship-icon";
 
 /* ------------------------------------------------------------------ *
  * The world under the data
@@ -429,27 +447,7 @@ export function dataLayers(paint: MapPaint): LayerSpecification[] {
       filter: ["==", ["get", "band"], 50],
       paint: { "line-color": paint.contour50, "line-width": 1.4 * k },
     },
-    // Wind and surface current over the event, one arrow per coarse cell,
-    // each the cell's mean (`sim/flow.ts`), pointing where the air or water
-    // goes. A few large arrows show the general movement; sized by speed
-    // within a narrow range.
-    ...(["wind", "current"] as const).map(
-      (kind): LayerSpecification => ({
-        id: `flow-${kind}`,
-        type: "symbol",
-        source: SOURCE.flow,
-        filter: ["==", ["get", "kind"], kind],
-        layout: {
-          "icon-image": FLOW_ARROW,
-          "icon-rotate": ["get", "towardDeg"],
-          "icon-rotation-alignment": "map",
-          "icon-allow-overlap": true,
-          "icon-ignore-placement": true,
-          "icon-size": ["interpolate", ["linear"], ["get", "speed"], 0, 0.8, kind === "wind" ? 12 : 0.8, 1.3],
-        },
-        paint: { "icon-color": kind === "wind" ? paint.target : paint.contour50, "icon-opacity": 0.8 },
-      }),
-    ),
+    // Wind and current are not layers: they move, on their own canvas (`FlowStreaks`).
     {
       id: "traffic",
       type: "line",
@@ -520,6 +518,28 @@ export function dataLayers(paint: MapPaint): LayerSpecification[] {
         "line-width": 1,
         "line-dasharray": [2, 2],
         "line-opacity": 0.55,
+      },
+    },
+    // Every ship reporting near the playhead, drawn as a ship turned to its
+    // course (the user, 2026-09-26): candidates in the suspect ink, passing
+    // traffic smaller and faint. `LayerToggles.shipIcons` off puts back the dots.
+    {
+      id: "vessel-icons",
+      type: "symbol",
+      source: SOURCE.vessels,
+      layout: {
+        "icon-image": SHIP_ICON,
+        "icon-rotate": ["get", "cog"],
+        "icon-rotation-alignment": "map",
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": true,
+        "icon-size": ["case", ["get", "candidate"], 0.62, 0.46],
+      },
+      paint: {
+        "icon-color": ["case", ["get", "candidate"], paint.suspect, paint.target],
+        "icon-opacity": ["case", ["get", "candidate"], 1, 0.5],
+        "icon-halo-color": paint.water,
+        "icon-halo-width": 1,
       },
     },
     {
@@ -623,10 +643,12 @@ export interface LayerToggles {
   /** The release itself, played forward from the first hour of the discharge. */
   release: boolean;
   darkVessel: boolean;
-  /** Small wind arrows on and around the event (`sim/flow.ts`). */
+  /** Moving wind streaks on and around the event (`map/FlowStreaks.ts`). */
   windArrows: boolean;
-  /** Small surface-current arrows, half a step off the wind arrows. */
+  /** Moving surface-current streaks, the same way. */
   currentArrows: boolean;
+  /** Ships drawn as ships turned to their course; off, the earlier dots. */
+  shipIcons: boolean;
 }
 
 export const DEFAULT_TOGGLES: LayerToggles = {
@@ -654,4 +676,5 @@ export const DEFAULT_TOGGLES: LayerToggles = {
   darkVessel: true,
   windArrows: true,
   currentArrows: true,
+  shipIcons: true,
 };

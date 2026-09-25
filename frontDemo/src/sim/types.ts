@@ -286,6 +286,12 @@ export interface ScenarioMeta {
   acquiredAt: number;
   centre: LngLat;
   zoom: number;
+  /**
+   * A framing fixed by its bottom edge rather than its centre (`frameScene`):
+   * this zoom, centred between `west` and `east`, the view's lower edge on
+   * `south`. Set where a view was chosen by eye; otherwise `centre` + `zoom`.
+   */
+  view?: { west: number; east: number; south: number; zoom: number };
   sceneId: string;
   summary: string;
   /** What this scenario is meant to prove. */

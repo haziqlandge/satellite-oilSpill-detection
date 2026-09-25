@@ -26,7 +26,7 @@ import { ensureRealRun, REAL_RUN_LISTINGS, setRealRunLoader, type RealSceneFile 
 import type { RealDriftRun } from '../src/sim/realDrift';
 import { buildRun } from '../src/sim/scenarios';
 import { windGate } from '../src/sim/slick';
-import { flowCells, flowMean, isSimulated, spillParts } from '../src/sim/flow';
+import { flowMean, isSimulated, ringsBbox, spillParts } from '../src/sim/flow';
 import type { LngLat } from '../src/sim/types';
 import { useDiskLandmask } from './landmaskDisk';
 import { detectionFeatures } from '../src/map/detectionView';
@@ -199,9 +199,8 @@ for (const { id, scene } of REAL_RUN_LISTINGS) {
   assert.ok(!isSimulated(run.flow.windSource) && !isSimulated(run.flow.currentSource),
     `${id}: a real run's wind or current reads as simulated (${run.flow.windSource} / ${run.flow.currentSource})`);
   assert.equal(run.trafficSource, 'marinecadastre AIS', `${id}: the Gulf runs' ships are real AIS`);
-  const cells = flowCells([...spillParts(run.detection), ...run.drift.frames.flatMap((f) => f.contour90)]);
-  assert.ok(cells.length >= 1 && cells.length <= 9, `${id}: ${cells.length} arrow cells; a few averaged arrows, not a scatter`);
-  assert.ok(cells.some((c) => flowMean(run.flow!, 'current', c.bbox, 0) !== null), `${id}: no cell has a current at the pass`);
+  // The streaks and the cards read the current around the spill: it must be there at the pass.
+  assert.ok(flowMean(run.flow, 'current', ringsBbox(spillParts(run.detection), 1.5), 0) !== null, `${id}: no current around the spill at the pass`);
 
   // The refusal: no age (C1 keeps the triple), nobody ranked, and it says why.
   // With an age when the export converged (its own triple, C1), without one when it did not.

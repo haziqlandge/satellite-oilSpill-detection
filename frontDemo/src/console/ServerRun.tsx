@@ -12,10 +12,10 @@
  * in the pipeline's own words, in the warning tone, not hidden.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getRun, useApi, watchRun, type ApiRunStage, type ApiRunStatus } from "../lib/api";
 import { registerApiRun, type RealRunId } from "../sim/realRun";
-import { Flag } from "./components";
+import { Flag, useFollowRunning } from "./components";
 
 const formatMs = (ms: number) => (ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`);
 
@@ -50,6 +50,8 @@ export function ServerRunTimings({ runId }: { runId: string }) {
   }, [runId]);
 
   const running = run?.stages.some((s) => s.state === "running") ?? false;
+  const list = useRef<HTMLUListElement>(null);
+  useFollowRunning(list, run?.stages.find((s) => s.state === "running")?.key ?? run?.status ?? "");
   useEffect(() => {
     if (!running) return;
     const timer = window.setInterval(() => tick((n) => n + 1), 250);
@@ -74,7 +76,7 @@ export function ServerRunTimings({ runId }: { runId: string }) {
     </div>
     <p className="num mt-1 px-2 text-[10px]" style={{ color: "var(--ink-faint)" }}>
       {run.source}{run.use_precomputed ? " · PRECOMPUTED segmentation requested" : ""}</p>
-    <ul className="mt-2 border" style={{ borderColor: "var(--line)" }} data-server-stages>
+    <ul ref={list} className="mt-2 border" style={{ borderColor: "var(--line)" }} data-server-stages>
       {run.stages.map((s) =>
         <li key={s.key} data-stage={s.key} data-stage-status={s.state}
           className="flex items-start justify-between gap-3 border-b px-2 py-2 text-[11px]" style={{ borderColor: "var(--line)" }}>

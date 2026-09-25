@@ -249,6 +249,33 @@ export function realVessels(scene: string): Vessel[] {
   return vessels;
 }
 
+/**
+ * An upload's traffic: the hosted real export whose box and time window hold
+ * the upload, installed as the "upload" scene's traffic; null when none does
+ * (the upload then simulates its traffic, labelled SIM). Only the Gulf days on
+ * this site are hosted; there is no free AIS feed a browser can query (F14).
+ */
+export async function realTrafficForUpload(centre: LngLat, acquiredAt: number): Promise<RealTrafficFile | null> {
+  files.delete("upload");
+  vesselCache.delete("upload");
+  for (const scene of REAL_RUN_AIS_SCENES) {
+    // The scene name carries its day: skip the fetch unless it is within two days.
+    const day = Date.parse(`${scene.slice(5, 9)}-${scene.slice(9, 11)}-${scene.slice(11, 13)}T00:00:00Z`);
+    if (!(Math.abs(day - acquiredAt) < 2 * 86_400_000)) continue;
+    await ensureRealTraffic(scene);
+    const file = files.get(scene);
+    if (!file) continue;
+    const t0 = Date.parse(file.acquiredAt);
+    const [west, south, east, north] = file.box;
+    if (centre[0] >= west && centre[0] <= east && centre[1] >= south && centre[1] <= north
+      && acquiredAt >= t0 + file.window.startS * 1000 && acquiredAt <= t0 + file.window.endS * 1000) {
+      files.set("upload", file);
+      return file;
+    }
+  }
+  return null;
+}
+
 /** The id of the vessel the publication names, or null for a scene without one. */
 export function publishedVesselId(scene: string): string | null {
   return files.get(scene)?.vessels.find((v) => v.published)?.id ?? null;

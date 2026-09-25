@@ -30,7 +30,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { Flag, GroupHead, SCROLL } from "./components";
+import { Flag, GroupHead, ScrollArea, useFollowRunning } from "./components";
 import { DEMO_PRESETS, DEMO_SAMPLE_KEYS, type DemoSampleKey } from "../site/demoData";
 import { DB_WINDOW, parseAcquisitionTime, ribbonFromMask, type Ribbon } from "../sim/ingest";
 import { looksLikeTiff, type GeoRaster } from "../sim/geotiff";
@@ -39,13 +39,15 @@ import { isAbort, loadManifest, loadSegmenter, segment, type Segmentation } from
 import { findPrecomputed, sha256Hex, toSegmentation, type PrecomputedEntry } from "../sim/precomputed";
 import { despeckle } from "../sim/despeckle";
 import { buildUploadSpec } from "../sim/uploadSpec";
+import { fetchMeasuredFlow } from "../sim/metocean";
+import { realTrafficForUpload } from "../sim/realAis";
 import { registerUpload } from "../sim/scenarios";
-import { ensureLandmask, isLand, LANDMASK_SOURCE, type LandmaskBuild } from "../sim/landmask";
+import { ensureLandmask, isLand, type LandmaskBuild } from "../sim/landmask";
 import { PositionPicker } from "./PositionPicker";
 import { ApiProblem, refreshApi, startRun, watchRun } from "../lib/api";
 import { ServerRunTimings } from "./ServerRun";
 import { RasterViewer } from "./RasterViewer";
-import type { LngLat, ScenarioId } from "../sim/types";
+import type { FlowGrid, LngLat, ScenarioId } from "../sim/types";
 
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -321,6 +323,8 @@ export const UPLOAD_STAGES = [
   "Trace outline",
   "Despeckle (display only)",
   "Coastline tiles (GSHHG)",
+  "Wind and currents (ERA5, Copernicus)",
+  "AIS traffic (marinecadastre)",
   "Drift, traffic and scoring",
 ] as const;
 export type UploadStage = (typeof UPLOAD_STAGES)[number];
@@ -444,8 +448,9 @@ export const nextFrame = () => new Promise<void>((resolve) => {
  * button when the operator moves the scene. The coastline is the one piece of
  * data an upload run fetches -- GSHHG tiles for wherever the scene is, served
  * from `public/landmask/` -- and it must be in hand before the drift, or the
- * slick could be drifted across land. Wind, currents and AIS for an upload are
- * simulated, and the provenance says so.
+ * slick could be drifted across land. Wind and currents are then fetched for
+ * this place and time (`sim/metocean.ts`); AIS for an upload is simulated, and
+ * the provenance says so.
  */
 export async function runUpload(a: { centre: LngLat; acrossKm: number; acquiredAt: number }) {
   const ribbon = session.ribbon;
@@ -475,7 +480,33 @@ export async function runUpload(a: { centre: LngLat; acrossKm: number; acquiredA
     stageEnd("Coastline tiles (GSHHG)", "failed", "unavailable; drift will not strand on land");
     publish({ coastline: null, preparing: "Coastline unavailable — drift will not strand on land" });
   }
+  // The measured forcing for this place and time. Without it the drift runs
+  // through the simulated field, and the panels tag it SIM.
+  const forcingStage = "Wind and currents (ERA5, Copernicus)";
+  stageStart(forcingStage);
+  publish({ preparing: "Fetching ERA5 wind and Copernicus currents for this place and time" });
+  let measured: FlowGrid | null = null;
+  try {
+    measured = await fetchMeasuredFlow(a.centre, a.acquiredAt, -36, 72);
+    if (sequence !== uploadSequence) return;
+    stageEnd(forcingStage, measured ? "done" : "failed", !measured
+      ? "no ERA5 hours for this time (ERA5 is ~5 days behind); drift field SIM"
+      : `ERA5 wind${measured.current ? " + SMOC currents" : "; no currents for this date (SIM)"}, ${measured.hours.length} h, Open-Meteo`);
+  } catch (error) {
+    if (sequence !== uploadSequence) return;
+    stageEnd(forcingStage, "failed", `unreachable (${(error as Error).message}); drift field SIM`);
+  }
+  const aisStage = "AIS traffic (marinecadastre)";
+  stageStart(aisStage);
+  const ais = await realTrafficForUpload(a.centre, a.acquiredAt).catch(() => null);
+  if (sequence !== uploadSequence) return;
+  stageEnd(aisStage, ais ? "done" : "failed", ais
+    ? `${ais.vessels.length} recorded vessels, ${ais.acquiredAt.slice(0, 10)}, identities withheld`
+    : "none hosted for this place and day (US Gulf days only); ships SIM");
+  publish({ preparing: "" });
   registerUpload(buildUploadSpec(ribbon, {
+    measured,
+    realAis: ais !== null,
     centre: a.centre,
     acrossKm: a.acrossKm,
     acquiredAt: a.acquiredAt,
@@ -491,11 +522,16 @@ export async function runUpload(a: { centre: LngLat; acrossKm: number; acquiredA
  * Send the upload to the live pipeline (FUTURE_WORK §3), when it is running.
  *
  * Only a georeferenced GeoTIFF: the pipeline needs a position it can read and a
- * time (a Sentinel-1 product name, or TIFFTAG_DATETIME). The browser's own run
- * goes on regardless; the real one streams its stages into the Model Timing
- * pane and opens as its own view when it finishes (`ConsoleShell`).
+ * time. A file that carries its time (a Sentinel-1 product name, or
+ * TIFFTAG_DATETIME) goes at once; one that does not waits in `awaitingTime`
+ * until the operator runs it with a time, which is sent as asserted -- never the
+ * panel's default. The browser's own run goes on regardless; the real one
+ * streams its stages into the Model Timing pane and opens as its own view when
+ * it finishes (`ConsoleShell`).
  */
-async function sendToPipeline(file: File, usePrecomputed: boolean, sequence: number) {
+let awaitingTime: { file: File; usePrecomputed: boolean; sequence: number } | null = null;
+
+async function sendToPipeline(file: File, usePrecomputed: boolean, sequence: number, acquiredAt?: number) {
   const api = await refreshApi();
   if (sequence !== uploadSequence) return;
   if (!api.up) {
@@ -503,7 +539,7 @@ async function sendToPipeline(file: File, usePrecomputed: boolean, sequence: num
     return;
   }
   try {
-    const run = await startRun(file, { usePrecomputed });
+    const run = await startRun(file, { usePrecomputed, acquiredAt });
     if (sequence !== uploadSequence) return;
     publish({ server: { id: run.id, note: "" } });
     watchRun(run.id);
@@ -703,7 +739,12 @@ export async function uploadSample(file: File) {
 
     // A georeferenced raster also goes to the live pipeline, with the same
     // choice the operator made here: a precomputed segmentation, or a live one.
-    if (geo) void sendToPipeline(file, backend === "precomputed", sequence);
+    awaitingTime = null;
+    if (geo && session.parsedAcquiredAt !== null) void sendToPipeline(file, backend === "precomputed", sequence);
+    else if (geo) {
+      awaitingTime = { file, usePrecomputed: backend === "precomputed", sequence };
+      publish({ server: { id: null, note: "This file carries no acquisition time. Set it below and press Re-run: the live pipeline then runs with that time, recorded as asserted." } });
+    }
 
     stageStart("Trace outline");
     await nextFrame();
@@ -919,11 +960,13 @@ export function UploadTimings() {
   const elapsed = (t: StageTiming) =>
     t.status === "running" && t.startedAt !== null ? now - t.startedAt : t.durationMs;
   const total = current.timings.reduce((sum, t) => sum + elapsed(t), 0);
+  const list = useRef<HTMLUListElement>(null);
+  useFollowRunning(list, current.timings.find((t) => t.status === "running")?.label ?? current.state);
   return <>
-    <p className="num mt-2 px-2 text-[10px]" style={{ color: "var(--ink-faint)" }}>
-      in this browser · pipeline timings for {current.sourceName || "this upload"}</p>
+    <p className="num mt-2 truncate px-2 text-[10px]" style={{ color: "var(--ink-faint)" }} title={current.sourceName}>
+      in this browser · {current.sourceName || "this upload"}</p>
     {current.sourceUrl && <div className="mt-2 px-2"><PrecomputedControl s={current} /></div>}
-    <ul className="mt-2 border" style={{ borderColor: "var(--line)" }} data-upload-timings>
+    <ul ref={list} className="mt-2 border" style={{ borderColor: "var(--line)" }} data-upload-timings>
       {current.timings.map((t) =>
         <li key={t.label} data-stage-status={t.status}
           className="flex items-start justify-between gap-3 border-b px-2 py-2 text-[11px]" style={{ borderColor: "var(--line)" }}>
@@ -948,9 +991,6 @@ export function UploadTimings() {
       <li className="flex justify-between px-2 py-2 text-[11px] font-medium">
         <span>Total{running ? " so far" : ""}</span><span className="num">{formatMs(total)}</span></li>
     </ul>
-    <p className="mt-2 px-2 text-[9.5px] leading-[1.5]" style={{ color: "var(--ink-faint)" }}>
-      Measured in this browser for this upload, as it runs. Drift, traffic and scores are
-      simulated physics; the time they take to compute is real.</p>
     {current.server.id && <div className="mt-3 border-t pt-1" style={{ borderColor: "var(--line)" }}>
       <ServerRunTimings runId={current.server.id} />
     </div>}
@@ -1032,136 +1072,108 @@ export function SampleImagePanel({ onSelect }: { onSelect: (id: ScenarioId) => v
   const run = async () => {
     if (!current.ribbon || !parsed.valid) return;
     await runUpload({ centre: parsed.centre, acrossKm: parsed.across, acquiredAt: parsed.at });
+    // The operator has now stated the time a timeless GeoTIFF was waiting for.
+    const waiting = awaitingTime;
+    if (waiting && waiting.sequence === uploadSequence) {
+      awaitingTime = null;
+      void sendToPipeline(waiting.file, waiting.usePrecomputed, waiting.sequence, parsed.at);
+    }
   };
 
   const m = current.measured;
-  return <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2" style={SCROLL} data-console-image-lab>
-    <GroupHead right={<Flag tone="warn">trained segmenter · research</Flag>}>add image</GroupHead>
+  const geo = current.geo;
+  const done = (label: string) => current.timings.find((t) => t.label === label)?.status === "done";
+  return <ScrollArea className="px-2 py-2" data-console-image-lab>
+    <GroupHead right={<Flag tone="warn">segmenter · research</Flag>}>add image</GroupHead>
 
-    <div className="mt-2 border border-dashed p-3" style={{ borderColor: "var(--accent)" }}
+    <div className="mt-2 flex items-center gap-2 border border-dashed p-2" style={{ borderColor: "var(--accent)" }}
       tabIndex={0} aria-label="Drop images here"
       onDragOver={event => event.preventDefault()}
       onDrop={event => { event.preventDefault(); upload(event.dataTransfer.files); }}
       onPaste={event => { if (event.clipboardData.files.length) { event.preventDefault(); upload(event.clipboardData.files); } }}>
-      <p className="text-[11px]">Drop a SAR raster. A GeoTIFF brings its own position;
-        a PNG or JPEG needs one stated.</p>
-      <p className="mt-1 text-[10px]" style={{ color: "var(--ink-faint)" }}>
-        Corpus tiles: <span className="num">data/processed/dataset/oos/images/train/</span> —
-        prefer <span className="num">train</span> over <span className="num">test</span>, which is
-        the consumed holdout. Georeferenced windows:
-        <span className="num"> data/processed/sar/windows/</span>, cut by
-        <span className="num"> scripts/cut_geotiff_window.py</span>.</p>
       <button type="button" onClick={() => input.current?.click()}
-        className="mt-3 cursor-pointer border px-3 py-2 text-[11px] uppercase"
+        className="shrink-0 cursor-pointer border px-3 py-1.5 text-[11px] uppercase"
         style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>Upload image</button>
+      <span className="text-[10px]" style={{ color: "var(--ink-faint)" }}
+        title="A GeoTIFF brings its own position and often its time; a PNG or JPEG needs both stated. Georeferenced windows: data/processed/sar/windows/.">
+        or drop a GeoTIFF, PNG or JPEG</span>
       <input ref={input} type="file" accept="image/*" className="hidden" aria-label="Image file"
         onChange={event => { upload(event.target.files); event.target.value = ""; }} />
-      {current.error && <p role="alert" className="mt-2 text-[11px]" style={{ color: "var(--alarm)" }}>{current.error}</p>}
     </div>
+    {current.error && <p role="alert" className="mt-2 text-[11px]" style={{ color: "var(--alarm)" }}>{current.error}</p>}
 
-    {current.sourceUrl && <div className="mt-3 space-y-3">
+    {current.sourceUrl && <div className="mt-2 space-y-2">
       <div role="status" aria-live="polite" className="flex items-center gap-2 text-[11px]" data-sample-stage={current.step}>
         {processing && <span aria-hidden className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />}
-        <span>{message}</span>
+        <span className="min-w-0 flex-1">{message}</span>
       </div>
-      <p className="num text-[10px]" style={{ color: "var(--ink-faint)" }}>{current.sourceName}</p>
+      <p className="num truncate text-[10px]" style={{ color: "var(--ink-faint)" }} title={current.sourceName}>{current.sourceName}</p>
       <PrecomputedControl s={current} />
 
-      {/* Only the uploaded image and the mask here (the user, 2026-09-24): the
-          despeckled copy is display-only and lives in the detect pane and the
-          full-size viewer. The image shows once decoded -- a TIFF has no
-          picture before that -- and the mask once the model has run. */}
-      {(current.step >= 1 || current.maskUrl) && <div className="grid gap-2" data-upload-pair>
-        <figure className="border" style={{ borderColor: "var(--line)" }} data-upload-input>
-          <figcaption className="px-2 py-1 text-[10px] uppercase">Uploaded image
-            <span className="block normal-case" style={{ color: "var(--ink-faint)" }}>
-              {current.geo ? `band ${current.geo.band}` : "the raster"} as the segmenter saw it</span></figcaption>
-          <img src={current.sourceUrl} alt="uploaded image" className="mx-auto block max-h-56 object-contain"
-            style={{ background: "var(--ink-void, #0b0f12)" }} />
-        </figure>
-        {current.geo && current.geo.noDataFraction > 0.001 &&
-          <p className="text-[10px]" style={{ color: "var(--ink-faint)" }} data-no-data-note>
-            {(current.geo.noDataFraction * 100).toFixed(0)}% of this frame is no data — outside the
-            satellite's swath, stored as zeros in the file. The model is given it as white, exactly as
-            in training, and is told to ignore it.</p>}
-        {current.maskUrl && <figure className="border" style={{ borderColor: "var(--line)" }}>
-          <figcaption className="px-2 py-1 text-[10px] uppercase">Mask · shaded: everything the model marked · outline: the slick drifted
-            <span className="block normal-case" style={{ color: "var(--ink-faint)" }}>drawn over the uploaded image, which is what the model ran on</span></figcaption>
-          <img src={current.maskUrl} alt="segmented slick" className="mx-auto block max-h-56 object-contain"
-            style={{ background: "var(--ink-void, #0b0f12)" }} data-mask-ready />
-        </figure>}
+      {/* The uploaded image and the mask side by side (the user, 2026-09-26);
+          the despeckled copy lives in the detect pane and the full-size viewer. */}
+      {(current.step >= 1 || current.maskUrl) && <div className="grid grid-cols-2 gap-1.5" data-upload-pair>
+        {([
+          ["SAR image", current.sourceUrl, `${geo ? `band ${geo.band}` : "the raster"} as the segmenter saw it`],
+          ["Mask", current.maskUrl, "shaded: everything the model marked · outline: the slick drifted"],
+        ] as const).map(([label, url, hint]) =>
+          <figure key={label} className="border" style={{ borderColor: "var(--line)" }} title={hint}>
+            <figcaption className="px-1.5 py-0.5 text-[9.5px] uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>{label}</figcaption>
+            {url
+              ? <img src={url} alt={label} className="block aspect-square w-full object-contain"
+                  style={{ background: "var(--ink-void, #0b0f12)" }} data-mask-ready={label === "Mask" || undefined} />
+              : <div className="flex aspect-square w-full items-center justify-center text-[10px]"
+                  style={{ background: "var(--ink-void, #0b0f12)", color: "var(--ink-faint)" }}>segmenting…</div>}
+          </figure>)}
       </div>}
 
-      {m && <div className="space-y-1 border p-2" style={{ borderColor: "var(--line)" }}>
-        <p className="text-[10px] uppercase" style={{ color: "var(--ink-faint)" }}>measured from this raster</p>
-        <Row label="raster" value={`${m.width} × ${m.height}`} />
-        <Row label="model" value="L1-ciou · research release" />
-        <Row label="detections" value={`${m.detections} over ${m.tiles} tile${m.tiles === 1 ? "" : "s"}`} />
-        <Row label="best score" value={m.score.toFixed(2)} tone={m.score < 0.5 ? "var(--alarm)" : undefined} />
-        <Row label="marked" value={`${(m.markedFraction * 100).toFixed(2)} % of frame`} />
-        <Row label="drifted slick" value={`${(m.coverage * 100).toFixed(2)} % of frame · ${m.components} group${m.components === 1 ? "" : "s"} found`} />
-        <Row label="damping" value={`${m.dampingDb.toFixed(2)} dB`} />
-        <Row label="inference" value={`${(m.inferMs / 1000).toFixed(1)} s · ${m.backend}`} />
-        {m.touchesEdge && <p className="text-[10px]" style={{ color: "var(--alarm)" }}>
-          Slick reaches the frame edge; its true extent is cut off by the tile.</p>}
-        <p className="pt-1 text-[10px]" style={{ color: "var(--ink-faint)" }}>
-          The project's trained segmenter, run in your browser. It marks slick-like
-          regions; it cannot tell oil from a natural film, so this is classed
-          <span className="num"> slick_unknown</span>. On the held-out test it scored
-          mAP50 0.36 and missed most small slicks, so an empty result is not proof of
-          clean water.</p>
-      </div>}
+      {m && <Readings title="measured" rows={[
+        ["raster", `${m.width} × ${m.height}`],
+        ["detections", `${m.detections} · ${m.tiles} tile${m.tiles === 1 ? "" : "s"}`],
+        ["best score", m.score.toFixed(2), m.score < 0.5 ? "var(--alarm)" : undefined],
+        ["marked", `${(m.markedFraction * 100).toFixed(2)} %`],
+        ["drifted", `${(m.coverage * 100).toFixed(2)} % · ${m.components} grp`],
+        ["damping", `${m.dampingDb.toFixed(2)} dB`],
+        ["inference", `${(m.inferMs / 1000).toFixed(1)} s · ${m.backend}`],
+        ["class", "slick_unknown"],
+      ]} hint="The trained segmenter (L1-ciou research release) in this browser. It cannot tell oil from a natural film, so the class is slick_unknown; on the held-out test it scored mAP50 0.36 and missed most small slicks, so an empty result is not proof of clean water." />}
+      {m?.touchesEdge && <p className="text-[10px]" style={{ color: "var(--alarm)" }}>slick cut off at the frame edge</p>}
 
       {(current.state === "ready" || (current.state === "complete" && !current.key)) &&
         <div className="space-y-2 border p-2" style={{ borderColor: "var(--accent)" }}>
-        <p className="text-[10px] uppercase" style={{ color: "var(--accent)" }}>
-          {current.geo ? "read from the raster" : "asserted, not measured"}</p>
-        <p className="text-[10px]" style={{ color: "var(--ink-faint)" }}>
-          {current.geo
-            ? "This GeoTIFF carries its own geotransform, so the position and scale below are measured, not stated. Edit them only if you know the file is wrong."
-            : "This raster carries no georeferencing, so position and scale cannot be read from it. It was run at the default position below; move it and re-run. The run is stamped POSITION ASSERTED either way."}</p>
-        {current.geo && <div className="space-y-1 pb-1">
-          <Row label="band" value={current.geo.bandCount > 1 ? `${current.geo.band} of ${current.geo.bandCount}` : "single"} />
-          <Row label="source range" value={`${current.geo.lowDb.toFixed(1)} to ${current.geo.highDb.toFixed(1)} dB`} />
-          {current.geo.noDataFraction > 0.001 &&
-            <Row label="no data" value={`${(current.geo.noDataFraction * 100).toFixed(0)}% · outside the swath`} />}
-          <Row
-            label="mapped from"
-            value={current.geo.scaledThroughWindow
-              ? `${current.geo.mappedLow.toFixed(1)} to ${current.geo.mappedHigh.toFixed(1)} dB`
-              : "already 8-bit"}
-            tone={current.geo.windowFallback ? "var(--alarm)" : undefined} />
-          {current.geo.bandCount > 1 && <p className="text-[10px]" style={{ color: "var(--ink-faint)" }}>
-            {current.geo.bandNote}. The bands carry no names (DATA.md D5); over the sea the
-            co-polarised return is the brighter one, and it is the band oil damping shows in.</p>}
-          {current.geo.windowFallback && <p className="text-[10px]" style={{ color: "var(--alarm)" }}>
-            This scene sits outside the corpus window of -35 to 0 dB, which would have clipped most
-            of it to black. Its own range was used instead, so greys here are NOT comparable with
-            other tiles.</p>}
-        </div>}
-        <Field label={current.geo ? "position from the raster — move only if it is wrong" : "click or drag to place the scene"}>
-          <PositionPicker
-            centre={parsed.validCentre}
-            acrossKm={parsed.validAcross}
-            onChange={([nextLon, nextLat]) => { setLon(String(nextLon)); setLat(String(nextLat)); }}
-          />
-        </Field>
-        <Field label="image width (km) — the green box is this much ground">
-          <input className={INPUT} style={{ borderColor: "var(--line)" }} value={acrossKm}
-            onChange={e => setAcrossKm(e.target.value)} inputMode="decimal" />
-        </Field>
+        <p className="text-[10px] uppercase tracking-[0.14em]" style={{ color: "var(--accent)" }}
+          title={geo ? "Read from the GeoTIFF's own geotransform: measured, not stated." : "This raster carries no georeferencing: the position is stated, and the run is stamped POSITION ASSERTED."}>
+          geolocation of slick{geo ? "" : " · asserted"}</p>
+        {geo && <Readings rows={[
+          ["band", geo.bandCount > 1 ? `${geo.band} of ${geo.bandCount}` : "single"],
+          ["range", `${geo.lowDb.toFixed(1)}…${geo.highDb.toFixed(1)} dB`],
+          ...(geo.noDataFraction > 0.001 ? [["no data", `${(geo.noDataFraction * 100).toFixed(0)} % swath edge`] as const] : []),
+          ["mapped", geo.scaledThroughWindow ? `${geo.mappedLow.toFixed(0)}…${geo.mappedHigh.toFixed(0)} dB` : "8-bit",
+            geo.windowFallback ? "var(--alarm)" : undefined],
+        ]} hint={geo.bandCount > 1 ? `${geo.bandNote}. The bands carry no names (DATA.md D5).` : undefined} />}
+        {geo?.windowFallback && <p className="text-[10px]" style={{ color: "var(--alarm)" }}>
+          outside the −35…0 dB corpus window: greys not comparable with other tiles</p>}
+        <PositionPicker
+          centre={parsed.validCentre}
+          acrossKm={parsed.validAcross}
+          onChange={([nextLon, nextLat]) => { setLon(String(nextLon)); setLat(String(nextLat)); }}
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="width km">
+            <input className={INPUT} style={{ borderColor: "var(--line)" }} value={acrossKm}
+              onChange={e => setAcrossKm(e.target.value)} inputMode="decimal" />
+          </Field>
+          <Field label={`time UTC${current.parsedAcquiredAt ? " · from file" : " · not in file"}`}>
+            <input className={INPUT} style={{ borderColor: "var(--line)" }} type="datetime-local" value={when} onChange={e => setWhen(e.target.value)} />
+          </Field>
+        </div>
         <details>
-          <summary className="cursor-pointer text-[10px] uppercase" style={{ color: "var(--ink-faint)" }}>
-            type coordinates instead
-          </summary>
+          <summary className="cursor-pointer text-[10px] uppercase" style={{ color: "var(--ink-faint)" }}>coordinates</summary>
           <div className="mt-1 grid grid-cols-2 gap-2">
-            <Field label="centre lat"><input className={INPUT} style={{ borderColor: "var(--line)" }} value={lat} onChange={e => setLat(e.target.value)} inputMode="decimal" /></Field>
-            <Field label="centre lon"><input className={INPUT} style={{ borderColor: "var(--line)" }} value={lon} onChange={e => setLon(e.target.value)} inputMode="decimal" /></Field>
+            <Field label="lat"><input className={INPUT} style={{ borderColor: "var(--line)" }} value={lat} onChange={e => setLat(e.target.value)} inputMode="decimal" /></Field>
+            <Field label="lon"><input className={INPUT} style={{ borderColor: "var(--line)" }} value={lon} onChange={e => setLon(e.target.value)} inputMode="decimal" /></Field>
           </div>
         </details>
-        <Field label={`acquisition UTC${current.parsedAcquiredAt ? " · parsed from file name" : " · not in the file name"}`}>
-          <input className={INPUT} style={{ borderColor: "var(--line)" }} type="datetime-local" value={when} onChange={e => setWhen(e.target.value)} />
-        </Field>
         <button type="button" disabled={!parsed.valid || !!preparing} onClick={() => void run()}
           className="w-full cursor-pointer border px-3 py-2 text-[11px] uppercase disabled:cursor-not-allowed disabled:opacity-40"
           style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>
@@ -1172,16 +1184,25 @@ export function SampleImagePanel({ onSelect }: { onSelect: (id: ScenarioId) => v
           style={{ borderColor: "var(--line)" }}>Or open the authored {current.key} scenario</button>}
       </div>}
 
-      {current.state === "complete" && <>
-        <p className="text-[11px]" style={{ color: "var(--accent)" }}>Running your raster on the map · hindcast, forecast, traffic and evidence available.</p>
-        <button type="button" className="cursor-pointer border px-3 py-2 text-[11px] uppercase"
+      {current.state === "complete" && <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className="cursor-pointer border px-3 py-1.5 text-[11px] uppercase"
           style={{ borderColor: "var(--line)" }} onClick={() => onSelect("upload")}>Back to this run</button>
-        <p className="text-[10px]" style={{ color: "var(--ink-faint)" }}>−36 h hindcast · +72 h forecast · drift, AIS and scores simulated</p>
-        {coastline && <p className="text-[10px]" style={{ color: "var(--ink-faint)" }} data-coastline>
-          Coastline: {LANDMASK_SOURCE.split(" (")[0]}, the shoreline OpenDrift uses · {coastline.tiles} coastal
-          tile{coastline.tiles === 1 ? "" : "s"} · {(coastline.landFraction * 100).toFixed(0)}% land nearby
-          {coastline.fetched ? ` · loaded in ${coastline.ms} ms` : ""}</p>}
-      </>}
+        <span className="flex flex-wrap gap-1" data-coastline={coastline ? coastline.tiles : undefined}>
+          <Flag tone={done("Wind and currents (ERA5, Copernicus)") ? "ok" : "warn"}>{done("Wind and currents (ERA5, Copernicus)") ? "era5 + currents" : "sim forcing"}</Flag>
+          <Flag tone={done("AIS traffic (marinecadastre)") ? "ok" : "warn"}>{done("AIS traffic (marinecadastre)") ? "recorded ais" : "sim ships"}</Flag>
+          <Flag tone="warn">drift engine sim</Flag>
+        </span>
+      </div>}
     </div>}
+  </ScrollArea>;
+}
+
+/** Label / value pairs in two columns; the caveat, if any, on hover. */
+function Readings({ title, rows, hint }: { title?: string; rows: readonly (readonly [string, string, string?])[]; hint?: string }) {
+  return <div className="border p-2" style={{ borderColor: "var(--line)" }} title={hint}>
+    {title && <p className="mb-1 text-[9.5px] uppercase tracking-[0.14em]" style={{ color: "var(--ink-faint)" }}>{title}</p>}
+    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+      {rows.map(([label, value, tone]) => <Row key={label} label={label} value={value} tone={tone} />)}
+    </div>
   </div>;
 }

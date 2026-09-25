@@ -38,7 +38,7 @@ import {
   type ScenarioListing,
 } from "../sim/scenarios";
 import { ensureRealTraffic } from "../sim/realAis";
-import { ensureRealRun } from "../sim/realRun";
+import { ensureRealRun, subscribeApiRuns } from "../sim/realRun";
 import type { DriftVariant } from "../sim/scoring";
 import type { Run } from "../sim/types";
 
@@ -107,6 +107,18 @@ export function useSpill(
   const [hour, setHour] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [ablated, setAblated] = useState(false);
+
+  // A linked API run is not a scenario until the run list has loaded (F25):
+  // switch to it once it is registered.
+  useEffect(() => {
+    if (!fromUrl?.startsWith("real-api-") || isScenario(fromUrl)) return;
+    const unsubscribe = subscribeApiRuns(() => {
+      if (!isScenario(fromUrl)) return;
+      setScenarioRaw(fromUrl);
+      unsubscribe();
+    });
+    return unsubscribe;
+  }, [fromUrl]);
 
   const ref = useRef<HTMLDivElement | null>(null);
   const [visible, setVisible] = useState(eager);

@@ -792,3 +792,40 @@
     margin-top: 0.5rem;
   }
 }
+
+/* ---- scroll bodies that look scrollable (2026-09-26) ------------- *
+ *
+ * `ScrollArea` in console/components.tsx. A full-width bar in the accent on a
+ * visible track: the thin grey one read as a border, and nobody scrolled.
+ */
+[data-scroll] {
+  scrollbar-width: auto;
+  scrollbar-color: color-mix(in oklab, var(--accent) 60%, transparent)
+    color-mix(in oklab, var(--line) 55%, transparent);
+}
+[data-panel-reader] [data-scroll-more] {
+  display: none;
+}
+
+/* ---- denser panes in the dock (2026-09-26) ------------------------ *
+ *
+ * A pane body is a size container (`@container` on `PaneBody`). Wide enough,
+ * a figure and its readings sit side by side instead of stacked, which is most
+ * of what it takes for a pane to fit one view. The panel reader keeps its own,
+ * more specific, split above; there the notes print open (`Note`).
+ */
+@container (min-width: 360px) {
+  [data-block-split] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 0.75rem;
+    align-items: start;
+  }
+  [data-block-split] > [data-split-text] {
+    margin-top: 0;
+  }
+}
+[data-panel-reader] [data-note-body],
+[data-panel-reader] [data-block-body] {
+  display: block;
+}

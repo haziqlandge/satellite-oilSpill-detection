@@ -261,7 +261,10 @@ function sideFor(p: Placement, id: PanelId): DockSide {
   return homeSide(id);
 }
 
-const DEFAULT_SIZES: DockSizes = { left: 214, right: 430 };
+// Left widened from 214 at the user's request (2026-09-26): the timing and
+// control panels wrapped every other line.
+const DEFAULT_SIZES: DockSizes = { left: 270, right: 430 };
+const OLD_LEFT_DEFAULT = 214;
 
 export const DOCK_LIMITS: Record<DockSide, [number, number]> = {
   left: [150, 470],
@@ -509,10 +512,13 @@ export function useDock(): Dock {
   const [layout, setLayout] = useState<Layout>(
     () => stored.current?.layout ?? DEFAULT_LAYOUT,
   );
-  const [sizes, setSizes] = useState<DockSizes>(() => ({
-    ...DEFAULT_SIZES,
-    ...(stored.current?.sizes ?? {}),
-  }));
+  const [sizes, setSizes] = useState<DockSizes>(() => {
+    const kept = { ...(stored.current?.sizes ?? {}) };
+    // 214 was the left default until 2026-09-26, persisted on first visit
+    // whether or not anyone chose it; it gives way to the wider default.
+    if (kept.left === OLD_LEFT_DEFAULT) delete kept.left;
+    return { ...DEFAULT_SIZES, ...kept };
+  });
   const [collapsed, setCollapsed] = useState<Record<DockSide, boolean>>(() => ({
     left: false,
     right: false,

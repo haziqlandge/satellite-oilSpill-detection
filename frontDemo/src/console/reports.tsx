@@ -13,7 +13,7 @@
  * usually decides it cannot.
  */
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { SampleEvidenceImages } from "./SampleImagePanel";
 import { isSample } from "../sim/samples";
 import {
@@ -55,11 +55,12 @@ import {
   Note,
   Pane,
   Row,
+  Rows,
   Sourced,
   Table,
   Toggle,
 } from "./components";
-import { AnomalySeries, TermBar, TrackScope } from "./instruments";
+import { AnomalySeries, TrackScope } from "./instruments";
 import { zoneCaveats, zoneOf } from "../sim/regions";
 import { PaneBody } from "./panes";
 
@@ -229,6 +230,9 @@ function sharedNote(tag: CandidateTag | undefined): string {
  * 04 ATTRIBUTE
  * ================================================================== */
 
+/** Candidates listed before "all" is pressed. */
+const TOP_ROWS = 10;
+
 export function Attribute({ run, state }: { run: Run; state: SpillState }) {
   // Candidates whose track is recorded AIS; every other candidate is simulated and flagged SIM.
   const recorded = useMemo(
@@ -237,6 +241,9 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
   );
   const { ablated, setAblated, selectedId, setSelectedId } = state;
   const rows = useMemo(() => orderedSuspects(run, ablated), [run, ablated]);
+  // The top of the list in view; the rest one press away (a pane should fit one view).
+  const [all, setAll] = useState(false);
+  const shown = all ? rows : rows.slice(0, TOP_ROWS);
   const halt = run.drift.insufficientEvidence;
   // This table prints `label`, so that is what it disambiguates.
   const tags = useMemo(() => disambiguate(rows, (s) => s.label), [rows]);
@@ -322,7 +329,7 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
         )}
 
         <Block label="Weights" right={WEIGHTS_VERSION}>
-          <div className="grid grid-cols-2 gap-x-4">
+          <div className="grid grid-cols-2 gap-x-4 @sm:grid-cols-3">
             {TERM_ORDER.map((k) => (
               <Row key={k} label={TERM_SHORT[k]} value={WEIGHTS[k].toFixed(2)} tone="dim" />
             ))}
@@ -343,11 +350,11 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
           <Table
             head={["#", "candidate", "kind", "score", "", "no drift"]}
             align={["right", "left", "left", "right", "left", "right"]}
-            keys={rows.map((s) => s.id)}
+            keys={shown.map((s) => s.id)}
             activeKey={selectedId}
             onSelect={setSelectedId}
             empty="no candidate intersected the origin field inside the backward horizon"
-            rows={rows.map((s) => {
+            rows={shown.map((s) => {
               const rank = ablated ? s.rankWithoutDrift : s.rank;
               const total = ablated ? s.totalWithoutDrift : s.total;
               const tag = tags.get(s.id);
@@ -361,12 +368,12 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
                 >
                   <Tagged tag={tag} fallback={s.label} />
                 </span>,
-                <span className="inline-flex items-center gap-1">
+                <span className="inline-flex items-center gap-1 whitespace-nowrap">
                   <Flag tone={KIND_TONE[s.kind] ?? "dim"}>{KIND_SHORT[s.kind]}</Flag>
                   {!(s.kind === "ais_vessel" && recorded.has(s.id)) && <Flag tone="warn" title="simulated candidate">sim</Flag>}
                 </span>,
                 <span style={{ color: "var(--ink)" }}>{total.toFixed(3)}</span>,
-                <AsciiBar value={total} width={10} tone={halt ? "faint" : "ok"} />,
+                <AsciiBar value={total} width={6} tone={halt ? "faint" : "ok"} />,
                 <span style={{ color: "var(--ink-faint)" }}>
                   {s.totalWithoutDrift.toFixed(3)}
                   {s.rankWithoutDrift !== s.rank && (
@@ -385,12 +392,20 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
             instead of withheld.
           */}
           {rows.length > 0 && (
-            <p className="mt-1.5 text-[10px]" style={{ color: "var(--ink-faint)" }}>
-              {halt
-                ? "select a row to open its working in pane 05 — a card, not a place in a list"
-                : "select a row to open its evidence card in pane 05"}
+            <p className="mt-1 flex items-center gap-2 text-[10px]" style={{ color: "var(--ink-faint)" }}>
+              <span className="flex-1">{halt ? "select a row: its working opens in 05" : "select a row: its card opens in 05"}</span>
+              {rows.length > TOP_ROWS && (
+                <Btn onClick={() => setAll((a) => !a)}>{all ? `top ${TOP_ROWS}` : `all ${rows.length}`}</Btn>
+              )}
             </p>
           )}
+          <Note tone="warn" label="candidate · suspected · score">
+            Never responsible, confirmed or guilty. A ranked candidate is a
+            hypothesis with its working shown, and the alternatives stay on the
+            list beside it. Unlit contacts are scored and ranked but carry no
+            identity and are never resolved to a vessel; AIS identities are
+            masked throughout.
+          </Note>
         </Block>
 
         <Block label="Ablation" right={ablated ? "on" : "off"}>
@@ -400,7 +415,8 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
             label="recompute without s_drift"
             tone="warn"
           />
-          <div className="mt-1.5">
+          <div className="mt-1">
+            <Rows>
             <Row
               label="rank changes"
               value={`${moved} of ${rows.length}`}
@@ -411,6 +427,7 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
               value={separability === null ? "—" : separability.toFixed(3)}
               tone={separability !== null && separability < 0.015 ? "alarm" : "dim"}
             />
+            </Rows>
           </div>
           {/*
             Why `0 of 51` is not a finding about s_drift.
@@ -442,15 +459,6 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
           </Note>
         </Block>
 
-        <Block label="Language">
-          <Note tone="warn" label="candidate · suspected · score">
-            Never responsible, confirmed or guilty. A ranked candidate is a
-            hypothesis with its working shown, and the alternatives stay on the
-            list beside it. Unlit contacts are scored and ranked but carry no
-            identity and are never resolved to a vessel; AIS identities are
-            masked throughout.
-          </Note>
-        </Block>
       </PaneBody>
     </Pane>
   );
@@ -463,6 +471,7 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
 export function Evidence({ run, state }: { run: Run; state: SpillState }) {
   const { ablated, hour, selectedId, setSelectedId, setHour } = state;
   const rows = useMemo(() => orderedSuspects(run, ablated), [run, ablated]);
+  const [allRanks, setAllRanks] = useState(false);
   const halt = run.drift.insufficientEvidence;
   // The buttons print the identity alone, so that is what they disambiguate.
   // 04 disambiguates `label`; the two sets coincide for AIS vessels and can
@@ -553,10 +562,10 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
           <p className="num text-[13px]" style={{ color: "var(--accent)" }}>
             {selected.label}
           </p>
-          <p className="mt-1 text-[10.5px] leading-[1.55]" style={{ color: "var(--ink-dim)" }}>
+          <p className="mt-0.5 truncate text-[10.5px]" style={{ color: "var(--ink-dim)" }} title={selected.detail}>
             {selected.detail}
           </p>
-          <div data-fields className="mt-2 grid grid-cols-3 gap-1.5">
+          <div data-fields className="mt-1.5 grid grid-cols-2 gap-1.5 @sm:grid-cols-4">
             {/*
               The score keeps its value and loses its tone under halt. 04 prints
               these numbers too, deliberately, so suppressing the value here
@@ -574,6 +583,12 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
                   ? `Weighted sum ${rawSum.toFixed(3)}, scaled by a wind gate multiplier of ${gate.toFixed(2)}. Pane 04 withheld the ranking for this scene, so this total orders nothing; the terms below are the working it was built from.`
                   : undefined
               }
+            />
+            <Field
+              label="sum × gate"
+              value={`${rawSum.toFixed(2)}×${gate.toFixed(2)}`}
+              tone={gate < 0.75 ? "warn" : "dim"}
+              title="The total is the weighted sum of the six terms on the figure, scaled by the wind gate: a score with no decomposition is an accusation with no working."
             />
             <Field label="kind" value={KIND_LABEL[selected.kind]} />
             <Field
@@ -626,7 +641,7 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
               narrowed rather than closed, knowingly. ISSUES.md 9.4.3 stays
               open with this as its answer.
             */}
-              {rows.map((s) => {
+              {(allRanks ? rows : rows.slice(0, 12)).map((s) => {
                 const tag = tags.get(s.id);
                 return (
                   <Btn
@@ -643,9 +658,12 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
                   </Btn>
                 );
               })}
+              {rows.length > 12 && (
+                <Btn onClick={() => setAllRanks((v) => !v)}>{allRanks ? "less" : `+${rows.length - 12}`}</Btn>
+              )}
             </div>
           )}
-          <div className="mt-1 flex">
+          <div className="mt-1 flex items-center gap-2">
             {/*
               The origin window runs backward from the acquisition and the
               timeline runs forward from it, so the two meet at exactly one
@@ -692,6 +710,14 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
             is really for -- a candidate with no identity at all -- and it only
             says that when there is one in the list to say it about.
           */}
+          <Note tone="warn" label={`${caveats.length} caveats`}>
+            {caveats.map((c, i) => (
+              <span key={i} className="mt-1 flex gap-2 first:mt-0">
+                <span className="num shrink-0" style={{ color: "var(--warn)" }}>{String(i + 1).padStart(2, "0")}</span>
+                <span>{c}</span>
+              </span>
+            ))}
+          </Note>
           {halt && rows.length > 1 && (
             <p
               className="mt-1.5 text-[10px] leading-[1.5]"
@@ -713,68 +739,8 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
             matched={card.matchedSegment}
             position={selected.position}
             hour={hour}
+            terms={terms.map((t) => ({ key: t.key, label: TERM_SHORT[t.key], value: t.value, weight: t.weight, detail: t.detail }))}
           />
-        </Block>
-
-        <Block label="Terms" right={`${terms.length} of 6`}>
-          {terms.map((t) => (
-            <div key={t.key} className="mt-2 first:mt-0">
-              <div className="flex items-baseline gap-2">
-                <span
-                  className="num w-[7ch] shrink-0 text-[10px]"
-                  style={{ color: "var(--ink-faint)" }}
-                >
-                  {TERM_SHORT[t.key]}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <TermBar value={t.value} weight={t.weight} />
-                </div>
-                <span className="num shrink-0 text-[11px]" style={{ color: "var(--ink)" }}>
-                  {t.value.toFixed(2)}
-                </span>
-                <span
-                  className="num w-[6ch] shrink-0 text-right text-[10px]"
-                  style={{ color: "var(--ink-faint)" }}
-                >
-                  x{t.weight.toFixed(2)}
-                </span>
-                <span
-                  className="num w-[6ch] shrink-0 text-right text-[10.5px]"
-                  style={{ color: "var(--accent)" }}
-                >
-                  {(t.value * t.weight).toFixed(3)}
-                </span>
-              </div>
-              <p
-                className="mt-0.5 pl-[8ch] text-[10px] leading-[1.5]"
-                style={{ color: "var(--ink-dim)" }}
-              >
-                {t.detail}
-              </p>
-            </div>
-          ))}
-
-          <div className="mt-3 border-t pt-2" style={{ borderColor: "var(--line)" }}>
-            <Row label="weighted sum" value={rawSum.toFixed(3)} tone="dim" />
-            <Row
-              label="wind gate"
-              value={`x${gate.toFixed(2)}`}
-              tone={gate < 0.75 ? "warn" : "dim"}
-            />
-            {/* Same reasoning as the `score` field above: the number stays, the
-                affirmative tone does not, while the run is withheld. */}
-            <Row
-              label="total"
-              value={selected.total.toFixed(3)}
-              tone={halt ? "dim" : "ok"}
-            />
-          </div>
-          <Note label="never a bare total">
-            The total is the weighted sum scaled by the wind gate, and both halves
-            are printed because a score with no decomposition is an accusation
-            with no working. Each line above carries the value the term took, the
-            weight applied to it, and the text that produced it.
-          </Note>
         </Block>
 
         <Block label="Behaviour flags" right={`${card.anomalies.length}`}>
@@ -784,25 +750,23 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
             </p>
           ) : (
             card.anomalies.map((f) => (
-              <div key={f.code} className="mt-2.5 first:mt-0">
-                <div className="flex items-baseline gap-2">
-                  <Flag tone="warn">{f.code.replace(/_/g, " ")}</Flag>
-                  <span className="text-[10.5px]" style={{ color: "var(--ink)" }}>
-                    {f.label}
-                  </span>
-                </div>
-                <p
-                  className="mt-1 text-[10px] leading-[1.5]"
-                  style={{ color: "var(--ink-dim)" }}
-                >
-                  {f.detail}
-                </p>
-                <p className="mt-1 text-[9px] tracking-[0.16em] uppercase" style={{ color: "var(--ink-faint)" }}>
-                  {f.seriesLabel}
-                </p>
-                <AnomalySeries flag={f} />
+              <div key={f.code} className="mt-1 flex items-baseline gap-2 first:mt-0" title={`${f.detail} (${f.seriesLabel})`}>
+                <Flag tone="warn">{f.code.replace(/_/g, " ")}</Flag>
+                <span className="min-w-0 truncate text-[10.5px]" style={{ color: "var(--ink)" }}>
+                  {f.label}
+                </span>
               </div>
             ))
+          )}
+          {card.anomalies.length > 0 && (
+            <Note label="the series behind each flag">
+              {card.anomalies.map((f) => (
+                <span key={f.code} className="mt-1 block first:mt-0">
+                  <span className="text-[9px] uppercase tracking-[0.16em]">{f.seriesLabel}</span>
+                  <AnomalySeries flag={f} />
+                </span>
+              ))}
+            </Note>
           )}
           <Note label="a raw gap is not evidence">
             Every flag carries the series that raised it, and a reception gap is
@@ -811,20 +775,6 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
           </Note>
         </Block>
 
-        <Block label="Caveats" right={`${caveats.length}`}>
-          {caveats.map((c, i) => (
-            <p
-              key={i}
-              className="mt-1.5 flex gap-2 text-[10px] leading-[1.55] first:mt-0"
-              style={{ color: "var(--ink-dim)" }}
-            >
-              <span className="num shrink-0" style={{ color: "var(--warn)" }}>
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <span>{c}</span>
-            </p>
-          ))}
-        </Block>
       </PaneBody>
     </Pane>
   );
@@ -840,32 +790,25 @@ export function Method({ state }: { state: SpillState }) {
       <PaneBody>
         <Block label="Pipeline" right={`${STAGES.length} stages`}>
           {STAGES.map((s, i) => (
-            <div key={s.key} className="mt-3 first:mt-0">
-              <div className="flex items-baseline gap-2">
-                <span className="num text-[10px]" style={{ color: "var(--accent)" }}>
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <span className="num text-[11px]" style={{ color: "var(--ink)" }}>
-                  {s.proc}
-                </span>
-                <span
-                  className="ml-auto text-[9px] tracking-[0.2em] uppercase"
-                  style={{ color: "var(--ink-faint)" }}
-                >
-                  {s.name}
-                </span>
-              </div>
-              <p
-                className="mt-1 pl-[3ch] text-[10px] leading-[1.55]"
-                style={{ color: "var(--ink-dim)" }}
+            // One line a stage; what it does is on hover.
+            <div key={s.key} className="flex items-baseline gap-2 py-[2px]" title={s.body}>
+              <span className="num text-[10px]" style={{ color: "var(--accent)" }}>
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <span className="num min-w-0 truncate text-[11px]" style={{ color: "var(--ink)" }}>
+                {s.proc}
+              </span>
+              <span
+                className="ml-auto shrink-0 text-[9px] tracking-[0.2em] uppercase"
+                style={{ color: "var(--ink-faint)" }}
               >
-                {s.body}
-              </p>
+                {s.name}
+              </span>
             </div>
           ))}
         </Block>
 
-        <Block label="Terms" right={WEIGHTS_VERSION}>
+        <Block label="Terms" right={WEIGHTS_VERSION} fold>
           {TERM_ORDER.map((k: ScoreTermKey) => (
             <div key={k} className="mt-3 first:mt-0">
               <div className="flex items-baseline gap-2">
@@ -892,13 +835,13 @@ export function Method({ state }: { state: SpillState }) {
           ))}
         </Block>
 
-        <Block label="Constants">
+        <Block label="Constants" fold>
           <Row label="weights" value={WEIGHTS_VERSION} />
           <Row label="prox lambda" value={`${PROXIMITY_LAMBDA_KM.toFixed(1)} km`} />
           <Row label="contact radius" value={`${CONTACT_RADIUS_KM} km`} />
         </Block>
 
-        <Block label="Limits" right={`${LIMITS.length}`}>
+        <Block label="Limits" right={`${LIMITS.length}`} fold>
           {LIMITS.map((l) => (
             <div key={l.key} className="mt-3 first:mt-0">
               <div className="flex items-baseline gap-2">
@@ -919,7 +862,7 @@ export function Method({ state }: { state: SpillState }) {
           ))}
         </Block>
 
-        <Block label="Against prior art">
+        <Block label="Against prior art" fold>
           <Table
             head={["system", "detect", "drift", "ais", "explain"]}
             rows={COMPARISON.map((c) => [
@@ -934,7 +877,7 @@ export function Method({ state }: { state: SpillState }) {
           />
         </Block>
 
-        <Block label="Test cases" right={`${SCENARIOS.length}`}>
+        <Block label="Test cases" right={`${SCENARIOS.length}`} fold>
           {SCENARIOS.map((s) => (
             <div key={s.id} className="mt-2 first:mt-0">
               <button
@@ -965,7 +908,7 @@ export function Method({ state }: { state: SpillState }) {
           ))}
         </Block>
 
-        <Block label="Provenance" right="c10">
+        <Block label="Provenance" right="c10" fold>
           <Note tone="warn" label={PROVENANCE.flag}>
             {PROVENANCE.full}
           </Note>

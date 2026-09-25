@@ -1,7 +1,7 @@
 {
- "exportedAt": "2026-09-25T12:03:58Z",
+ "exportedAt": "2026-09-25T19:22:35Z",
  "unzipAt": "the repository root",
- "zipBytes": 294176379,
+ "zipBytes": 410030416,
  "files": [
   {
    "path": "weights/L1-ciou-research.pt",
@@ -47,20 +47,20 @@
   },
   {
    "path": "frontDemo/public/runs/S1A_IW_GRDH_1SDV_20230409T000206_20230409T000231_048012_05C552_27F2_s0db/scene.json",
-   "bytes": 48298,
-   "sha256": "d0d54000d8f183dc97a8066205f256230a62092ebcef92f0c33a327de42b851b",
+   "bytes": 374265,
+   "sha256": "361af7be83b7b64dfcfd3af1fc9f2d9f2f612db0b2c0aae411a4e5b3d6620427",
    "inZip": true
   },
   {
    "path": "frontDemo/public/runs/S1A_IW_GRDH_1SDV_20230515T000208_20230515T000233_048537_05D69B_35AF_s0db/scene.json",
-   "bytes": 103652,
-   "sha256": "0a2790e5cfb54aa283548dd614db21809eed694aa98109132d10b0832da83c28",
+   "bytes": 419417,
+   "sha256": "9602d9b40e5d9b466c3a470986932c10129705ed3711c31daf383f563aac4ba3",
    "inZip": true
   },
   {
    "path": "frontDemo/public/runs/S1A_IW_GRDH_1SDV_20231205T000214_20231205T000239_051512_0637C7_66B8_s0db/scene.json",
-   "bytes": 52820,
-   "sha256": "48375ba75db0fb9d85ed0c504332acad48cf4ea41f973c82c2391fff39c5c932",
+   "bytes": 371711,
+   "sha256": "17936f5b37224961c007eb06e3e2e458a8b96e1e2870da894238a44c810d86b4",
    "inZip": true
   },
   {
@@ -83,14 +83,14 @@
   },
   {
    "path": "frontDemo/public/ais/real-20230409.json",
-   "bytes": 515670,
-   "sha256": "fd3a8907e2894f560fc8676d93a621d9ebae11b0e90026a42d4191db24529951",
+   "bytes": 759800,
+   "sha256": "fd2965fbfb274e4e44d114770a85e99af8f63971761b46ec6698185e7f14c8ab",
    "inZip": false
   },
   {
    "path": "frontDemo/public/ais/real-20230515.json",
-   "bytes": 1091178,
-   "sha256": "7b4f2e52a30b3c83287aee423f29b26e662603c166fa25830306261b951eaed0",
+   "bytes": 1624359,
+   "sha256": "3185d6f6837f65ef9eef02318419f8e4a77e1093c1878c1ac4aee69dc72c5c2c",
    "inZip": false
   },
   {
@@ -358,6 +358,12 @@
    "inZip": true
   },
   {
+   "path": "data/cache/metocean/cmems-currents_cdfe26c4aa4d2b1288e18a67e2425db5.nc",
+   "bytes": 118594,
+   "sha256": "ce86604d3b7ac43151ef26e991e4067a553d051f0f49e377470264d71ef449eb",
+   "inZip": true
+  },
+  {
    "path": "data/cache/metocean/era5-wind_1051679ef881d3d799ed279fb252cb98.nc",
    "bytes": 151795,
    "sha256": "fcd2f4e1116e0eef06c79686ab30e0e6b4bf9282bbf506b2f6bda6e71d6757f2",
@@ -367,6 +373,12 @@
    "path": "data/cache/metocean/era5-wind_1b9640c179818c2eca9b4cc566265640.nc",
    "bytes": 170542,
    "sha256": "07bcf70b3e28408bf35c664dc26214ab13fca31537935ba08ba94cb66bf91386",
+   "inZip": true
+  },
+  {
+   "path": "data/cache/metocean/era5-wind_3c26dc57cd9560f4b0fae5ef1cef3774.nc",
+   "bytes": 124046,
+   "sha256": "568b8a770e7dcc1c8d63c3d3bea05a8a83d9340bdec831714e42e49814a31aa9",
    "inZip": true
   },
   {
@@ -448,6 +460,12 @@
    "inZip": true
   },
   {
+   "path": "data/interim/ais/AIS_2023_04_06_gulf.npz",
+   "bytes": 25463374,
+   "sha256": "7fe14ab2f58e569fadc63ece9b670d1903bfd55bd3e3f6e656ddbe7cc70442bc",
+   "inZip": true
+  },
+  {
    "path": "data/interim/ais/AIS_2023_04_07_gulf.npz",
    "bytes": 25931659,
    "sha256": "ff5ca69358ef8b4fb07d075a109aa3e76f47211156beaf434c6d6e46035c06bd",
@@ -463,6 +481,12 @@
    "path": "data/interim/ais/AIS_2023_04_09_gulf.npz",
    "bytes": 23809273,
    "sha256": "39c5b33117030f7c2e735b509016106705c9bb8520f57e7673016cea83fc8820",
+   "inZip": true
+  },
+  {
+   "path": "data/interim/ais/AIS_2023_05_12_gulf.npz",
+   "bytes": 25578090,
+   "sha256": "898c0cab64c6522923a7525cc85b872a6efb03037eed38111da40554eeec33c5",
    "inZip": true
   },
   {
@@ -559,6 +583,144 @@
    "path": "data/runs/20260925T075334Z-ca0bc5/scene.json",
    "bytes": 16901,
    "sha256": "ccb2c00f1e00894ed530c191a1e5b0a4fc95211e96dd4fdfa7b6a5dcbc1a54eb",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T174858Z-a9322b/ais.json",
+   "bytes": 879887,
+   "sha256": "4b7f6d7a68631a388fa96c6073c37acde0c8030ea3e0f6abbe25c730c74186b8",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T174858Z-a9322b/detections.geojson",
+   "bytes": 210144,
+   "sha256": "9c23302428833a4ae7cf97374210e13dd902fb4845f441bfb404afc16e450edb",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T174858Z-a9322b/drift.json",
+   "bytes": 6804425,
+   "sha256": "871c64f60a49b58c59bbdaab44f3ffbe18a2a6b780ad523d905ef020cc036d6a",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T174858Z-a9322b/events.jsonl",
+   "bytes": 12410,
+   "sha256": "a640720fe47568253153411b3f78dddc921e22ba1657f0147798031f72e7b2f1",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T174858Z-a9322b/pipeline.log",
+   "bytes": 12677,
+   "sha256": "71884e7f16ff4ae2b9d166a78e4bd32f16df2d5bd5781d4f530c0ed5934b7813",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T174858Z-a9322b/request.json",
+   "bytes": 368,
+   "sha256": "0285977da7f39cf21215aeef8c49f16489dd64d71cf36f753993e41a5dd9514f",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T174858Z-a9322b/run.json",
+   "bytes": 2449,
+   "sha256": "410e3b3bfde9df3dfaecc771efff39f904491392beab5967bc75c9b3bc8445b8",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T174858Z-a9322b/S1A_IW_GRDH_1SDV_20231205T000214_20231205T000239_051512_0637C7_66B8_s0db_win2048.tif",
+   "bytes": 11472444,
+   "sha256": "045dd91bad58b8afd5064ec4d6e5db5ff205710b2f4d544c7586a15c69692512",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T174858Z-a9322b/scene.json",
+   "bytes": 335607,
+   "sha256": "398c00c7065654b2654cc6ee92fbf50c171f12d25d41766acfce71cf446910af",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T174923Z-91ee5c/01268.tif",
+   "bytes": 44205658,
+   "sha256": "a1d77132a853ec47918e6b13d9e8f54906067d3a0ad7d0cbd16675d4b171ea46",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T174923Z-91ee5c/events.jsonl",
+   "bytes": 5029,
+   "sha256": "418bea63b1466beb4f73658429ade5c53674861cfc5c56c093396afc5df63cce",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T174923Z-91ee5c/pipeline.log",
+   "bytes": 5029,
+   "sha256": "418bea63b1466beb4f73658429ade5c53674861cfc5c56c093396afc5df63cce",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T174923Z-91ee5c/request.json",
+   "bytes": 218,
+   "sha256": "69df973e462dfbb1f905105f4bf817e181f76234c7cb171d73a0213a6cec0d08",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T174923Z-91ee5c/run.json",
+   "bytes": 227,
+   "sha256": "3ec6b0ccfe2a858f190a102ae03cb0b6a2f938c1e71879def144cf7832e1811d",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T180518Z-f45e82/ais.json",
+   "bytes": 879928,
+   "sha256": "2e5b8db8690db836c44e30f8a9275f82562023012351861b15424e950e3a82a6",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T180518Z-f45e82/december_window.tif",
+   "bytes": 13283502,
+   "sha256": "69ba4bf9c04f5bfe66b1a63d6f744d49ba43485183c3968e0350da5eba009c31",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T180518Z-f45e82/detections.geojson",
+   "bytes": 210079,
+   "sha256": "fc8d850f28cec3a49926774e246506bf4ca84b341b950b9e23db4edb44388cc6",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T180518Z-f45e82/drift.json",
+   "bytes": 6606678,
+   "sha256": "5504d06b0b26efd5afdff71fc68d4949d073a0eb5d58fe4536f0e46bbd2ecccf",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T180518Z-f45e82/events.jsonl",
+   "bytes": 12320,
+   "sha256": "eb8081d41dd275a3c6f770519a302b60f407d8aee36b50371f467ba1ee28b5d1",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T180518Z-f45e82/pipeline.log",
+   "bytes": 12587,
+   "sha256": "ffd800fbe08012fa397e1119211a940da3a04295aed442cff9f6b33d15fc5fae",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T180518Z-f45e82/request.json",
+   "bytes": 260,
+   "sha256": "fcbefbf644dc53bb1436cd1f9751abeb22d8875a1a2740b8c868cd4a6dff30ee",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T180518Z-f45e82/run.json",
+   "bytes": 2275,
+   "sha256": "cf1d251807a5a1068dcdd509d8df41fbf6fb42d52c717f465733ade9d05152f3",
+   "inZip": true
+  },
+  {
+   "path": "data/runs/20260925T180518Z-f45e82/scene.json",
+   "bytes": 335387,
+   "sha256": "de5a0d3877e0aaffcfbcaeeb3f13181ddad582a17fd9dd0fb909d3fceb50ac92",
    "inZip": true
   }
  ]

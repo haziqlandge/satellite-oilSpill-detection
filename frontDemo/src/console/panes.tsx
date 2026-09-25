@@ -27,7 +27,6 @@ import { verdictFor } from "../sim/verdict";
 import { zoneOf } from "../sim/regions";
 
 import {
-  Alarm,
   Block,
   Btn,
   Field,
@@ -36,7 +35,8 @@ import {
   Note,
   Pane,
   Row,
-  SCROLL,
+  Rows,
+  ScrollArea,
   Sourced,
   Split,
   Table,
@@ -69,13 +69,9 @@ function sceneSource(run: Run): string | null {
  */
 export function PaneBody({ children }: { children: ReactNode }) {
   return (
-    <div
-      data-pane-body
-      className="h-full overflow-y-auto px-3 py-3"
-      style={SCROLL}
-    >
+    <ScrollArea data-pane-body className="@container px-3 py-2">
       {children}
-    </div>
+    </ScrollArea>
   );
 }
 
@@ -130,56 +126,65 @@ export function Detect({ run }: { run: Run }) {
         {run.meta.id === "upload" && <Block label="Uploaded SAR evidence"><UploadEvidenceImages /></Block>}
         <Block label="Scene" right={<Sourced source={sceneSource(run)} />}>
           <Row label="scene" value={d.sceneId} />
-          <Row label="acq" value={stamp(d.acquiredAt)} />
-          <Row label="sensor" value="sentinel-1 iw · vv · 10 m" />
-          <Row label="region" value={zoneOf(run.meta.centre)?.label ?? REGION[run.meta.region] ?? run.meta.region} />
-          <Row
-            label="centre"
-            value={`${run.meta.centre[1].toFixed(3)} ${run.meta.centre[0].toFixed(3)}`}
-          />
+          <Rows>
+            <Row label="acq" value={stamp(d.acquiredAt)} />
+            <Row label="sensor" value="s1 iw · vv · 10 m" />
+            <Row label="region" value={zoneOf(run.meta.centre)?.label ?? (run.meta.id === "upload" ? "outside the listed zones" : REGION[run.meta.region] ?? run.meta.region)} />
+            <Row
+              label="centre"
+              value={`${run.meta.centre[1].toFixed(3)} ${run.meta.centre[0].toFixed(3)}`}
+            />
+          </Rows>
           <Note label="provenance" tone="warn">
             {run.meta.provenance}
           </Note>
         </Block>
 
         <Block label="Classify" right={`${d.parts.length} part`}>
-          <Row label="detector" value="slick · one class" />
-          <Meter
-            label="conf"
-            value={d.confidence}
-            display={d.confidence.toFixed(2)}
-            tone={d.confidence > 0.7 ? "ok" : "warn"}
-          />
-          <Row label="verdict" value={verdict.verdict} tone={unknown ? "warn" : "ok"} />
-          <Meter
-            label="support"
-            value={verdict.support}
-            display={verdict.support.toFixed(2)}
-            tone={unknown ? "warn" : "ok"}
-            title="Evidence for an operational discharge after the wind gate; oos at 0.50 or more"
-          />
-          <div className="mt-1.5" data-verdict-terms>
-            {verdict.terms.map((t) =>
-              t.value === null ? (
-                <Row key={t.key} label={t.label} value="not measured" />
-              ) : (
-                <Meter
-                  key={t.key}
-                  label={t.label}
-                  value={t.value}
-                  display={t.value.toFixed(2)}
-                  tone={t.key === "diverge" ? (t.value >= 0.5 ? "warn" : "ok") : t.value >= 0.5 ? "ok" : "warn"}
-                  title={t.detail}
-                />
-              ),
-            )}
+          <Rows>
+            <Row label="detector" value="slick · 1 class" />
+            <Row label="verdict" value={verdict.verdict} tone={unknown ? "warn" : "ok"} />
+            <Meter
+              label="conf"
+              value={d.confidence}
+              display={d.confidence.toFixed(2)}
+              tone={d.confidence > 0.7 ? "ok" : "warn"}
+              width={8}
+            />
+            <Meter
+              label="support"
+              value={verdict.support}
+              display={verdict.support.toFixed(2)}
+              tone={unknown ? "warn" : "ok"}
+              title="Evidence for an operational discharge after the wind gate; oos at 0.50 or more"
+              width={8}
+            />
+          </Rows>
+          <div className="mt-1 border-t pt-1" style={{ borderColor: "var(--line)" }} data-verdict-terms>
+            <Rows>
+              {verdict.terms.map((t) =>
+                t.value === null ? (
+                  <Row key={t.key} label={t.label} value="not measured" />
+                ) : (
+                  <Meter
+                    key={t.key}
+                    label={t.label}
+                    value={t.value}
+                    display={t.value.toFixed(2)}
+                    tone={t.key === "diverge" ? (t.value >= 0.5 ? "warn" : "ok") : t.value >= 0.5 ? "ok" : "warn"}
+                    title={`${t.label}: ${t.detail}`}
+                    width={8}
+                  />
+                ),
+              )}
+            </Rows>
           </div>
           {verdict.caution && (
             <Note tone="warn" label="possible wake">
               {verdict.caution}
             </Note>
           )}
-          <Note>
+          <Note label="why this verdict">
             {verdict.summary} The model has one class, slick: it outlines
             slick-like water and cannot tell a discharge from a natural film or a
             wake. Discharge or unknown origin is decided here, after detection,
@@ -191,21 +196,21 @@ export function Detect({ run }: { run: Run }) {
         </Block>
 
         <Block label="Geometry">
-          <div data-fields className="grid grid-cols-2 gap-1.5">
-            <Field label="area" value={c.areaKm2.toFixed(2)} unit="km2" />
-            <Field label="length" value={c.lengthKm.toFixed(1)} unit="km" />
-            <Field label="width mean" value={c.widthMMean.toFixed(0)} unit="m" />
-            <Field label="orientation" value={`${c.orientationDeg.toFixed(0)}°`} />
-          </div>
-          <div className="mt-2">
-            <Row label="elongation" value={c.elongation.toFixed(1)} />
-            <Row label="compactness" value={c.compactness.toFixed(2)} />
-            <Row label="fragmentation" value={c.fragmentation.toFixed(2)} />
-            <Row
-              label="head/tail"
-              value={c.headTailResolvedBy.replace(/_/g, " ")}
-              tone={c.headTailResolvedBy === "ambiguous" ? "warn" : "ok"}
-            />
+          <div>
+            <Rows>
+              <Row label="area" value={c.areaKm2.toFixed(2)} unit="km2" tone="ok" />
+              <Row label="length" value={c.lengthKm.toFixed(1)} unit="km" tone="ok" />
+              <Row label="width" value={c.widthMMean.toFixed(0)} unit="m" tone="ok" />
+              <Row label="bearing" value={`${c.orientationDeg.toFixed(0)}°`} tone="ok" />
+              <Row label="elongation" value={c.elongation.toFixed(1)} />
+              <Row label="compactness" value={c.compactness.toFixed(2)} />
+              <Row label="fragments" value={c.fragmentation.toFixed(2)} />
+              <Row
+                label="head/tail"
+                value={c.headTailResolvedBy.replace(/_/g, " ")}
+                tone={c.headTailResolvedBy === "ambiguous" ? "warn" : "ok"}
+              />
+            </Rows>
           </div>
           {c.headTailResolvedBy === "ambiguous" && (
             <Note tone="warn" label="ambiguous">
@@ -216,12 +221,9 @@ export function Detect({ run }: { run: Run }) {
           )}
         </Block>
 
-        <Block label="Width profile" right="head → tail">
-          <WidthProfile values={c.widthMProfile} />
-        </Block>
-
-        <Block label="Damping">
-          <Row label="ratio" value={Number.isFinite(c.dampingRatioDb) ? `${c.dampingRatioDb.toFixed(1)} dB` : "not measured"} />
+        <Block label="Width profile · damping" right="head → tail">
+          <Split figure={<WidthProfile values={c.widthMProfile} />}>
+          <Row label="damping" value={Number.isFinite(c.dampingRatioDb) ? `${c.dampingRatioDb.toFixed(1)} dB` : "not measured"} />
           <Row label="confidence" value={c.dampingConfidence} tone="warn" />
           {c.backend?.dampingNote && <Note tone="faint" label="measured">{c.backend.dampingNote}</Note>}
           <Note tone="warn" label="not a thickness">
@@ -230,6 +232,7 @@ export function Detect({ run }: { run: Run }) {
             volume, because converting a contrast ratio into either would be
             inventing a number remote sensing cannot currently supply.
           </Note>
+          </Split>
         </Block>
 
         <Block
@@ -257,12 +260,14 @@ export function Detect({ run }: { run: Run }) {
         </Block>
 
         {c.backend && (
-          <Block label="Age prior" right="Fay, a ceiling">
-            <Row
-              label="spreading time"
-              value={`${c.backend.agePrior.lowHours.toFixed(1)} / ${c.backend.agePrior.bestHours.toFixed(1)} / ${c.backend.agePrior.highHours.toFixed(1)} h`}
-            />
-            <Row label="width read" value={`${c.backend.agePrior.widthM.toFixed(0)} m`} />
+          <Block label="Age prior" right="Fay, a ceiling" fold>
+            <Rows>
+              <Row
+                label="spreading"
+                value={`${c.backend.agePrior.lowHours.toFixed(1)} / ${c.backend.agePrior.bestHours.toFixed(1)} / ${c.backend.agePrior.highHours.toFixed(1)} h`}
+              />
+              <Row label="width read" value={`${c.backend.agePrior.widthM.toFixed(0)} m`} />
+            </Rows>
             <Note tone="warn" label="not an age">{c.backend.agePrior.explanation}</Note>
           </Block>
         )}
@@ -270,7 +275,7 @@ export function Detect({ run }: { run: Run }) {
         {/* Generated from the damping ratio. A real scene now has a measured
             one, but a synthetic picture beside real data would read as the
             scene, so real runs never get it. */}
-        {Number.isFinite(c.dampingRatioDb) && !isRealRun(run.meta.id) && <Block label="Radar tile" right="synthesised">
+        {Number.isFinite(c.dampingRatioDb) && !isRealRun(run.meta.id) && <Block label="Radar tile" right="synthesised" fold>
           <Split
             figure={
               /* `data-fig` and `--fig-w` sit on the frame rather than on the
@@ -383,46 +388,30 @@ export function Drift({
       }
     >
       <PaneBody>
+        {/* The refusal: its code is on the pane's flag and in full in pane 04; here, why. */}
         {d.insufficientEvidence && (
-          <div className="mb-3">
-            <Alarm
-              code={refusalLabel(d.insufficientEvidence).code}
-              title={d.insufficientEvidence.kind
-                ? refusalLabel(d.insufficientEvidence).title
-                : "field too diffuse to discriminate"}
-              compact>
-              <p>
-                90% contour {d.insufficientEvidence.area90Km2.toFixed(0)} km².{" "}
-                {d.insufficientEvidence.reason}
-              </p>
-            </Alarm>
-          </div>
+          <Note tone="alarm" label={`${refusalLabel(d.insufficientEvidence).code} · ${d.insufficientEvidence.kind ? refusalLabel(d.insufficientEvidence).title : "field too diffuse to discriminate"}`}>
+            90% contour {d.insufficientEvidence.area90Km2.toFixed(0)} km².{" "}
+            {d.insufficientEvidence.reason}
+          </Note>
         )}
 
-        <Block label="Ensemble">
-          <Row label="engine" value={<Sourced source={isRealRun(run.meta.id) ? "OpenDrift (OpenOil)" : null} />} />
-          <Row label="wind" value={<Sourced source={run.flow?.windSource} />} />
-          <Row label="current" value={<Sourced source={run.flow?.currentSource} />} />
-          <div data-fields className="mt-1.5 grid grid-cols-2 gap-1.5">
-            <Field label="members" value={d.ensembleSize} />
-            <Field label="particles" value={d.particleCount.toLocaleString()} />
-            <Field label="forecast" value={`${d.forwardHours} h`} />
-            <Field label="hindcast" value={`${d.backwardHours} h`} />
-          </div>
-          <div className="mt-2 flex items-center gap-1.5">
-            <span
-              className="text-[10px] tracking-[0.14em] uppercase"
-              style={{ color: "var(--ink-faint)" }}
-            >
-              s_drift
-            </span>
-            <Btn onClick={() => setVariant("integral")} active={variant === "integral"}>
-              integral
-            </Btn>
-            <Btn onClick={() => setVariant("max")} active={variant === "max"}>
-              max
-            </Btn>
-          </div>
+        <Block label="Ensemble" right={
+          <span className="flex items-center gap-1">
+            <span className="text-[9px] tracking-[0.14em] uppercase" style={{ color: "var(--ink-faint)" }}>s_drift</span>
+            <Btn onClick={() => setVariant("integral")} active={variant === "integral"}>integral</Btn>
+            <Btn onClick={() => setVariant("max")} active={variant === "max"}>max</Btn>
+          </span>
+        }>
+          <Rows>
+            <Row label="engine" value={<Sourced source={isRealRun(run.meta.id) ? "OpenDrift (OpenOil)" : null} />} />
+            <Row label="wind" value={<Sourced source={run.flow?.windSource} />} />
+            <Row label="current" value={<Sourced source={run.flow?.currentSource} />} />
+            <Row label="members" value={d.ensembleSize} />
+            <Row label="particles" value={d.particleCount.toLocaleString()} />
+            <Row label="forecast" value={`${d.forwardHours} h`} />
+            <Row label="hindcast" value={`${d.backwardHours} h`} />
+          </Rows>
           <Note label="backward ensemble + forecast">
             Before T0 these are the ensemble's own backward frames: the same
             members, integrated with the time step negated. The cloud widens
@@ -436,11 +425,9 @@ export function Drift({
 
         <Block label={`Field at ${formatHour(rounded)}`} right={frame ? `${frame.spreadKm.toFixed(1)} km spread` : "--"}>
           <Split figure={<FieldScope run={run} hour={hour} />}>
-            <div data-fields className="grid grid-cols-3 gap-1.5">
-              <Field label="50%" value={frame ? frame.area50Km2.toFixed(1) : "--"} unit="km2" />
-              <Field label="90%" value={frame ? frame.area90Km2.toFixed(1) : "--"} unit="km2" />
-              <Field label="spread" value={frame ? frame.spreadKm.toFixed(1) : "--"} unit="km" />
-            </div>
+            <Row label="50%" value={frame ? frame.area50Km2.toFixed(1) : "--"} unit="km2" />
+            <Row label="90%" value={frame ? frame.area90Km2.toFixed(1) : "--"} unit="km2" />
+            <Row label="spread" value={frame ? frame.spreadKm.toFixed(1) : "--"} unit="km" />
             {/*
               Two readings that only exist at this hour and are stated nowhere
               else on the pane. The ratio is how much wider the outer band is
@@ -450,7 +437,7 @@ export function Drift({
               difference between one cloud and a field that has torn in two,
               and it is drawn on the scope beside this without being named.
             */}
-            <div className="mt-2">
+            <div>
               <Row
                 label="90/50"
                 value={
@@ -493,7 +480,7 @@ export function Drift({
           </Split>
         </Block>
 
-        <Block label="Convergence" right="area90 vs hour">
+        <Block label="Convergence · age" right={`area90 vs hour · ${age.state}`}>
           <Split
             figure={
               <>
@@ -502,22 +489,6 @@ export function Drift({
               </>
             }
           >
-            <Note>
-              The illustrated hindcast grows into T0, followed by the original
-              forward horizon: how much the region has stopped ruling out by the
-              time the forecast runs out.{" "}
-              <strong style={{ color: "var(--ink)", fontWeight: 500 }}>
-                The insufficient-evidence rule is not tested on this curve.
-              </strong>{" "}
-              It is tested on the backward leg, at the tightest the origin
-              contour ever gets, and that measurement and its threshold are
-              printed below — so the refusal can be checked rather than taken on
-              trust.{" "}
-              Those rows report that one test and nothing more: a run can still
-              be withheld by a closed wind gate, by no candidate surviving the
-              gate, or by a top two too close to separate, none of which this
-              curve or that contour can see.
-            </Note>
             {/*
               The two ends of the curve, and the second trace named.
 
@@ -528,7 +499,7 @@ export function Drift({
               line, and the frame count is what "as the model emits it" means:
               one frame an hour, not a resampling.
             */}
-            <div className="mt-2">
+            <div>
               <Row
                 label={`area90 at ${formatHour(first ? first.hour : 0)}`}
                 value={first ? first.area90Km2.toFixed(1) : "--"}
@@ -557,7 +528,7 @@ export function Drift({
               live only inside the simulation, so the pane could assert that a
               rule existed and never show it being applied.
             */}
-            <div className="mt-2">
+            <div className="mt-1 border-t pt-1" style={{ borderColor: "var(--line)" }}>
               <Row
                 label="origin min"
                 value={Number.isFinite(originMin) ? originMin.toFixed(0) : "--"}
@@ -578,59 +549,50 @@ export function Drift({
                 title="The result of the diffuse test alone. The run can still be withheld for reasons this test does not see."
               />
             </div>
+            <Note label="what this curve tests">
+              The illustrated hindcast grows into T0, followed by the original
+              forward horizon: how much the region has stopped ruling out by the
+              time the forecast runs out.{" "}
+              <strong style={{ color: "var(--ink)", fontWeight: 500 }}>
+                The insufficient-evidence rule is not tested on this curve.
+              </strong>{" "}
+              It is tested on the backward leg, at the tightest the origin
+              contour ever gets, and that measurement and its threshold are
+              printed below — so the refusal can be checked rather than taken on
+              trust.{" "}
+              Those rows report that one test and nothing more: a run can still
+              be withheld by a closed wind gate, by no candidate surviving the
+              gate, or by a top two too close to separate, none of which this
+              curve or that contour can see.
+            </Note>
+            <div className="mt-1 border-t pt-1" style={{ borderColor: "var(--line)" }}>
+            <Rows>
+              <Row label="age" value={age.value} tone="ok" />
+              <Row label="method" value={age.method} />
+              {/*
+                Only when the readout is not the interval. `ageStatement` returns
+                "ongoing" or "<= N h" for a degenerate window and keeps the raw
+                interval to be printed beside it; on a real interval `value` *is*
+                this row, and printing both was the same five characters twice.
+              */}
+              {age.degenerate && (
+                <Row
+                  label="interval"
+                  value={`${d.ageHours[0]}–${d.ageHours[2]} h`}
+                  tone="dim"
+                />
+              )}
+            </Rows>
+            <Note tone={age.degenerate ? "warn" : "faint"} label="how to read it">
+              {age.phrase}. There is no reliable regressor from a radar image to an
+              age, so this is never reported as a single number: what the system
+              determined is a window, and the window is what every temporal term
+              downstream is scored against.
+            </Note>
+              </div>
           </Split>
         </Block>
 
-        <Block label="Age" right={age.state}>
-          {/*
-            The answer and the method it came by, side by side.
-
-            C1 is the constraint here: an age never travels without the method
-            that produced it. It used to travel as a 22px readout -- the only
-            such size in the console, nearly twice the next largest -- in a box
-            the full width of the column around five characters, with the method
-            printed twice underneath, once as a row and once in the block
-            header. Two boxes on one line state both once, and the first is
-            metrically an ordinary `Field` (9px label over a 13px `num`) with
-            only its border in the accent, because it is the pane's answer
-            rather than a different kind of thing.
-          */}
-          <div data-fields className="grid grid-cols-2 gap-1.5">
-            <div
-              className="border px-2 py-1.5"
-              style={{ borderColor: "var(--accent)", background: "var(--base)" }}
-            >
-              <p className="text-[9px] tracking-[0.2em] uppercase" style={{ color: "var(--ink-faint)" }}>
-                estimated age
-              </p>
-              <p className="num mt-1 text-[13px] leading-none" style={{ color: "var(--accent)" }}>
-                {age.value}
-              </p>
-            </div>
-            <Field label="method" value={age.method} />
-          </div>
-          {/*
-            Only when the readout is not the interval. `ageStatement` returns
-            "ongoing" or "<= N h" for a degenerate window and keeps the raw
-            interval to be printed beside it; on a real interval `value` *is*
-            this row, and printing both was the same five characters twice.
-          */}
-          {age.degenerate && (
-            <div className="mt-2">
-              <Row
-                label="interval"
-                value={`${d.ageHours[0]}–${d.ageHours[2]} h`}
-                tone="dim"
-              />
-            </div>
-          )}
-          <Note tone={age.degenerate ? "warn" : "faint"} label="how to read it">
-            {age.phrase}. There is no reliable regressor from a radar image to an
-            age, so this is never reported as a single number: what the system
-            determined is a window, and the window is what every temporal term
-            downstream is scored against.
-          </Note>
-        </Block>
       </PaneBody>
     </Pane>
   );

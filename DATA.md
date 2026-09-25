@@ -236,10 +236,10 @@ underneath is Esri's picture and can differ from both. GSHHG is LGPL
 
 | Artifact | Size | What |
 |---|---|---|
-| `data/raw/ais/2023/AIS_2023_*.zip` | 2.9 GB, 10 days | marinecadastre national days: Apr 7-9, May 13-15, Dec 2-5 2023 — the 48 h before each of the three Gulf cases. **Irreplaceable offline** (re-download from marinecadastre.gov) |
-| `data/interim/ais/AIS_*_gulf.npz` | 178 MB, 8 files (15-27 MB each) | Each day a scene window needs, cut to the Gulf AOI and cached by `scripts/export_ais_traffic.py`. Regenerable, ~90 s a day |
+| `data/raw/ais/2023/AIS_2023_*.zip` | 3.6 GB, 12 days | marinecadastre national days: Apr 6-9, May 12-15, Dec 2-5 2023 — the 72 h before each of the three Gulf cases (Apr 6 and May 12 downloaded 2026-09-26 from `coast.noaa.gov/htdata/CMSP/AISDataHandler/2023/`, at the user's request). **Irreplaceable offline** (re-download from marinecadastre.gov) |
+| `data/interim/ais/AIS_*_gulf.npz` | 12 files (15-27 MB each) | Each day a scene window needs, cut to the Gulf AOI and cached by `scripts/export_ais_traffic.py`. Regenerable, ~90 s a day |
 | `frontDemo/public/ais/{gom-platform,gom-moving,gom-berthed}.json` | 1.2 MB | Per-scene tracks, simplified to 100 m (TD-TR), reception gaps as `breaks`, identities withheld (MID only), the published vessel flagged. **Tracked**; the app fetches them |
-| `frontDemo/public/ais/real-{20230409,20230515,20231205}.json` | 3.2 MB | Traffic around each real OpenDrift run's seed, for the console's real-run views. Box = the run's 90% contour extent + 15 km; window = the AIS days on disk (48 h Apr/May, 72 h Dec). `python -m scripts.export_ais_traffic --real-runs`. Needs Dec 2-3 parsed into `data/interim/ais/` (done 2026-09-23) |
+| `frontDemo/public/ais/real-{20230409,20230515,20231205}.json` | 3.2 MB | Traffic around each real OpenDrift run's seed, for the console's real-run views. Box = the run's 90% contour extent + 15 km; window = the AIS days on disk, 72 h for all three since 2026-09-26 (282 / 617 / 342 vessels; April and May had 48 h, 235 / 537). `python -m scripts.export_ais_traffic --real-runs`. Needs Dec 2-3 parsed into `data/interim/ais/` (done 2026-09-23) |
 | `frontDemo/public/runs/<scene>/drift.json` | 7-10 MB | The real OpenDrift run: 10 members x 200 parcels, seeded uniformly over the seed detection's polygon (the same positions for every member), 72 h backward and 72 h forward on ERA5 wind and CMEMS currents (since 2026-09-25; each member's wind shifted in time by up to 3 h either way, the ensemble's timing uncertainty), one frame per hour from -72 to +72 (all 2,000 parcels, the 0.01° 50/90% cells, spread; forward frames add `strandedPct`, and a forward hour with nothing afloat is still a frame: no parcels, areas and spread 0, `strandedPct` 100 -- April's v12 seed is all ashore by +42 h), plus OpenDrift's own on-land share, the convergence series (backward only) and the age (`estimate_age`: a triple, or a refusal). `python -m scripts.export_drift_runs --all`, ~3 min a scene here. **Gitignored** |
 | `frontDemo/public/runs/<scene>/scene.json` | 70-650 KB | Beside each `drift.json`: the model's full-scene detections, one ring per polygon part (simplified to 0.0002°), each with its `feature` index, its own confidence, `seed` and `boxCut` (a straight axis-aligned edge of 1.2 km or more, `ISSUES.md` Q5/F18), and the ERA5 wind at the seed from the drift's own two cached requests, -72 to +72 h. Also `cfar`: CA-CFAR targets (lon/lat, peak dB, area px) within 15 km of the seed on the processed scene (`cfar_near_seed`; `not_run` when the 3.6 GB scene is absent). Also, since the night of 2026-09-23, `characterisation`: the backend's PHASE-03 record of the seed detection (`characterise_seed`, `backend/characterize`) -- geometry from the unsimplified polygon in an equal-area projection, the damping ratio on the processed scene's band 2 against clean sea (GSHHG land, other detections and SNAP's zero fill kept out; `null` when the scene is absent), the ERA5 wind and wind gate at the pass, and the Fay morphology age prior (a ceiling, never an age). `python -m scripts.export_real_scenes` (offline; reads the ERA5 cache). The flagged seed is the detection `choose_seed` picked (largest at sea without a box-cut edge). **Gitignored** with the rest of `public/runs/`, like `drift.json`: regenerate on any other machine, after `export_drift_runs` |
 | `data/cache/metocean/era5-wind_<hash>.nc` | 80-210 KB each | The ERA5 10 m wind the real runs are forced by, one file per request, keyed by the request's hash (`backend/ingest/metocean/cache.py`). Per scene: the 74 h before the pass and the 74 h after it; `wind_requests` in `export_drift_runs.py` defines both, over the extent of every detection in the scene. So a new model means new files: six were fetched 2026-09-25 (user-approved) for v12's detections, which reach the scene's west edge (-91.02); the v11 files stay for `scenes-v11`. **Gitignored**; re-fetched from CDS with `CDSAPI_KEY` if missing |
@@ -291,6 +291,17 @@ machine against it. Re-export last, after any pipeline re-run.
 | `eval/evaluation/authored.json` | PHASE-08's drift/attribution measurements on the authored scenarios |
 | `eval/ennore/crosscheck.json` | The engine against the INCOIS Ennore 2017 assessment (X17) |
 | `data/cache/metocean/cmems-currents_*.nc`, `era5-wind_*.nc` | Now also the Ennore 2017 window (fetched by the toolbox via the `CDSE_*` login) |
+
+### Fetched live by the browser (nothing stored)
+
+| Source | What | Used by |
+|---|---|---|
+| `archive-api.open-meteo.com/v1/archive?models=era5` | ERA5 hourly 10 m wind on a 5 × 5 grid, 220 km across, around an upload; about 5 days behind real time | `frontDemo/src/sim/metocean.ts`, the upload's drift, wind gate and arrows |
+| `marine-api.open-meteo.com/v1/marine` | Copernicus Marine SMOC hourly surface currents, tides included (Météo-France, 0.08°), from January 2022 | the same |
+| `frontDemo/public/ais/real-*.json` | The hosted real AIS; an upload inside one's box and window uses it | `realTrafficForUpload` in `sim/realAis.ts` |
+
+Open-Meteo is free for non-commercial use with attribution, no key, open
+CORS; the panels name it in every "sourced from" line.
 
 ## 6. Evaluation artifacts — `eval/`
 

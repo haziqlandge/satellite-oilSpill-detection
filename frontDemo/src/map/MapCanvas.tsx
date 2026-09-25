@@ -25,7 +25,8 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 
 import {
   EMPTY,
-  FLOW_ARROW,
+  SHIP_ICON,
+  frameScene,
   SOURCE,
   WORLD_LAYER_IDS,
   WORLD_SOURCE_IDS,
@@ -38,9 +39,10 @@ import {
   type LayerToggles,
 } from "./basemap";
 import { ParticleOverlay } from "./ParticleOverlay";
+import { FlowStreaks } from "./FlowStreaks";
 import { subscribePlayhead, syncPlayhead } from "../lib/playhead";
 import type { MapPaint } from "../theme";
-import type { LngLat, Run, Suspect } from "../sim/types";
+import type { LngLat, Run, Suspect, Vessel } from "../sim/types";
 import { positionAt } from "../sim/ais";
 import { trackSegments } from "../sim/realAis";
 import { pointInPolygon, distanceToPathKm, polygonsOf } from "../sim/geo";
@@ -48,7 +50,7 @@ import { detectionFeatures } from "./detectionView";
 import { verdictFor } from "../sim/verdict";
 import { landImage } from "./offlineLand";
 import { FlowCards } from "./FlowCards";
-import { flowCells, flowMean, speedToward, spillParts } from "../sim/flow";
+import { spillParts } from "../sim/flow";
 
 const OFFLINE_LAND = "offline-land";
 
@@ -133,22 +135,34 @@ function line(coords: LngLat[], props: Record<string, unknown> = {}): GeoJSON.Fe
   };
 }
 
-/** A small arrow pointing north, white on clear: tinted by `icon-color` and turned by `icon-rotate`. */
-function flowArrowImage(): ImageData {
+/** A ship from above, bow up, white on clear: tinted by `icon-color` and turned to its course by `icon-rotate`. */
+function shipImage(): ImageData {
   const size = 32;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d")!;
   ctx.fillStyle = "#fff";
-  ctx.fillRect(14, 10, 4, 19);
+  // Hull: a pointed bow, parallel sides, a square stern.
   ctx.beginPath();
   ctx.moveTo(16, 2);
-  ctx.lineTo(8, 13);
-  ctx.lineTo(24, 13);
-  ctx.closePath();
+  ctx.quadraticCurveTo(22, 8, 22, 14);
+  ctx.lineTo(22, 28);
+  ctx.lineTo(10, 28);
+  ctx.lineTo(10, 14);
+  ctx.quadraticCurveTo(10, 8, 16, 2);
   ctx.fill();
+  // The house aft, cut out of the deck so it reads as a ship and not a pill.
+  ctx.clearRect(12.5, 20, 7, 4);
+  ctx.fillRect(13.5, 21, 5, 2);
   return ctx.getImageData(0, 0, size, size);
+}
+
+/** The course a vessel is on at `at`: its reported COG nearest in time. */
+function courseAt(v: Vessel, at: number): number {
+  let best = v.points[0];
+  for (const p of v.points) if (Math.abs(p.t - at) < Math.abs(best.t - at)) best = p;
+  return Number.isFinite(best.cog) ? best.cog : 0;
 }
 
 /**
@@ -209,6 +223,7 @@ export function MapCanvas({
   const holder = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const overlayRef = useRef<ParticleOverlay | null>(null);
+  const streaksRef = useRef<FlowStreaks | null>(null);
   const resizeRef = useRef<ResizeObserver | null>(null);
   /**
    * Which world the live style currently holds.
@@ -335,11 +350,11 @@ export function MapCanvas({
           SOURCE.trackingGap,
           SOURCE.trackingPredicted,
           SOURCE.trackingMarkers,
-          SOURCE.flow,
+          SOURCE.vessels,
         ]) {
           map.addSource(id, { type: "geojson", data: EMPTY });
         }
-        if (!map.hasImage(FLOW_ARROW)) map.addImage(FLOW_ARROW, flowArrowImage(), { sdf: true });
+        if (!map.hasImage(SHIP_ICON)) map.addImage(SHIP_ICON, shipImage(), { sdf: true });
         for (const layer of dataLayers(paint)) map.addLayer(layer);
         // Above the data, which is why it is not in `buildStyle`.
         for (const layer of worldSpec(paint).over) map.addLayer(layer);
@@ -348,6 +363,7 @@ export function MapCanvas({
         worldRef.current = { basemap: paint.basemap, labels: hasLabels(paint) };
 
         overlayRef.current = new ParticleOverlay(map, holder.current!);
+        streaksRef.current = new FlowStreaks(map, holder.current!);
         setReady(true);
         onMapRef.current?.(map);
       });
@@ -371,6 +387,8 @@ export function MapCanvas({
         worldRef.current = null;
         overlayRef.current?.dispose();
         overlayRef.current = null;
+        streaksRef.current?.dispose();
+        streaksRef.current = null;
         const map = mapRef.current;
         mapRef.current = null;
         setReady(false);
@@ -426,6 +444,7 @@ export function MapCanvas({
     overlayRef.current?.setColour(paint.particle);
     overlayRef.current?.setReleaseColour(paint.target);
     overlayRef.current?.setAdditive(isDarkGround(paint.water));
+    streaksRef.current?.setColours({ wind: paint.wind, current: paint.current });
 
     // Every layer `dataLayers` paints from the theme, not a subset of them.
     //
@@ -478,6 +497,8 @@ export function MapCanvas({
         ],
       ],
       ["markers", "circle-stroke-color", paint.water],
+      ["vessel-icons", "icon-color", ["case", ["get", "candidate"], paint.suspect, paint.target]],
+      ["vessel-icons", "icon-halo-color", paint.water],
     ];
 
     /*
@@ -517,8 +538,6 @@ export function MapCanvas({
       ["suspect-track", "line-width"],
       ["contour90-fill", "fill-opacity"],
       ["contour50-fill", "fill-opacity"],
-      ["flow-wind", "icon-color"],
-      ["flow-current", "icon-color"],
     ];
     for (const [layer, prop] of scaled) {
       const value = built.get(layer)?.[prop];
@@ -675,7 +694,7 @@ export function MapCanvas({
     const map = mapRef.current;
     if (!map || !ready) return;
 
-    map.jumpTo({ center: run.meta.centre, zoom: run.meta.zoom });
+    frameScene(map, run.meta);
 
     const src = (id: string) => map.getSource(id) as maplibregl.GeoJSONSource;
 
@@ -769,7 +788,10 @@ export function MapCanvas({
    * interpolates, so it subscribes to the continuous value and repaints from
    * its own loop. See lib/playhead.ts.
    */
-  useEffect(() => subscribePlayhead((h) => overlayRef.current?.setHour(h)), []);
+  useEffect(() => subscribePlayhead((h) => {
+    overlayRef.current?.setHour(h);
+    streaksRef.current?.setHour(h);
+  }), []);
 
 
   const candidateIds = useMemo(
@@ -837,6 +859,7 @@ export function MapCanvas({
     const traffic: GeoJSON.Feature[] = [];
     const candidates: GeoJSON.Feature[] = [];
     const vessels: GeoJSON.Feature[] = [];
+    const ships: GeoJSON.Feature[] = [];
     const trackingGap: GeoJSON.Feature[] = [];
     const trackingPredicted: GeoJSON.Feature[] = [];
     const trackingMarkers: GeoJSON.Feature[] = [];
@@ -872,7 +895,9 @@ export function MapCanvas({
         trackingMarkers.push(point(pa,{kind:"tracking-off",mmsi:v.mmsi}));
         if (b.t <= at) trackingMarkers.push(point(pb,{kind:"tracking-on",mmsi:v.mmsi}));
       }
-      if (now && reporting && isCandidate) vessels.push(point(now, { kind: "vessel" }));
+      if (now && reporting && toggles.shipIcons && (isCandidate ? toggles.candidates : toggles.traffic))
+        ships.push(point(now, { cog: courseAt(v, at), candidate: isCandidate }));
+      else if (now && reporting && isCandidate && !toggles.shipIcons) vessels.push(point(now, { kind: "vessel" }));
     }
 
     src(SOURCE.traffic).setData(collection(traffic));
@@ -880,6 +905,7 @@ export function MapCanvas({
     src(SOURCE.trackingGap).setData(collection(trackingGap));
     src(SOURCE.trackingPredicted).setData(collection(trackingPredicted));
     src(SOURCE.trackingMarkers).setData(collection(trackingMarkers));
+    src(SOURCE.vessels).setData(collection(ships));
 
     src(SOURCE.markers).setData(
       collection([
@@ -888,7 +914,7 @@ export function MapCanvas({
         ...vessels,
       ]),
     );
-  }, [hour, run, ready, candidateIds, paint]);
+  }, [hour, run, ready, candidateIds, paint, toggles.shipIcons, toggles.candidates, toggles.traffic]);
 
   /* --- camera ------------------------------------------------------ */
 
@@ -1062,8 +1088,7 @@ export function MapCanvas({
     set("forecast-fill", toggles.forecast);
     set("forecast-line", toggles.forecast);
     set("labels", toggles.labels);
-    set("flow-wind", toggles.windArrows);
-    set("flow-current", toggles.currentArrows);
+    streaksRef.current?.setVisible({ wind: toggles.windArrows, current: toggles.currentArrows });
     // One toggle each, rather than an OR across both. Ored together, turning
     // the ensemble off did nothing at all as long as the release was on, which
     // is a control that lies about what it controls.
@@ -1071,34 +1096,17 @@ export function MapCanvas({
     overlayRef.current?.setReleaseVisible(toggles.release);
   }, [toggles, ready, hour, showHindcastAreas]);
 
-  /* --- flow arrows -------------------------------------------------- */
+  /* --- flow streaks ------------------------------------------------ */
 
-  // Cells once per run, over the slick and every hour's 90% region, hindcast
-  // and forecast alike (`flowCells`); each arrow is its cell's mean flow at the
-  // playhead.
-  const cells = useMemo(
-    () => (run.flow ? flowCells([...spillParts(run.detection), ...run.drift.frames.flatMap((f) => f.contour90)]) : null),
-    [run],
-  );
+  // Moving wind and current streaks over the slick and every hour's 90% region,
+  // hindcast and forecast alike (`FlowStreaks`).
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !ready) return;
-    const source = map.getSource(SOURCE.flow) as maplibregl.GeoJSONSource | undefined;
-    if (!source) return;
-    const flow = run.flow;
-    const features: GeoJSON.Feature[] = [];
-    if (flow && cells) {
-      for (const cell of cells) {
-        for (const kind of ["wind", "current"] as const) {
-          const vector = flowMean(flow, kind, cell.bbox, hour);
-          if (!vector) continue;
-          const { speed, towardDeg } = speedToward(vector);
-          features.push(point(cell[kind], { kind, speed, towardDeg }));
-        }
-      }
-    }
-    source.setData(collection(features));
-  }, [run, cells, hour, ready]);
+    if (!ready) return;
+    streaksRef.current?.setColours({ wind: paint.wind, current: paint.current });
+    streaksRef.current?.setData(run.flow ?? null, [...spillParts(run.detection), ...run.drift.frames.flatMap((f) => f.contour90)]);
+    // Colours follow the paint effect; only a new run re-seeds the tracers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run, ready]);
 
   /* --- detections -------------------------------------------------- */
 
@@ -1146,9 +1154,12 @@ export function MapCanvas({
           the map initialises. */}
       <div ref={holder} className="h-full w-full" />
       {showHindcastAreas && (
-        <div className="absolute bottom-10 left-3 z-10 flex gap-4 bg-base-2/90 px-2 py-1 font-mono text-[10px]" aria-label="Area legend">
-          <span style={{ color: paint.hindcast }}>▱ Hindcast · before T0</span>
-          <span style={{ color: paint.forecast }}>▱ Forecast · after T0</span>
+        <div className="absolute bottom-10 left-3 z-10 flex flex-col gap-1 bg-base-2/90 px-2 py-1.5 font-mono text-[10px]" aria-label="Area legend">
+          {([["Hindcast", paint.hindcast], ["Forecast", paint.forecast]] as const).map(([label, colour]) => (
+            <span key={label} className="flex items-center gap-1.5" style={{ color: "var(--ink)" }}>
+              <span className="inline-block h-2.5 w-2.5" style={{ background: colour }} />{label}
+            </span>
+          ))}
         </div>
       )}
       {flowCards && <FlowCards run={run} hour={hour} paint={paint} />}

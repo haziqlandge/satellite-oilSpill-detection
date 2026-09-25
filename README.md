@@ -72,17 +72,26 @@ npm run dev --prefix frontDemo
 
 Opens on port 5180. `http://127.0.0.1:5180/#/console` is the operations console.
 
-**Uploads need the model file, which is not in git.** The console runs the
-trained segmenter in the browser from `frontDemo/public/models/L1-ciou-research.onnx`,
-and `*.onnx` is gitignored like every other weight file. On a fresh clone, or
-on the training machine, generate it once from `weights/L1-ciou-research.pt`:
+**An upload runs in the browser.**
 
-```bash
-.venv/Scripts/python.exe -m ml.export.onnx_export
-```
+- **Its mask** comes from the trained segmenter,
+  `frontDemo/public/models/L1-ciou-research.onnx`. It is committed on purpose
+  (`.gitignore` re-includes it) so the Vercel site can run it. After a
+  retrain, regenerate it from `weights/L1-ciou-research.pt`:
 
-It checks the export against PyTorch before writing it. Without it, an upload
-says the segmenter could not be loaded rather than falling back to anything.
+  ```bash
+  .venv/Scripts/python.exe -m ml.export.onnx_export
+  ```
+
+  The export is checked against PyTorch before it is written.
+- **Its drift** is forced by ERA5 wind and Copernicus Marine currents for its
+  own place and time, fetched from Open-Meteo (`sim/metocean.ts`). Currents
+  exist from 2022; ERA5 runs about five days behind real time. The drift
+  engine itself is the console's, tagged SIM.
+- **Its ships** are the recorded AIS when a hosted Gulf day covers it, and
+  SIM elsewhere.
+- **With the API below running**, the same file also goes through the real
+  pipeline: OpenDrift and the AIS on disk.
 
 ### The live pipeline (API)
 

@@ -28,7 +28,7 @@ import { DEFAULT_TOGGLES, type LayerToggles } from "../map/basemap";
 import { REPO_URL } from "../theme";
 import { usePaint } from "../lib/palette";
 import { PalettePanel } from "../components/PalettePanel";
-import { Caret, Flag, GroupHead, SCROLL, Toggle, useNarrow } from "./components";
+import { Caret, Flag, GroupHead, ScrollArea, Toggle, useNarrow } from "./components";
 import { LogPanel, useEventLog } from "./LogStream";
 import { Timeline } from "./Timeline";
 import { Workspace } from "./Workspace";
@@ -67,6 +67,7 @@ const LAYERS: { key: keyof LayerToggles; label: string; hint: string }[] = [
   { key: "hindcast", label: "hindcast", hint: "show or hide the persistent hindcast areas before T0" },
   { key: "windArrows", label: "wind arrows", hint: "10 m wind around the event, where the air goes" },
   { key: "currentArrows", label: "current arrows", hint: "surface current around the event, where the water goes" },
+  { key: "shipIcons", label: "ship icons", hint: "ships drawn as ships turned to their course; off, as dots" },
   { key: "labels", label: "place labels", hint: "coastline names from the basemap" },
 ];
 
@@ -78,7 +79,8 @@ export default function ConsoleShell() {
   // Merged over `SURFACES.console.map` by the colour panel. `MapCanvas` already
   // re-applies paint live, so this needs no other wiring.
   const paint = usePaint();
-  const state = useSpill("gom-berthed", { eager: true, syncUrl: true });
+  // Opens on the real May 2023 run (the user, 2026-09-26).
+  const state = useSpill("real-20230515", { eager: true, syncUrl: true });
   const dock = useDock();
   /*
     The drag controller belongs here and cannot belong anywhere lower.
@@ -288,13 +290,12 @@ export default function ConsoleShell() {
 
     if (id === "layers") {
       return (
-        <div
+        <ScrollArea
           /* A control panel, not a report: `data-pane-narrow` keeps it at rail
              width in the panel reader instead of stretching a column of
              switches across the whole page. */
           data-pane-narrow
-          className="min-h-0 flex-1 overflow-y-auto px-2 py-2"
-          style={SCROLL}
+          className="px-2 py-2"
         >
           <GroupHead hint="What the chart draws. Each switch is one layer.">
             control attributes
@@ -353,7 +354,7 @@ export default function ConsoleShell() {
               </p>
             </div>
           )}
-        </div>
+        </ScrollArea>
       );
     }
 
@@ -394,20 +395,20 @@ export default function ConsoleShell() {
       // A run the live pipeline made: its own stages, as the pipeline timed them.
       const liveRun = activeRun ? apiRunId(activeRun.meta.id) : null;
       if (liveRun) {
-        return <div data-pane-narrow className="min-h-0 flex-1 overflow-y-auto px-2 py-2" style={SCROLL}>
+        return <ScrollArea data-pane-narrow className="px-2 py-2">
           <GroupHead right={<Flag tone="ok">measured · pipeline</Flag>}>pipeline time</GroupHead>
           <ServerRunTimings runId={liveRun} />
-        </div>;
+        </ScrollArea>;
       }
       // The latest upload, live, whenever it is what the console is showing or
       // is still being processed; otherwise the scenario's own figures.
       const uploadLive = !sampleSession.key && sampleSession.timings.length > 0 &&
         (activeRun?.meta.id === "upload" || sampleSession.startedAt >= scenarioSwitchRef.current);
       if (uploadLive) {
-        return <div data-pane-narrow className="min-h-0 flex-1 overflow-y-auto px-2 py-2" style={SCROLL}>
+        return <ScrollArea data-pane-narrow className="px-2 py-2">
           <GroupHead right={<Flag tone="ok">measured · live</Flag>}>pipeline time</GroupHead>
           <UploadTimings />
-        </div>;
+        </ScrollArea>;
       }
       const sample = isSample(activeRun?.meta.id ?? null) ? DEMO_PRESETS[activeRun!.meta.id as DemoSampleKey] : null;
       const rows = sample?.timings ?? [
@@ -418,7 +419,7 @@ export default function ConsoleShell() {
         { label: "Evidence and animation", durationMs: 1180 },
       ];
       const total = rows.reduce((sum, row) => sum + row.durationMs, 0);
-      return <div data-pane-narrow className="min-h-0 flex-1 overflow-y-auto px-2 py-2" style={SCROLL}>
+      return <ScrollArea data-pane-narrow className="px-2 py-2">
         <GroupHead right={<Flag tone="warn">simulated</Flag>}>model train time</GroupHead>
         <p className="num mt-2 px-2 text-[10px]" style={{ color: "var(--ink-faint)" }}>pipeline timings for {activeRun?.meta.name ?? "current run"}</p>
         <ul className="mt-2 border" style={{ borderColor: "var(--line)" }}>
@@ -426,7 +427,7 @@ export default function ConsoleShell() {
           <li className="flex justify-between px-2 py-2 text-[11px] font-medium"><span>Total</span><span className="num">{(total / 1000).toFixed(1)} s</span></li>
         </ul>
         <p className="mt-2 px-2 text-[9.5px] leading-[1.5]" style={{ color: "var(--ink-faint)" }}>Timing is simulated for this demonstration; vessel correlation is included in the total.</p>
-      </div>;
+      </ScrollArea>;
     }
 
     if (!activeRun) return null;

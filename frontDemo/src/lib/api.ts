@@ -21,7 +21,8 @@ import { useSyncExternalStore } from "react";
  * pipeline instead (FUTURE_WORK §4.3) with `VITE_API_BASE=https://host/api/v1`
  * at build time; that host must list the site in `API_CORS_ORIGINS`.
  */
-export const API_BASE = (import.meta.env.VITE_API_BASE ?? "api/v1").replace(/\/+$/, "");
+// `env` is Vite's; the Node checks (tsx) have none.
+export const API_BASE = (import.meta.env?.VITE_API_BASE ?? "api/v1").replace(/\/+$/, "");
 
 export type ApiStageState = "pending" | "running" | "done" | "failed" | "skipped" | "refused";
 
@@ -148,8 +149,10 @@ export async function getRun(id: string): Promise<ApiRunStatus> {
  * `usePrecomputed` asks for the stored segmentation of this exact file and
  * model (§1.5); the API refuses with the reason (409) when there is none.
  */
-export async function startRun(file: File, opts: { usePrecomputed?: boolean } = {}): Promise<ApiRunStatus> {
+export async function startRun(file: File, opts: { usePrecomputed?: boolean; acquiredAt?: number } = {}): Promise<ApiRunStatus> {
   const params = new URLSearchParams({ name: file.name, use_precomputed: String(!!opts.usePrecomputed) });
+  // Only for a file that carries no time: the pipeline records it as asserted by the operator.
+  if (opts.acquiredAt !== undefined) params.set("acquired_at", new Date(opts.acquiredAt).toISOString());
   const response = await fetch(`${API_BASE}/runs?${params}`, {
     method: "POST",
     headers: { "content-type": "image/tiff" },
