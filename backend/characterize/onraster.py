@@ -113,8 +113,12 @@ def wind_series(
     *,
     hours: int,
     forward: int,
+    current_note: str = "none: no current field (ISSUES X2); the drift is wind-driven",
 ) -> dict[str, object]:
-    """ERA5 10 m wind at the seed, hour by hour, from the files the drift ran on."""
+    """ERA5 10 m wind at the seed, hour by hour, from the files the drift ran on.
+
+    `current_note` says what moved the water, from the run's own `forcingNote`.
+    """
     import xarray as xr
 
     hour_list, speed, from_deg = [], [], []
@@ -140,7 +144,7 @@ def wind_series(
         "hours": hour_list,
         "ms": speed,
         "fromDeg": from_deg,
-        "current": "none: no current field (CMEMS has no credentials, ISSUES X2); the drift is wind-driven",
+        "current": current_note,
     }
 
 

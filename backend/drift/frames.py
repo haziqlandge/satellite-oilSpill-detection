@@ -12,7 +12,7 @@ BEFORE it. The sign of an hour comes from the direction, never from the row.
 from __future__ import annotations
 
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import numpy as np
@@ -58,6 +58,12 @@ def history_frames(result: Any, field: Any, *, forward: bool) -> list[dict[str, 
         finite = np.isfinite(lons) & np.isfinite(lats)
         lons, lats = lons[finite], lats[finite]
         if lons.size == 0:
+            if forward:
+                # Every parcel has stranded. The forecast says so to its horizon
+                # rather than ending early: nothing afloat, so no area and no spread.
+                frames.append(dict(hour=hour, particles=[], contour50=[], contour90=[], area50Km2=0.0,
+                                   area90Km2=0.0, spreadKm=0.0,
+                                   strandedPct=round(100.0 * (1.0 - float(adrift.sum()) / total), 2)))
             continue
         particles: list[float] = []
         for lon, lat in zip(lons, lats, strict=True):
@@ -155,6 +161,22 @@ def on_land_pct(result: Any) -> float:
     return float(100.0 * np.mean(ashore)) if ashore.size else 0.0
 
 
+def forcing_note(forcing_mode: str, start: datetime) -> str:
+    """What forced a run, in the words every artifact carries (`forcingNote`)."""
+    from backend.drift.ensemble import WIND_PHASE_SHIFT_H
+
+    timing = f" Each member's wind is shifted in time by up to {WIND_PHASE_SHIFT_H:g} h either way (ISSUES X9)."
+    if forcing_mode == "era5+cmems":
+        from backend.ingest.metocean.cmems import HOURLY_DATASET, dataset_for
+
+        dataset = dataset_for(start)
+        cadence = "hourly" if dataset == HOURLY_DATASET else "daily-mean"
+        return f"ERA5 10 m wind and CMEMS {cadence} surface currents ({dataset}, 1/12 deg)." + timing
+    if forcing_mode == "era5":
+        return "ERA5 10 m wind only; no current field (ISSUES X2)." + timing
+    return "Constant forcing. With no spatially varying flow there is no convergence minimum."
+
+
 def drift_payload(
     *,
     stem: str,
@@ -197,11 +219,7 @@ def drift_payload(
         detectionPolygons=polygons,
         engine="OpenDrift OpenOil",
         forcing=forcing_mode,
-        forcingNote=(
-            "ERA5 10 m wind only; no current field, because CMEMS has no credentials (ISSUES X2)."
-            if forcing_mode == "era5"
-            else "Constant forcing. With no spatially varying flow there is no convergence minimum."
-        ),
+        forcingNote=forcing_note(forcing_mode, acquired - timedelta(hours=hours)),
         members=members,
         particlesPerMember=per_member,
         particlesRendered=len(frames[0]["particles"]) // 2 if frames else 0,
@@ -212,9 +230,9 @@ def drift_payload(
             "detection's polygon; the same positions for every member"
         ),
         forwardForcingNote=(
-            f"ERA5 10 m wind for the {forward_hours} h after the pass; no current field (ISSUES X2). "
+            f"For the {forward_hours} h after the pass: {forcing_note(forcing_mode, acquired)} "
             "Parcels that reach the coast strand (OpenDrift coastline_action 'stranding')."
-            if forcing_mode == "era5"
+            if forcing_mode != "constant"
             else "Constant forcing."
         ),
         forwardMemberFailures=list(ahead.failures),

@@ -22,8 +22,8 @@ shorter one.
 **On the 4060 Ti machine this is reversed** — check with
 `.venv/Scripts/python.exe -c "import torch; print(torch.cuda.get_device_name(0))"`.
 As of 2026-09-23 the work has moved there: training is allowed, and
-`FUTURE_WORK.md` §0 says what comes first (Part II and the look-alike rate,
-then the rest of the plan). Files git does not carry are listed in
+`FUTURE_WORK.md` §0 says what comes next (Part II was trained and promoted on
+2026-09-25). Files git does not carry are listed in
 `pasteHere.txt` at the repository root.
 
 The frontend is authored separately and pushed straight to GitHub, so
@@ -44,6 +44,28 @@ resolve. `.venv/pyvenv.cfg` was repointed on 2026-09-22.
 Run `.venv/Scripts/python.exe -m scripts.repath_artifacts` after copying, then
 `--check`. Symptom if you forget: a missing-file error that reads like a corrupt
 dataset rather than a path problem. See `DATA.md` §1.
+
+**Two layouts, one repository.**
+
+- **Session machine (GT 710):** everything lives inside the repository:
+  - `data/interim/datasets/zenodo/{8346860,13761290,8253899}`;
+  - `data/raw/…` and `data/processed/…`;
+  - `runs/`.
+
+  Use those in-repo files. Treat every `E:\…` or `oilSpil2l16` path in these
+  docs as describing the 4060 Ti only: no junctions, and no `ZENODO_DIR`
+  needed.
+- **RTX 4060 Ti:** C: was too small, so the corpus is scattered:
+  - `data/interim/datasets` is a directory junction into
+    `C:\Users\adi\Downloads\oilSpil2l16\oilSpil2l`;
+  - Parts I and III sit behind junctions onto `E:\oilSpil2l-data`;
+  - Part II is in `E:\temp downloads`, so pass it to `scripts.part_two` as
+    `--extracted "E:\temp downloads"`.
+
+Code defaults are repo-relative only. `scripts/part_two.py` defaults to
+`data/interim/datasets/zenodo/8253899`. The `scene` field in
+`eval/final/scenes*/*.geojson` is the absolute path inference ran on,
+provenance only; nothing reads it.
 
 ## 3. Where to look
 
@@ -115,10 +137,11 @@ freshly frozen, independently labelled holdout.
 .venv/Scripts/python.exe -m ruff check . && .venv/Scripts/python.exe -m mypy ml backend scripts
 ```
 
-Baseline is **630 passed, 9 skipped** — six database tests skip because the
-Supabase session pooler returns tenant/user not found, and the rest need
-hardware this machine lacks. A drop below 630 is a regression. ruff and mypy
-are both clean as of 2026-09-24 (mypy: 130 files); keep them that way. For the frontend,
+Baseline is **667 passed, 8 skipped** as of the last full run (2026-09-25, 4060 Ti; later changes added about 5 tests — re-run and update this) — six database
+tests skip because the Supabase project is paused (the pooler answers
+tenant/user not found, ISSUES X1), and two need a hybrid CPU. A drop below 667
+is a regression. ruff and mypy are both clean as of 2026-09-25 (mypy: 143
+files); keep them that way. For the frontend,
 `cd frontDemo && npx tsc -b && npm run check` (14 scripts; the corpus and
 real-run checks skip on a machine without their data or the exported model).
 
@@ -129,6 +152,15 @@ When its output looks wrong, the input is wrong — compare against
 Run the command and read the output. "Should pass" is not evidence.
 
 ## 8. Traps that have already cost time twice
+
+- **Vercel ships only what git carries.** The live demo
+  (`satellite-oil-spill-detection.vercel.app`) is built from `main`.
+  `frontDemo/public/runs/` and `frontDemo/public/models/*.onnx` are committed on
+  purpose (`.gitignore` re-includes them). Without them every Real view is a
+  404. Regenerate them with the export commands; never re-ignore them.
+- **Import MapLibre from `frontDemo/src/map/maplibre.ts`**, never from
+  `maplibre-gl`. v6 finds its worker beside its own module, and Vite moves the
+  module; that file hands the worker over (`PREVIOUS_WORK.md` §2.25).
 
 - **`weights/` is partially un-ignored.** `.gitignore` has `weights/` then
   `!weights/`, so files there are visible to git even though `*.pt` still hides

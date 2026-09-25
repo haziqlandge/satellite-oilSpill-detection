@@ -15,6 +15,7 @@ write, `POST /runs`, queues a separate process and returns at once
 
 from __future__ import annotations
 
+import os
 import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -71,10 +72,14 @@ def create_app(*, store: ArtifactStore | None = None, jobs: JobManager | None = 
         app.state.jobs = jobs or JobManager(API_RUNS)
         app.state.weights_status = weights_status()
         app.state.database = {"ok": None, "detail": "not probed yet"}
-        if probe_database:
+        from backend.ingest.metocean.cache import is_offline
+
+        if probe_database and not is_offline():
             threading.Thread(target=_probe_database, args=(app.state.database,), daemon=True).start()
         else:
-            app.state.database = {"ok": None, "detail": "not probed (disabled)"}
+            # The hosted database is a network call; DEMO_OFFLINE forbids it (PHASE-09).
+            app.state.database = {"ok": None,
+                                  "detail": "not probed (DEMO_OFFLINE=1)" if is_offline() else "not probed (disabled)"}
         if warm:
             threading.Thread(target=_warm, args=(app.state.store,), daemon=True).start()
         yield
@@ -87,9 +92,19 @@ def create_app(*, store: ArtifactStore | None = None, jobs: JobManager | None = 
         docs_url=f"{API_PREFIX}/docs",
         openapi_url=f"{API_PREFIX}/openapi.json",
     )
+    # The local dev servers always; a hosted pipeline (FUTURE_WORK §4.3) also
+    # admits the sites named in API_CORS_ORIGINS, comma-separated -- the
+    # deployed console, e.g. https://satellite-oil-spill-detection.vercel.app.
+    from dotenv import load_dotenv
+
+    from backend.config import REPO_ROOT
+
+    load_dotenv(REPO_ROOT / ".env")
+    hosted = [o.strip().rstrip("/") for o in os.environ.get("API_CORS_ORIGINS", "").split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
         allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
+        allow_origins=hosted,
         allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )

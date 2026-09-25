@@ -30,9 +30,11 @@ import { centroid, distanceKm, kmPerDegLon, KM_PER_DEG_LAT, ringAreaKm2 } from "
 import { ensureLandmask } from "./landmask";
 import { realVessels, ensureRealTraffic, registerTrafficSource } from "./realAis";
 import { deepAshore, sceneLabel, type RealDriftRun } from "./realDrift";
-import { positionAt } from "./ais";
+import { buildTraffic, planCorridors, positionAt } from "./ais";
+import { completeFlow, flowMean, isSimulated, ringsBbox, speedToward } from "./flow";
+import { makeRng, seedFrom } from "./rng";
 import { characterise, windGate, type SlickGeometry } from "./slick";
-import type { Characterisation, DetectionPartKind, LngLat, Run, ScenarioId } from "./types";
+import type { Characterisation, DetectionPartKind, FlowGrid, LngLat, Run, ScenarioId } from "./types";
 
 export type RealRunId = Extract<ScenarioId, `real-${string}`>;
 
@@ -147,6 +149,8 @@ export interface RealSceneFile {
     fromDeg: number[];
     current: string;
   };
+  /** Wind and current around the run for the map's arrows (`backend/drift/flow.py`). Absent from older exports. */
+  flow?: FlowGrid;
   /**
    * The backend's PHASE-03 record for the seed detection
    * (`export_real_scenes.characterise_seed`): geometry from the unsimplified
@@ -204,7 +208,9 @@ export async function ensureRealRun(id: string): Promise<void> {
     for (const frame of drift.frames)
       for (let k = 0; k < frame.particles.length; k += 2)
         reach = Math.max(reach, distanceKm(drift.seed, [frame.particles[k], frame.particles[k + 1]]));
-    await ensureLandmask(drift.seed, reach + 20);
+    // Far enough out for simulated lanes too (`planCorridors` reaches 110 km),
+    // in case this place has no AIS and traffic has to be simulated.
+    await ensureLandmask(drift.seed, Math.max(reach + 20, 140));
     loaded.set(id, { drift, scene });
   })();
   pending.set(id, job);
@@ -326,11 +332,14 @@ export function buildRealRun(id: RealRunId): Run {
   */
   const frames = drift.frames.map((f) => {
     const particles = Float64Array.from(f.particles);
-    // Masked on deep land only: see `densityGrid` for why the raster coast is not enough here.
-    const grid = densityGrid(particles, particles.length / 2, undefined, undefined, undefined, deepAshore);
-    const table = massTable(grid);
-    const contour50 = contour(grid, levelForMass(table, 0.5));
-    const contour90 = contour(grid, levelForMass(table, 0.9));
+    // A forecast hour after every parcel stranded has nothing afloat to outline.
+    const grid = particles.length
+      // Masked on deep land only: see `densityGrid` for why the raster coast is not enough here.
+      ? densityGrid(particles, particles.length / 2, undefined, undefined, undefined, deepAshore)
+      : null;
+    const table = grid && massTable(grid);
+    const contour50 = grid && table ? contour(grid, levelForMass(table, 0.5)) : [];
+    const contour90 = grid && table ? contour(grid, levelForMass(table, 0.9)) : [];
     return {
       hour: f.hour,
       at: acquiredAt + f.hour * HOUR,
@@ -353,17 +362,34 @@ export function buildRealRun(id: RealRunId): Run {
   const lastAhead = drift.frames[drift.frames.length - 1];
   // The forecast envelope, drawn the way an authored scene's is: the 90% outline every 12 h.
   const forwardImpact = ahead.filter((f) => f.hour % 12 === 0).flatMap((f) => f.contour90);
-  const vessels = realVessels(id);
+  const realTracks = realVessels(id);
+  // No AIS for this place and time (marinecadastre is US waters only, ISSUES
+  // F14): simulated voyages are drawn instead, SIM wherever they show. Display
+  // only: the radar matching and the gate below read the real tracks alone, so
+  // a simulated ship can never make a real radar target look matched.
+  const simulatedTraffic = !realTracks.length;
+  const vessels = simulatedTraffic
+    ? buildTraffic(
+        {
+          corridors: planCorridors(drift.seed).corridors,
+          vesselCount: 24,
+          cadenceS: 120,
+          windowHours: drift.backwardHours + 8,
+          acquiredAt,
+        },
+        makeRng(seedFrom(`sim-traffic-${id}`)),
+      )
+    : realTracks;
   // A loop, not Math.min(...): tens of thousands of reports overflow the stack.
   let firstReport = acquiredAt;
-  for (const v of vessels) for (const p of v.points) if (p.t < firstReport) firstReport = p.t;
+  for (const v of realTracks) for (const p of v.points) if (p.t < firstReport) firstReport = p.t;
   const aisHours = Math.round((acquiredAt - firstReport) / HOUR);
 
   // The scene's own radar returns near the seed, each matched to a real vessel
   // that reported within 10 minutes and 0.5 km of it at the pass. An unmatched
   // return is a dark vessel or an installation: CFAR cannot tell which.
   const MATCH_KM = 0.5;
-  const reportedAtPass = vessels.filter((v) => v.points.some((p) => Math.abs(p.t - acquiredAt) <= 10 * 60_000));
+  const reportedAtPass = realTracks.filter((v) => v.points.some((p) => Math.abs(p.t - acquiredAt) <= 10 * 60_000));
   const passPositions = reportedAtPass.map((v) => positionAt(v, acquiredAt)).filter((p): p is LngLat => p !== null);
   const radar = scene.cfar?.status === "run" ? scene.cfar.targets : [];
   const cfarTargets = radar.map((t, i) => ({
@@ -380,16 +406,27 @@ export function buildRealRun(id: RealRunId): Run {
     : `Radar: CFAR not run (${scene.cfar?.reason ?? "exported before it existed"}). `;
   // The age is the export's own (`estimate_age`), a triple with its method
   // (C1), when the backward field has a convergence minimum; otherwise a
-  // refusal. Either way nothing is ranked: the field is wind-only.
+  // refusal. Either way nothing is ranked: wind-only, or not yet scored (X16).
   const triple = drift.age.age_hours;
   const aged = drift.age.status === "converged" && !!triple &&
     [triple.low, triple.best, triple.high].every((v) => v !== null && Number.isFinite(v));
   const ageHours: [number, number, number] = aged
     ? [triple!.low!, triple!.best!, triple!.high!]
     : [0, drift.backwardHours, drift.backwardHours];
-  const windOnly =
-    "the field is wind-only: there is no current field (ISSUES X2), and a wind-only field cannot " +
-    `carry an attribution. ${vessels.length} real vessels are shown; none is scored.`;
+  const currents = drift.forcing === "era5+cmems";
+  const windOnly = (currents
+    ? "ranking a real field is not built yet (ISSUES X16), although this one is current-forced (CMEMS). "
+    : "the field is wind-only: there is no current field (ISSUES X2), and a wind-only field cannot " +
+      "carry an attribution. ") +
+    // The scorer's own first refusal (C9), which no forcing can lift: below the
+    // Bragg threshold the sea is dark with or without oil on it.
+    (characterisation.windGateMultiplier === 0
+      ? `The wind at the pass, ${characterisation.windSpeedMs.toFixed(1)} m/s, puts the wind gate at 0 as well, so ` +
+        "no ranking here would mean anything whatever the forcing. "
+      : "") +
+    (simulatedTraffic
+      ? `No real AIS here; ${vessels.length} simulated vessels are shown, none scored.`
+      : `${vessels.length} real vessels are shown; none is scored.`);
   const reasons = aged
     ? `An age but no ranking. The backward field is tightest ${ageHours[1].toFixed(1)} h before the ` +
       `pass (${ageHours[0].toFixed(1)} / ${ageHours[1].toFixed(1)} / ${ageHours[2].toFixed(1)} h, convergence ` +
@@ -425,12 +462,21 @@ export function buildRealRun(id: RealRunId): Run {
   const detected = apiRun
     ? `REAL · Live pipeline run ${apiRun} (POST /api/v1/runs). Detections: ${scene.detectionSource}, `
     : `REAL · Detections: the release model (L1-ciou research) on the full Sentinel-1 scene, `;
-  const aisNote = vessels.length
+  const aisNote = !simulatedTraffic
     ? `AIS: marinecadastre.gov, identities withheld; it covers the last ${aisHours} h of the ` +
       `${drift.backwardHours} h hindcast. `
-    : "AIS: none on this machine for this place and time (marinecadastre covers US waters only, ISSUES F14); " +
-      "no vessel is shown. ";
+    : "AIS: none for this place and time (marinecadastre covers US waters only, ISSUES F14). The " +
+      `${vessels.length} vessels drawn are SIMULATED voyages on lanes laid around the coast, for display only: ` +
+      "no radar target is matched to them and nobody is scored. ";
+  const flow = completeFlow(scene.flow, [...scene.detections.filter((d) => d.seed).map((d) => d.ring), ...frames.flatMap((f) => f.contour90)],
+    scene.wind.hours, drift.seed);
+  const simulatedParts = [
+    simulatedTraffic && "the ship traffic",
+    isSimulated(flow.windSource) && "the wind arrows",
+    isSimulated(flow.currentSource) && "the current arrows",
+  ].filter((part): part is string => !!part);
   const provenance =
+    (simulatedParts.length ? `SIM ${simulatedParts.join(", ")} (no real data for this place and time) · ` : "") +
     detected +
     `${counted}; ${seedNote}. SAR alone cannot tell oil ` +
     `from a natural film (ISSUES Q2). Drift: ${drift.engine}, ${drift.members} members x ` +
@@ -444,9 +490,18 @@ export function buildRealRun(id: RealRunId): Run {
         (lastAhead.strandedPct !== undefined ? `; ${lastAhead.strandedPct.toFixed(1)}% reach the coast by +${lastAhead.hour} h. ` : ". ")
       : "No forecast was exported for this run. ") +
     `${aisNote}${radarNote}${measuredNote}Wind: ${scene.wind.source}. ` +
-    "Nothing here is simulated, and nobody is ranked -- see the drift pane for why.";
+    (simulatedParts.length
+      ? `Simulated, and labelled SIM: ${simulatedParts.join(", ")}. Nobody is ranked -- see the drift pane for why.`
+      : "Nothing here is simulated, and nobody is ranked -- see the drift pane for why.");
 
   const hours = scene.wind.hours;
+  // The mean around the slick, as the flow cards read it: a point at a seed
+  // against the coast falls in the current field's land cells.
+  const around = ringsBbox(scene.detections.filter((d) => d.seed).map((d) => d.ring), 1.5);
+  const measuredCurrent = (h: number) => {
+    const v = isSimulated(flow.currentSource) ? null : flowMean(flow, "current", around, h);
+    return v ? speedToward(v) : null;
+  };
   return {
     meta: {
       id,
@@ -492,7 +547,8 @@ export function buildRealRun(id: RealRunId): Run {
       ageMethod: aged ? "drift_convergence" : "no_convergence",
       // The authored engine's rule (`drift.ts`), so both read an age the same way.
       temporalState: aged ? (ageHours[1] <= 6 ? "ongoing" : ageHours[1] <= 24 ? "recent" : "legacy") : "indeterminate",
-      insufficientEvidence: { area90Km2: horizon.area90Km2, reason: reasons, kind: aged ? "wind_only" : "no_age" },
+      insufficientEvidence: { area90Km2: horizon.area90Km2, reason: reasons,
+        kind: !aged ? "no_age" : currents ? "unscored" : "wind_only" },
       diffuseThresholdKm2: DIFFUSE_THRESHOLD_KM2,
     },
     vessels,
@@ -509,13 +565,16 @@ export function buildRealRun(id: RealRunId): Run {
       hours,
       windMs: scene.wind.ms,
       windFromDeg: scene.wind.fromDeg,
-      // No current field exists for these runs. NaN, not zero: zero would read
-      // as a measured slack current.
-      currentMs: hours.map(() => Number.NaN),
-      currentTowardDeg: hours.map(() => Number.NaN),
+      // Measured currents only (CMEMS, at the seed); a simulated one stays NaN
+      // here, because these charts carry no SIM label. NaN, not zero: zero
+      // would read as a measured slack current.
+      currentMs: hours.map((h) => measuredCurrent(h)?.speed ?? Number.NaN),
+      currentTowardDeg: hours.map((h) => measuredCurrent(h)?.towardDeg ?? Number.NaN),
       tideMs: hours.map(() => Number.NaN),
     },
-    gate: { considered: vessels.length, admitted: 0, reason: reasons },
+    flow,
+    trafficSource: simulatedTraffic ? "SIM voyages" : "marinecadastre AIS",
+    gate: { considered: realTracks.length, admitted: 0, reason: reasons },
     separability: null,
     truth: null,
   };

@@ -22,9 +22,10 @@ FOUR TRAPS THIS CODE IS SHAPED AROUND, all of them already paid for:
     dies deep inside pandas with a comparison error that names neither the
     argument nor the cause. Acquisition times parsed from a file name are
     naturally aware, so they are stripped here.
-  * **Wind only.** CMEMS has no credentials (ISSUES X2), so there is no current
-    field. Every artifact records `forcing` so the interface can say so rather
-    than implying a full metocean field.
+  * **Currents when they can be had.** CMEMS surface currents (`cmems.py`) join
+    the wind when cached or fetchable; without Copernicus Marine credentials the
+    run is wind-only (ISSUES X2). Every artifact records `forcing` so the
+    interface can say which rather than implying a full metocean field.
   * **The ensemble is the point** (C5). Ten members differing in wind drift
     factor and diffusivity, stacked -- never one trajectory.
 
@@ -176,18 +177,35 @@ def export_scene(path: Path, *, forcing_mode: str, hours: int, verbose: bool = T
     # 9 km streak began the reconstruction -- and the view's T0 -- as a blob.
     seed_lons, seed_lats = points_in_polygon(seed_polygon(path, seed), PARTICLES_PER_MEMBER, seed=0)
 
-    def readers_for(request: Any) -> list[Any] | None:
-        if forcing_mode != "era5":
+    back_current = ahead_current = None
+    if forcing_mode == "era5":
+        from backend.ingest.metocean.cmems import currents_for
+
+        bbox, _ = scene_bbox(path)
+        back_current, ahead_current, currents_from = currents_for(bbox, acquired, hours=hours, forward=FORWARD_HOURS)
+        if back_current is not None:
+            forcing_mode = "era5+cmems"
+        if verbose:
+            print(f"  CMEMS currents: {currents_from if back_current is not None else 'none, wind-only -- ' + currents_from}",
+                  flush=True)
+
+    def readers_for(request: Any, current: Path | None) -> Any:
+        """Each member's readers, its wind shifted by its own phase (ISSUES X9); None for constant forcing."""
+        if forcing_mode == "constant":
             return None
-        from backend.ingest.metocean.cache import fetch_with_cache
-        from backend.ingest.metocean.era5 import fetch_era5_wind, wind_only_readers
+        from backend.ingest.metocean.cache import resolve
+        from backend.ingest.metocean.era5 import drift_readers, fetch_era5_wind
 
         if verbose:
             print(f"  ERA5 {request.key()[:8]} ...", flush=True)
-        return wind_only_readers(fetch_with_cache(request, fetch_era5_wind))
+        # Exact, covering or fetched: a file from a longer request answers a shorter one.
+        wind, how = resolve(request, fetch_era5_wind, fetched_from="the Copernicus CDS")
+        if verbose:
+            print(f"    {how}", flush=True)
+        return lambda member: drift_readers(wind, current, wind_shift_h=member.wind_phase_shift_h)
 
     back_request, ahead_request = wind_requests(path, hours, FORWARD_HOURS)
-    readers = readers_for(back_request)
+    readers = readers_for(back_request, back_current)
     # None once real readers carry the forcing; `run_ensemble` takes either.
     forcing: Forcing | None = None if readers else Forcing()
 
@@ -210,7 +228,7 @@ def export_scene(path: Path, *, forcing_mode: str, hours: int, verbose: bool = T
 
     # The forecast: the same parcels and members, forward from the pass, on
     # the ERA5 wind for the hours after it. Oil that reaches the coast strands.
-    ahead_readers = readers_for(ahead_request)
+    ahead_readers = readers_for(ahead_request, ahead_current)
     started = time.time()
     ahead = run_ensemble(
         lon=seed_lons, lat=seed_lats, start=acquired, hours=FORWARD_HOURS, backward=False,

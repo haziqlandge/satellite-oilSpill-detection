@@ -65,6 +65,8 @@ const LAYERS: { key: keyof LayerToggles; label: string; hint: string }[] = [
   { key: "targets", label: "radar targets", hint: "bright contacts, matched or dark" },
   { key: "forecast", label: "72 h forecast", hint: "forward impact envelope" },
   { key: "hindcast", label: "hindcast", hint: "show or hide the persistent hindcast areas before T0" },
+  { key: "windArrows", label: "wind arrows", hint: "10 m wind around the event, where the air goes" },
+  { key: "currentArrows", label: "current arrows", hint: "surface current around the event, where the water goes" },
   { key: "labels", label: "place labels", hint: "coastline names from the basemap" },
 ];
 

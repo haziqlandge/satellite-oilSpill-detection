@@ -24,6 +24,7 @@ import {
   type ReleaseShapeName,
 } from "./drift";
 import { makeForcing, type FieldConfig, type Forcing } from "./field";
+import { ringsBbox, sampleFlowGrid } from "./flow";
 import { bearingDeg, centroid, circleRing, destination, distanceKm } from "./geo";
 import { makeRng, seedFrom } from "./rng";
 import {
@@ -96,6 +97,20 @@ export const SCENARIOS: ScenarioListing[] = [
     region: "indian-waters",
     tests:
       "The system has to name nobody. A pipeline that always produces a suspect is useless.",
+  },
+  {
+    id: "ennore-anchored",
+    name: "Anchored after a collision",
+    short: "Tanker at the Ennore anchorage, Bay of Bengal",
+    region: "indian-waters",
+    tests: "A stationary source in a busy port approach, in the Bay of Bengal's monsoon regime.",
+  },
+  {
+    id: "paradip-spm",
+    name: "Mooring leak",
+    short: "Single point mooring off Paradip",
+    region: "indian-waters",
+    tests: "An installation has to outrank the vessels around it, without a special case.",
   },
 ];
 
@@ -176,6 +191,11 @@ export interface ScenarioSpec {
 }
 
 const DEG_MIN_SEC = (d: number, m: number, s: number) => d + m / 60 + s / 3600;
+
+/** The outer anchorage of Kamarajar port, Ennore, about 4 km off the breakwater. Authored (PHASE-10). */
+const ENNORE: LngLat = [80.375, 13.245];
+/** The Paradip crude terminal's single point mooring, about 17 km offshore. Placed from public descriptions (PHASE-10). */
+const PARADIP_SPM: LngLat = [86.84, 20.24];
 
 /** P004 Case 2, 00:02 UTC 15 May 2023. Southern tip at the suspected source. */
 const GOM_CASE_2: LngLat = [
@@ -793,6 +813,157 @@ const AUTHORED_SPECS: Record<Exclude<ScenarioId, "upload" | RealRunId>, Scenario
     infrastructureCoverage: "complete",
     source: { type: "none" },
   },
+
+  /*
+    PHASE-10's two further zones. Both are AUTHORED (C10), at their real
+    places, with simulated AIS (no free AIS outside US waters) and the
+    console's analytic forcing. They test that the pipeline operates over
+    these zones -- not that detection transfers to real Indian SAR imagery,
+    which is P002's highest-priority open problem and is not claimed.
+  */
+  "ennore-anchored": {
+    meta: {
+      id: "ennore-anchored",
+      name: "Anchored after a collision",
+      region: "indian-waters",
+      provenance:
+        "SIM · Authored scenario off Kamarajar (Ennore) port, loosely modelled on the January 2017 collision there; it is not a reconstruction of that event, and no vessel in it is a real one. The AIS is simulated because free real AIS covers US waters only; the forcing is the console's analytic field, set to a north-east monsoon over a southward East India Coastal Current. Ground truth is written by us (C10).",
+      acquiredAtIso: "2024-01-28T00:40:00Z",
+      centre: [80.37, 13.2],
+      zoom: 10.4,
+      sceneId: "S1A_IW_GRDH_1SDV_20240128T004000_ENNORE",
+      place: "the outer anchorage of Kamarajar port, Ennore",
+      summary:
+        "An 8 km band running south-south-west along the coast from a tanker anchored off the port approach, carried by the monsoon current toward the Chennai shore.",
+      tests: "A stationary source in a busy port approach, in the Bay of Bengal's monsoon regime.",
+      expectedTop1: "The anchored tanker",
+    },
+    field: {
+      meanU: -0.03,
+      meanV: -0.2,
+      eddy: { centre: [80.6, 13.05], radiusKm: 24, strengthMs: 0.04 },
+      convergence: { centre: ENNORE, radiusKm: 11, strengthMs: 0.045 },
+      tideMs: 0.07,
+      tidePhaseHours: 2.2,
+      windMs: 6.4,
+      windDirDeg: 40,
+      windRotateDegPerHour: 0.15,
+    },
+    // A holed tank losing oil fast at first, then at a falling rate.
+    releaseShape: "tapering",
+    release: ENNORE,
+    releaseAgeHours: 16,
+    ongoing: true,
+    slick: {
+      axisDeg: 196,
+      lengthKm: 8.0,
+      headWidthM: 170,
+      tailWidthM: 540,
+      meanderKm: 0.35,
+      fragments: 2,
+      className: "oos",
+      confidence: 0.81,
+      dampingRatioDb: -6.4,
+    },
+    drift: {
+      backwardHours: 30,
+      forwardHours: 48,
+      ensembleSize: 12,
+      perMember: 320,
+      diffusivity: 2.6,
+      diffuseThresholdKm2: 420,
+    },
+    traffic: {
+      vesselCount: 180,
+      corridors: [
+        // The Kamarajar approach from the east, ending at the outer anchorage.
+        { from: [81.05, 13.3], to: [80.42, 13.26], widthKm: 3 },
+        // The Chennai port approach, south of the slick.
+        { from: [81.05, 13.08], to: [80.37, 13.1], widthKm: 3 },
+        // The coastal lane, well offshore.
+        { from: [80.55, 13.75], to: [80.47, 12.6], widthKm: 5 },
+      ],
+    },
+    infrastructure: [],
+    infrastructureCoverage: "partial",
+    source: {
+      type: "berthed",
+      approachBearingDeg: 88,
+      approachKm: 24,
+      mooredHoursBefore: 30,
+      kind: "Tanker",
+      lengthM: 172,
+    },
+  },
+
+  "paradip-spm": {
+    meta: {
+      id: "paradip-spm",
+      name: "Mooring leak",
+      region: "indian-waters",
+      provenance:
+        "SIM · Authored scenario at the Paradip crude terminal's single point moorings, placed from public descriptions; not a reconstruction of any event. The AIS is simulated because free real AIS covers US waters only; the forcing is the console's analytic field, set to a pre-monsoon southerly over a northward East India Coastal Current. Ground truth is written by us (C10).",
+      acquiredAtIso: "2024-04-16T00:25:00Z",
+      centre: [86.86, 20.27],
+      zoom: 10.4,
+      sceneId: "S1A_IW_GRDH_1SDV_20240416T002500_PARADIP",
+      place: "the single point moorings off Paradip, Odisha",
+      summary:
+        "A 6 km band running north-north-east from a mooring buoy offshore of Paradip, with tankers working the port approach to the south-west.",
+      tests: "An installation has to outrank the vessels around it in the Bay of Bengal, without a special case.",
+      expectedTop1: "The mooring buoy",
+    },
+    field: {
+      meanU: 0.03,
+      meanV: 0.17,
+      eddy: { centre: [87.05, 20.35], radiusKm: 22, strengthMs: 0.05 },
+      convergence: { centre: PARADIP_SPM, radiusKm: 12, strengthMs: 0.045 },
+      tideMs: 0.1,
+      tidePhaseHours: 4.1,
+      windMs: 6.0,
+      windDirDeg: 200,
+      windRotateDegPerHour: 0.2,
+    },
+    // A hose failing progressively: little at first, then a rising rate.
+    releaseShape: "building",
+    release: PARADIP_SPM,
+    releaseAgeHours: 12,
+    ongoing: true,
+    slick: {
+      axisDeg: 24,
+      lengthKm: 6.0,
+      headWidthM: 150,
+      tailWidthM: 500,
+      meanderKm: 0.3,
+      fragments: 1,
+      className: "oos",
+      confidence: 0.85,
+      dampingRatioDb: -7.1,
+    },
+    drift: {
+      backwardHours: 30,
+      forwardHours: 48,
+      ensembleSize: 12,
+      perMember: 320,
+      diffusivity: 2.8,
+      diffuseThresholdKm2: 420,
+    },
+    traffic: {
+      vesselCount: 150,
+      corridors: [
+        // The Paradip port approach from the south-east.
+        { from: [87.45, 19.8], to: [86.75, 20.24], widthKm: 3 },
+        // The coastal lane, parallel to the Odisha shore and well offshore.
+        { from: [86.45, 19.62], to: [87.35, 20.55], widthKm: 5 },
+      ],
+    },
+    infrastructure: [
+      { id: "infra-paradip-spm1", label: "Paradip SPM-1", position: PARADIP_SPM },
+      { id: "infra-paradip-spm2", label: "Paradip SPM-2", position: [86.87, 20.19] },
+    ],
+    infrastructureCoverage: "partial",
+    source: { type: "platform", infraId: "infra-paradip-spm1" },
+  },
 };
 
 /* ------------------------------------------------------------------ *
@@ -1384,6 +1555,14 @@ function assemble(id: Exclude<ScenarioId, RealRunId>, variant: DriftVariant): Ru
 
   const meta: ScenarioMeta = { ...spec.meta, acquiredAt };
 
+  // The same forcing on a grid over the slick and every hour's 90% region, for
+  // the map's arrows and the flow cards (`sim/flow.ts`).
+  const flow = sampleFlowGrid(
+    forcing,
+    ringsBbox([...geom.parts, ...driftRun.frames.flatMap((f) => f.contour90)]),
+    environment.hours,
+  );
+
   return {
     meta,
     detection: {
@@ -1413,6 +1592,8 @@ function assemble(id: Exclude<ScenarioId, RealRunId>, variant: DriftVariant): Ru
     releaseEndHour,
     aisPointCount,
     environment,
+    flow,
+    trafficSource: realTraffic ? "marinecadastre AIS" : "SIM voyages",
     gate: scored.gate,
     separability: scored.separability,
     truth,

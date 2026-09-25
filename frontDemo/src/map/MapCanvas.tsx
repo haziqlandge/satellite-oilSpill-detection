@@ -20,11 +20,12 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import maplibregl from "maplibre-gl";
+import maplibregl from "./maplibre";
 import type { Map as MapLibreMap } from "maplibre-gl";
 
 import {
   EMPTY,
+  FLOW_ARROW,
   SOURCE,
   WORLD_LAYER_IDS,
   WORLD_SOURCE_IDS,
@@ -45,6 +46,11 @@ import { trackSegments } from "../sim/realAis";
 import { pointInPolygon, distanceToPathKm, polygonsOf } from "../sim/geo";
 import { detectionFeatures } from "./detectionView";
 import { verdictFor } from "../sim/verdict";
+import { landImage } from "./offlineLand";
+import { FlowCards } from "./FlowCards";
+import { flowCells, flowMean, speedToward, spillParts } from "../sim/flow";
+
+const OFFLINE_LAND = "offline-land";
 
 interface Props {
   run: Run;
@@ -89,6 +95,8 @@ interface Props {
    * track passed from a slick depends on it.
    */
   controls?: "full" | "scale" | "none";
+  /** The wind, current, drift and ships cards in the top-right corner (`FlowCards`): the console's map only. */
+  flowCards?: boolean;
   /**
    * Where the camera should be.
    *
@@ -123,6 +131,33 @@ function line(coords: LngLat[], props: Record<string, unknown> = {}): GeoJSON.Fe
     properties: props,
     geometry: { type: "LineString", coordinates: coords },
   };
+}
+
+/** A small arrow pointing north, white on clear: tinted by `icon-color` and turned by `icon-rotate`. */
+function flowArrowImage(): ImageData {
+  const size = 32;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(14, 10, 4, 19);
+  ctx.beginPath();
+  ctx.moveTo(16, 2);
+  ctx.lineTo(8, 13);
+  ctx.lineTo(24, 13);
+  ctx.closePath();
+  ctx.fill();
+  return ctx.getImageData(0, 0, size, size);
+}
+
+/**
+ * `setPaintProperty` for a property named at run time: the repaint table and the
+ * fade-in. MapLibre 6 types the name as a literal key of its paint spec, which
+ * a name built from a table (or with `-transition` appended) cannot be.
+ */
+function setPaint(map: MapLibreMap, layer: string, prop: string, value: unknown): void {
+  map.setPaintProperty(layer, prop as never, value as never);
 }
 
 function point(p: LngLat, props: Record<string, unknown> = {}): GeoJSON.Feature {
@@ -167,6 +202,7 @@ export function MapCanvas({
   className = "",
   interactive = true,
   controls = "full",
+  flowCards = false,
   camera = null,
   onMap,
 }: Props) {
@@ -299,9 +335,11 @@ export function MapCanvas({
           SOURCE.trackingGap,
           SOURCE.trackingPredicted,
           SOURCE.trackingMarkers,
+          SOURCE.flow,
         ]) {
           map.addSource(id, { type: "geojson", data: EMPTY });
         }
+        if (!map.hasImage(FLOW_ARROW)) map.addImage(FLOW_ARROW, flowArrowImage(), { sdf: true });
         for (const layer of dataLayers(paint)) map.addLayer(layer);
         // Above the data, which is why it is not in `buildStyle`.
         for (const layer of worldSpec(paint).over) map.addLayer(layer);
@@ -479,6 +517,8 @@ export function MapCanvas({
       ["suspect-track", "line-width"],
       ["contour90-fill", "fill-opacity"],
       ["contour50-fill", "fill-opacity"],
+      ["flow-wind", "icon-color"],
+      ["flow-current", "icon-color"],
     ];
     for (const [layer, prop] of scaled) {
       const value = built.get(layer)?.[prop];
@@ -486,7 +526,7 @@ export function MapCanvas({
     }
 
     for (const [layer, prop, value] of repaint) {
-      if (map.getLayer(layer)) map.setPaintProperty(layer, prop, value);
+      if (map.getLayer(layer)) setPaint(map, layer, prop, value);
     }
   }, [paint, ready]);
 
@@ -588,6 +628,46 @@ export function MapCanvas({
       );
     }
   }, [paint, ready, toggles.labels]);
+
+  /**
+   * The land from the local GSHHG mask, while the basemap tiles cannot be had
+   * (ISSUES F11, `offlineLand.ts`). Redrawn for the view after every move;
+   * removed the moment a world that loads is chosen, so it never sits under
+   * real tiles.
+   */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const drop = () => {
+      if (map.getLayer(OFFLINE_LAND)) map.removeLayer(OFFLINE_LAND);
+      if (map.getSource(OFFLINE_LAND)) map.removeSource(OFFLINE_LAND);
+    };
+    if (!basemapFailed) {
+      drop();
+      return;
+    }
+    let latest = 0;
+    const draw = async () => {
+      const mine = ++latest;
+      const b = map.getBounds();
+      const image = await landImage([b.getWest(), b.getSouth(), b.getEast(), b.getNorth()], paint.graticule);
+      if (mine !== latest) return;
+      if (!image) return drop();
+      const source = map.getSource<maplibregl.ImageSource>(OFFLINE_LAND);
+      if (source) source.updateImage(image);
+      else {
+        map.addSource(OFFLINE_LAND, { type: "image", ...image });
+        map.addLayer({ id: OFFLINE_LAND, type: "raster", source: OFFLINE_LAND,
+          paint: { "raster-opacity": 0.55, "raster-fade-duration": 0 } }, "graticule");
+      }
+    };
+    void draw();
+    map.on("moveend", draw);
+    return () => {
+      latest++;
+      map.off("moveend", draw);
+    };
+  }, [ready, basemapFailed, paint.graticule]);
 
   /* --- scenario ---------------------------------------------------- */
 
@@ -927,12 +1007,12 @@ export function MapCanvas({
       if (property && !layerOpacity.current.has(layer)) layerOpacity.current.set(layer, map.getPaintProperty(layer, property) ?? 1);
       map.setLayoutProperty(layer, "visibility", on ? "visible" : "none");
       if (on && before === "none" && property && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        map.setPaintProperty(layer, property + "-transition", { duration: 0 });
-        map.setPaintProperty(layer, property, 0);
+        setPaint(map, layer, property + "-transition", { duration: 0 });
+        setPaint(map, layer, property, 0);
         window.requestAnimationFrame(() => {
           if (!map.getLayer(layer)) return;
-          map.setPaintProperty(layer, property + "-transition", { duration: 700 });
-          map.setPaintProperty(layer, property, layerOpacity.current.get(layer));
+          setPaint(map, layer, property + "-transition", { duration: 700 });
+          setPaint(map, layer, property, layerOpacity.current.get(layer));
         });
       }
     };
@@ -982,12 +1062,43 @@ export function MapCanvas({
     set("forecast-fill", toggles.forecast);
     set("forecast-line", toggles.forecast);
     set("labels", toggles.labels);
+    set("flow-wind", toggles.windArrows);
+    set("flow-current", toggles.currentArrows);
     // One toggle each, rather than an OR across both. Ored together, turning
     // the ensemble off did nothing at all as long as the release was on, which
     // is a control that lies about what it controls.
     overlayRef.current?.setVisible(toggles.particles);
     overlayRef.current?.setReleaseVisible(toggles.release);
   }, [toggles, ready, hour, showHindcastAreas]);
+
+  /* --- flow arrows -------------------------------------------------- */
+
+  // Cells once per run, over the slick and every hour's 90% region, hindcast
+  // and forecast alike (`flowCells`); each arrow is its cell's mean flow at the
+  // playhead.
+  const cells = useMemo(
+    () => (run.flow ? flowCells([...spillParts(run.detection), ...run.drift.frames.flatMap((f) => f.contour90)]) : null),
+    [run],
+  );
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const source = map.getSource(SOURCE.flow) as maplibregl.GeoJSONSource | undefined;
+    if (!source) return;
+    const flow = run.flow;
+    const features: GeoJSON.Feature[] = [];
+    if (flow && cells) {
+      for (const cell of cells) {
+        for (const kind of ["wind", "current"] as const) {
+          const vector = flowMean(flow, kind, cell.bbox, hour);
+          if (!vector) continue;
+          const { speed, towardDeg } = speedToward(vector);
+          features.push(point(cell[kind], { kind, speed, towardDeg }));
+        }
+      }
+    }
+    source.setData(collection(features));
+  }, [run, cells, hour, ready]);
 
   /* --- detections -------------------------------------------------- */
 
@@ -1040,13 +1151,15 @@ export function MapCanvas({
           <span style={{ color: paint.forecast }}>▱ Forecast · after T0</span>
         </div>
       )}
+      {flowCards && <FlowCards run={run} hour={hour} paint={paint} />}
       {basemapFailed && (
         <div
           className="border-line bg-base-2/90 text-dim absolute bottom-3 left-3 z-10 max-w-[30ch] border px-3 py-2 font-mono text-[10.5px] leading-relaxed backdrop-blur"
           role="status"
         >
-          Basemap tiles unreachable. The world is missing; the graticule, the
-          scene and every result layer are generated locally and still correct.
+          Basemap tiles unreachable. The land is drawn from the local GSHHG
+          mask the drift uses (no place names); the scene and every result
+          layer are generated locally and still correct.
         </div>
       )}
     </div>

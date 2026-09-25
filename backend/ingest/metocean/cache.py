@@ -181,6 +181,29 @@ def fetch_with_cache(
     return target
 
 
+def resolve(
+    request: ForcingRequest,
+    fetcher: Callable[[ForcingRequest, Path], None],
+    *,
+    fetched_from: str,
+    cache_dir: Path = DEFAULT_CACHE_DIR,
+) -> tuple[Path, str]:
+    """The file for `request` and how it was found: exact hit, a covering cached file, or a fetch.
+
+    A window cut from a processed scene asks for a smaller box than the scene's
+    own runs did, so its exact key is new; the scene's cached file covers it,
+    which keeps such a run offline-capable. Only a true miss reaches the
+    network, and `DEMO_OFFLINE=1` forbids even that.
+    """
+    exact = cached_path(request, cache_dir=cache_dir)
+    if exact is not None:
+        return exact, "cached"
+    covering = covering_path(request, cache_dir=cache_dir)
+    if covering is not None:
+        return covering, f"cached in a covering request ({covering.name})"
+    return fetch_with_cache(request, fetcher, cache_dir=cache_dir), f"fetched from {fetched_from}"
+
+
 def warm(
     requests: Sequence[ForcingRequest],
     fetcher: Callable[[ForcingRequest, Path], None],

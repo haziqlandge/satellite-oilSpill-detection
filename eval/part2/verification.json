@@ -1,0 +1,48 @@
+{
+  "record": "8253899",
+  "failures": 0,
+  "files": {
+    "01_Train_Val_Lookalike_images.7z": {
+      "zenodo_size": 22993852696,
+      "zenodo_checksum": "md5:e0af26e0b2ad7979b889a91ed5df9a41",
+      "archive_md5_matches": true,
+      "listed": 685,
+      "on_disk": 685,
+      "missing": [],
+      "crc_mismatched": [],
+      "extra_on_disk": 0
+    },
+    "01_Train_Val_Lookalike_mask.7z": {
+      "zenodo_size": 426795,
+      "zenodo_checksum": "md5:ed7370a3dac9fff9287b5254349fdc26",
+      "archive_md5_matches": true,
+      "listed": 685,
+      "on_disk": 685,
+      "missing": [],
+      "crc_mismatched": [],
+      "extra_on_disk": 0,
+      "masks_with_foreground": []
+    },
+    "01_Train_Val_No_Oil_Images.7z": {
+      "zenodo_size": 22931223979,
+      "zenodo_checksum": "md5:6836df2bea59ebb73479ffea71828e14",
+      "archive_md5_matches": true,
+      "listed": 685,
+      "on_disk": 685,
+      "missing": [],
+      "crc_mismatched": [],
+      "extra_on_disk": 0
+    },
+    "01_Train_Val_No_Oil_mask.7z": {
+      "zenodo_size": 416694,
+      "zenodo_checksum": "md5:1b152ee4dd93173015197d0a82b2c864",
+      "archive_md5_matches": true,
+      "listed": 685,
+      "on_disk": 685,
+      "missing": [],
+      "crc_mismatched": [],
+      "extra_on_disk": 0,
+      "masks_with_foreground": []
+    }
+  }
+}

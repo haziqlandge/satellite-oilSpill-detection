@@ -1,0 +1,37 @@
+{
+ "reference": "Prasad et al. 2018, J. Earth Syst. Sci. 127:111, doi:10.1007/s12040-018-1015-3",
+ "engine": "OpenDrift OpenOil, 10 members x 200 parcels, 3% (2-4%) windage, stranding",
+ "forcing": {
+  "wind": "ERA5 10 m",
+  "currents": "cmems_mod_glo_phy_my_0.083deg_P1D-m"
+ },
+ "source": [
+  80.375,
+  13.245
+ ],
+ "start_utc": "2017-01-27T22:30:00Z",
+ "rows": [
+  {
+   "hoursAfterCollision": 10,
+   "modelSouthReachKm": 21.9,
+   "publishedCoastAffectedKm": 6.0,
+   "afloatPct": 74.1,
+   "centreBearingDeg": 208.0
+  },
+  {
+   "hoursAfterCollision": 26,
+   "modelSouthReachKm": 42.5,
+   "publishedCoastAffectedKm": 15.0,
+   "afloatPct": 1.7,
+   "centreBearingDeg": 208.0
+  },
+  {
+   "hoursAfterCollision": 43,
+   "modelSouthReachKm": 59.0,
+   "publishedCoastAffectedKm": 18.0,
+   "afloatPct": 0.0,
+   "centreBearingDeg": 208.0
+  }
+ ],
+ "memberFailures": []
+}

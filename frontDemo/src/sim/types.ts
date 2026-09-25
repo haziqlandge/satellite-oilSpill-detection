@@ -27,6 +27,8 @@ export type ScenarioId =
   | "gom-platform"
   | "kutch-dark"
   | "mumbai-null"
+  | "ennore-anchored"
+  | "paradip-spm"
   | "sample1"
   | "sample2"
   | "sample3"
@@ -166,8 +168,10 @@ export interface DriftRun {
      * Absent means the C3 diffuse test. `no_age`: the field never converges,
      * so there is no age (C1) to rank against. `wind_only`: it converges and
      * has an age, but carries no currents (ISSUES X2), so nothing is ranked.
+     * `unscored`: current-forced with an age, but ranking a real field is not
+     * built yet (ISSUES X16).
      */
-    kind?: "no_age" | "wind_only";
+    kind?: "no_age" | "wind_only" | "unscored";
   } | null;
   /**
    * The area the origin contour must come inside for the run to discriminate.
@@ -332,6 +336,33 @@ export interface Environment {
   tideMs: number[];
 }
 
+/**
+ * Wind and surface current on a coarse grid around the event, hour by hour:
+ * what the map's arrows and the flow cards read (`sim/flow.ts`).
+ *
+ * Data rather than a `Forcing`, so a real run can carry it from its export
+ * (ERA5 and CMEMS sampled on this grid, `backend/drift/flow.py`) exactly as an
+ * authored run carries its analytic forcing sampled the same way. Vectors are
+ * the direction the air or water moves, east and north, m/s.
+ */
+export interface FlowGrid {
+  minLon: number;
+  minLat: number;
+  dLon: number;
+  dLat: number;
+  nx: number;
+  ny: number;
+  /** Hours from acquisition, ascending, one per row of `wind`/`current`. */
+  hours: number[];
+  /** Per hour, [u0, v0, u1, v1, ...] per node, row-major from `minLat`. */
+  wind: number[][];
+  /** Same layout; null for a run with no current field, and null per value on land. */
+  current: (number | null)[][] | null;
+  /** What each is, as the cards print it: "ERA5 10 m", "CMEMS hourly", or "SIM analytic". */
+  windSource: string;
+  currentSource: string | null;
+}
+
 export interface Run {
   meta: ScenarioMeta;
   detection: Detection;
@@ -358,6 +389,10 @@ export interface Run {
   aisPointCount: number;
   /** The forcing the drift ran through, for the environment charts. */
   environment: Environment;
+  /** The same forcing on a grid around the event, for the map's arrows. Absent on runs exported before it. */
+  flow?: FlowGrid;
+  /** Where the ship traffic came from, as the flow cards print it: "marinecadastre AIS" or "SIM voyages". */
+  trafficSource?: string;
   /**
    * What the spatiotemporal gate considered and what it admitted.
    *

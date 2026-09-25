@@ -77,6 +77,8 @@ export function refusalLabel(halt: NonNullable<DriftRun["insufficientEvidence"]>
     return { code: "E-C1", title: "no convergence, no currents: nothing ranked", short: "no age", areaIsReason: false };
   if (halt.kind === "wind_only")
     return { code: "E-X2", title: "wind-only field, no currents: nothing ranked", short: "no currents", areaIsReason: false };
+  if (halt.kind === "unscored")
+    return { code: "E-X16", title: "current-forced field, ranking not built: nothing ranked", short: "not ranked", areaIsReason: false };
   return { code: "E-C3", title: "insufficient evidence", short: "diffuse", areaIsReason: true };
 }
 

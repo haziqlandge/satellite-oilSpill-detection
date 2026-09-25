@@ -1,0 +1,35 @@
+{
+  "identity": {
+    "model": "ccaad1a118ac5b5d324a0d54b5a8ecfdbde0d9aeb9be9f0ce7d4062360833399",
+    "data": "cb2bc09b9630aa0ff264c3dc203f0d39a34c994924b2001cec09a2936e0068e8",
+    "listing": "5b54e54f65de1ed706fa11081746ac146cee059819798da04a6e062bb5dbd669",
+    "settings": {
+      "imgsz": 1024,
+      "batch": 4,
+      "workers": 2,
+      "device": "0",
+      "half": false,
+      "rect": true,
+      "conf": 0.001,
+      "iou": 0.7,
+      "max_det": 1000,
+      "plots": false,
+      "save_json": false,
+      "save_txt": false,
+      "verbose": false
+    }
+  },
+  "completed_at": "2026-09-24T22:58:28.521237+00:00",
+  "metrics": {
+    "metrics/precision(B)": 0.5065843548323663,
+    "metrics/recall(B)": 0.352,
+    "metrics/mAP50(B)": 0.3623984476094494,
+    "metrics/mAP50-95(B)": 0.182709533921835,
+    "metrics/precision(M)": 0.5128202987609204,
+    "metrics/recall(M)": 0.3288421052631579,
+    "metrics/mAP50(M)": 0.34473032935741443,
+    "metrics/mAP50-95(M)": 0.14929015463456763,
+    "fitness": 0.3319996885564026
+  },
+  "rows_sha256": "217ac3c26ec482a32ec327ce646e4f805b56a63666e3332b051958e5c98d70ae"
+}

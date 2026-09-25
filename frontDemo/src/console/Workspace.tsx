@@ -20,12 +20,12 @@ import { animate } from "animejs";
 import { MapCanvas } from "../map/MapCanvas";
 import type { LayerToggles } from "../map/basemap";
 import { useAnimeScope, useReducedMotion } from "../lib/motion";
-import { ageStatement, provenanceFlag, refusalLabel, stamp } from "../lib/format";
+import { ageStatement, provenanceFlag, stamp } from "../lib/format";
 import { WEIGHTS_VERSION } from "../sim/scoring";
 import { verdictFor } from "../sim/verdict";
 import type { MapPaint } from "../theme";
 import type { Run, Suspect } from "../sim/types";
-import { Alarm, Btn, Caret, Flag } from "./components";
+import { Btn, Caret, Flag } from "./components";
 
 /* ------------------------------------------------------------------ *
  * The live map instance
@@ -441,7 +441,6 @@ export function Workspace({
 
   const mpp = view ? metresPerPixel(view.lat, view.zoom) : null;
   const scale = mpp ? niceScale(mpp * 120) : null;
-  const halt = run?.drift.insufficientEvidence ?? null;
 
   return (
     /*
@@ -486,6 +485,7 @@ export function Workspace({
             className="h-full w-full"
             interactive
             controls="none"
+            flowCards
             // Structural typing: `Workspace` needs four methods off the
             // instance, not the MapLibre type, so the narrowing happens here
             // and the file stays free of a dependency on the map library.
@@ -665,18 +665,9 @@ export function Workspace({
           )}
         </div>
 
-        {/* --- refusal ---------------------------------------------- */}
-        {halt && !booting && (
-          <div className="absolute inset-x-0 top-0 z-20 p-2 sm:p-3">
-            <Alarm code={refusalLabel(halt).code} title={`attribution withheld · ${refusalLabel(halt).title}`} compact>
-              <p>
-                {refusalLabel(halt).areaIsReason && <>90% origin contour {halt.area90Km2.toFixed(0)} km². </>}
-                {halt.reason} No candidate is ranked from this field, and the list in pane 04 is
-                suppressed rather than emptied.
-              </p>
-            </Alarm>
-          </div>
-        )}
+        {/* The refusal is not drawn over the map (the user's call,
+            2026-09-25): it stays in pane 04 in full, and as the header's
+            `halt` flag, so the map itself stays clear. */}
 
         {loading && !booting && (
           <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center p-2">

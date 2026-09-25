@@ -1,0 +1,22 @@
+{
+  "counts": {
+    "train": 4227,
+    "val": 482,
+    "test": 627
+  },
+  "holdout_counts": {
+    "Lookalike": 87,
+    "No_oil": 102
+  },
+  "part_two": {
+    "converted": 1370,
+    "train_kept": 872,
+    "holdout_kept": 189,
+    "excluded": 309,
+    "band": 2,
+    "db_window": [
+      -35.0,
+      0.0
+    ]
+  }
+}

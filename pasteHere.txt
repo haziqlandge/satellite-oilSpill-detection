@@ -17,6 +17,17 @@ data/cache/metocean/era5-wind_1b9640c179818c2eca9b4cc566265640.nc
     the ERA5 wind the real drift runs used (1.2 MB total): before each pass, and the
     three newest (2026-09-23 evening) after it, for the 72 h forecast
 
+data/cache/metocean/cmems-currents_browser-20230405-20230412.nc
+data/cache/metocean/cmems-currents_browser-20230511-20230518.nc
+data/cache/metocean/cmems-currents_browser-20231201-20231208.nc
+    the CMEMS surface currents the three real runs are forced by (13 MB total), downloaded
+    through the Copernicus Marine Data Store in a browser (the toolbox cannot log in yet,
+    ISSUES X2). Irreplaceable without that login or a Marine password
+
+demo/data/snapshot.zip
+    EVERYTHING in this list that the offline demo reads, in one file (scripts/export_snapshot.py).
+    Unzip at the repository root, then: .venv/Scripts/python.exe -m scripts.export_snapshot --check
+
 frontDemo/public/runs/S1A_IW_GRDH_1SDV_20230409T000206_20230409T000231_048012_05C552_27F2_s0db/drift.json
 frontDemo/public/runs/S1A_IW_GRDH_1SDV_20230409T000206_20230409T000231_048012_05C552_27F2_s0db/scene.json
 frontDemo/public/runs/S1A_IW_GRDH_1SDV_20230515T000208_20230515T000233_048537_05D69B_35AF_s0db/drift.json

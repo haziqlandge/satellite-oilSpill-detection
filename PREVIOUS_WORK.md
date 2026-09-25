@@ -105,6 +105,37 @@ request. See §2.19. Tests: 599 passed, 9 skipped.
 Timing, a live decode clock) and the upload -> pipeline -> auto-open flow seen
 end to end, see §2.21. Tests: 630 passed, 9 skipped.
 
+**2026-09-24/25 — the RTX 4060 Ti machine.** The tree was set up and proved
+(Job 0), and Zenodo Part II was verified. A geographic look-alike holdout was
+frozen before any training, `final-v12` built, and the release configuration
+retrained on it after proving on the GPU that the pipeline reproduces the
+release's epoch 1 exactly. See §2.22. Tests: 630 passed, 9 skipped.
+
+**2026-09-25 — the RTX 4060 Ti machine.** The user promoted v12. The weights,
+ONNX, full-scene inference, the three real runs (on new seeds and new ERA5 wind)
+and the precomputed uploads were all redone, and box-fill was measured. A drift
+bug that cut a stranding forecast short was fixed on the way. Then PHASE-06: the
+attribution engine in the backend, held to the console's scorer on exported
+fixtures. S_drift is `integral`, and the ablations are recorded. See §2.23.
+Tests: 654 passed, 8 skipped.
+
+**2026-09-25, later — the RTX 4060 Ti machine.** CMEMS currents: a fetcher
+(`backend/ingest/metocean/cmems.py`) and, because the toolbox cannot log in to a
+CDSE-linked account, the three real scenes' currents downloaded through the
+logged-in browser; the real runs regenerated on wind and currents. The wind
+phase shift is applied at last (X9), the console's width profile no longer counts
+gaps (F20), and PHASE-09 started: `verify_offline.py`, `export_snapshot.py`, the
+walkthrough and an offline land layer. See §2.24.
+
+**2026-09-25, evening — the RTX 4060 Ti machine.** The live demo on Vercel
+(`satellite-oil-spill-detection.vercel.app`) was found 404-ing every real view:
+the real runs and the browser model were gitignored, so they never shipped.
+They are committable now. The map gained wind and current arrows and a stack
+of flow cards; everything simulated is tagged SIM, and the panels name every
+real source. The refusal banner left the map, and panel prose clamps to a few
+lines. MapLibre went to 6.11.2 (critical XSS, F10). The Marine toolbox logs in.
+See §2.25.
+
 ### Results
 
 Screening, 12 cells at 60 epochs, mask metrics, single `slick` class:
@@ -812,12 +843,260 @@ The three console fixes the §3 session left (ISSUES F21-F23, now closed).
   coordinate missed; `.click()` on its `[role=tab]` element works. The pane
   does not support region zoom.
 
+## 2.22 Part II, a holdout by geography, and proving a retrain is comparable (2026-09-24/25, 4060 Ti)
+
+- **Part II is georeferenced, and that decides how to hold it out.** No
+  acquisition time anywhere, but every tile carries an EPSG:4326 footprint
+  (~0.18°, worldwide). "Split by scene" is therefore done by place, which is
+  stricter than by scene: single-linkage families at 0.1°, eligible only if no
+  member is within 0.1° of a final-v11 *train* footprint, half the eligible
+  families held out by CRC32. Part II overlaps the existing corpus heavily (254
+  tiles intersect a v11 train tile, 82 val, 85 test; ~490 sit in the Gulf of
+  Mexico), so a random tile split would have leaked.
+- **Part III is Zenodo's own test set** (`02_Test_images_and_ground_truth`); Parts I
+  and II are its train/val. D3 (Part III redistributed into internal splits)
+  is sharper than it reads.
+- **The footprint rule subsumes the pixel evidence.** Of 309 quarantined Part II
+  train candidates, 305 were caught by "within 0.1° of a v11 val/test
+  footprint" alone; all 5 SIFT registered/ambiguous overlaps (all with test)
+  and the 1 exact pixel duplicate were inside that set. For georeferenced tiles
+  the cheap geometric test is at least as strict as the expensive one. Refined
+  SOS has no footprint, so SIFT is still what covers it.
+- **A lost `runs/` can be checked against the release itself.** The release
+  checkpoint stores its `train_args` and every epoch's results. Regenerating
+  the shared head with `train_final.prepare`'s recipe and training one epoch on
+  final-v11 reproduced the release's epoch-1 row to 5 dp on all 12 values. That
+  one run checks four things: the head, the data bytes, deterministic training,
+  and the GPU path. It is why the v12 comparison can attribute differences to
+  data.
+- **Ultralytics' disk-cache guard misreads a presized cache.** It estimates the
+  space from *decoded full-size* images (32.9 GB for final-v12) and disables
+  caching when C: cannot hold that. `load_image` still loads any `.npy` that
+  exists, so presizing the new tiles (`part_two._presize`, the
+  `presize_cache` resize) keeps the release's input path. It is bit-identical
+  either way, only faster.
+- **The release evaluator reproduces.** Re-running `AuditValidator` on the
+  release selects .20 again and gives P .5354 / R .3373 / 13/23 look-alike
+  tiles, exactly the audit's figures. The raw audit rows (`*.jsonl`) are
+  gitignored, so they were gone; `scripts/evaluate_v12.py` regenerates them.
+- **Baseline on the holdout:** the release alarms on 55 of 87 look-alike tiles
+  and 17 of 102 No_oil tiles at .20. Look-alikes, not clean sea, are the
+  problem, as Q2 said.
+- **The negatives worked, and cost little** (`eval/part2/REPORT.md`). The
+  final-v12 retrain, identical config, best epoch 77, 4.32 h, reached 2/23 val
+  and 4/87 holdout look-alike alarm tiles at its own point (release 13/23 and
+  55/87). The holdout difference is −0.586, 95% CI [−0.690, −0.471]. At matched
+  val recall .30/.35/.40 it is 11→0, 13→2 and 14→3 of 23 on val, and 49→2, 59→4
+  and 69→6 of 87 on the holdout. The cost is −.005 mask mAP50-95, −.011 mAP50,
+  and ~3 points of precision on oil tiles at recall ≥ .35. The val look-alikes
+  are Part III, not the Part II it trained on, so the gain is not only
+  recognising Part II tiles. The P004 claim that negative curation is the
+  highest-leverage lever holds here too. Mid-run the v12 curve trailed the
+  release's by ~.02 mask mAP at the same epoch, and it closed to .005 by the end.
+  Do not judge a run by its middle.
+- **Harness:** a Windows venv can be moved by hard-link copy (`cp -al`) and a
+  rewritten `pyvenv.cfg` (delete the linked one first, or the edit lands in both),
+  then `pip install -e . --no-deps`. Frontend corpus checks decide "corpus
+  present" from the directory's existence; with a partial `data/interim` they
+  fail with ENOENT instead of skipping. Point `ZENODO_DIR` at the real corpus.
+
+## 2.23 Promoting v12, and the attribution engine (2026-09-25, 4060 Ti)
+
+- **Promotion keeps the path, not the model.** `weights/L1-ciou-research.pt` is
+  read by name in about ten places (pipeline, API health, inference, export,
+  measurements), so the promoted v12 took the name. Its manifest carries
+  `version: final-v12`, `supersedes` (the v11 hash and path) and the hash of the
+  record it was promoted from, and the v11 release sits beside it as
+  `-v11.{pt,json}`. `ml/export/export.py` does it and refuses to overwrite either.
+- **Box-fill (Q5) mostly went with the look-alikes.** On the three Gulf scenes,
+  box-cut polygons fell from 20 / 88 / 7 to 3 / 9 / 8. Their share of detected
+  area fell from 80 / 93 / 91% to 24 / 51 / 58%, and total detected area fell
+  from 373 / 2,152 / 199 km2 to 27 / 94 / 57 (`eval/part2/box_fill.json`). The April
+  upload window v11 filled 26.6% of with one box now has **no** detection.
+- **Two of the three real seeds were look-alikes.** v12 finds nothing where v11's
+  April seed (a filament network, a possible natural film) or its May seed (a
+  2.5 m/s sea, below the Bragg gate) lay. December's discharge streak is found
+  again, 0.16 km from before. The new April and May seeds are other slicks,
+  ~100 km away. The seed rule did not change, only the model.
+- **The ERA5 box follows the detections, so a new model needs new wind.** The
+  request is the extent of every detection in the scene. v12's reach the
+  scene's west edge, outside the cached v11 box. Six CDS fetches were needed
+  (user-approved). The cache's covering lookup cannot help with a wider box.
+- **A fully stranded member used to cut the whole forecast.** OpenDrift stops a
+  member once none of its parcels is afloat. `run_ensemble` trimmed every member
+  to the shortest, so the new April seed, 17 km off the Louisiana marsh, got a
+  forecast ending at +15.8 h while 37% of its oil was still adrift. All ten
+  members stranded completely, between +15.8 and +41.8 h. Now a member that
+  ended with nothing active (`DriftResult.active_at_end == 0`) is padded with
+  NaN (not afloat), and any other length difference is still trimmed. Forward
+  hours with nothing afloat get an explicit frame: no parcels, 100% stranded.
+  May and December are unchanged by the fix: none of their members ended early.
+- **The attribution engine is the console's, in Python** (`backend/attribute/`).
+  The authored scenarios were built and accepted on `sim/scoring.ts`, so the
+  backend reproduces it rather than re-deriving it. Fixtures from the console
+  (`npm run export:scoring-fixtures`) are matched on every term, total, rank,
+  gate count, refusal and line of evidence text, under both variants. Parity
+  traps met on the way:
+  - Python 3.12's `sum()` of floats is **compensated**, and JS adds left to
+    right (`js_sum`).
+  - `Math.round` rounds halves up (`js_round`).
+  - `toFixed` rounds the exact binary value half away from zero, and prints
+    `Infinity` (`fixed`).
+  - A template literal prints `140`, not `140.0` (`js_num`).
+  - `toVessel`'s resampling to a 5-minute grid is what keeps `behaviour`'s
+    cadence logic true on real AIS.
+- **Fixtures had to be trimmed to be committable.** The dense 128x128 float64
+  frames came to 13.5 MB. Storing the console's own mass table and only the
+  grid cells the scorer samples, and only vessels within reach of the gate,
+  brought them to 2.1 MB, with the omission asserted harmless at export.
+- **S_drift: `integral`, and not for the anticipated reason**
+  (`eval/attribution/REPORT.md`). Case 3 is identical under both variants. What
+  fails under `max` is kutch-dark: a track's max is the best cell its whole
+  voyage touched, while a fixed contact has one sample, so `max` rewards
+  carrying AIS.
+- **The field is decisive where geometry is silent, not on Case 3.** With no gate
+  and no S_drift, the platform (Case 1) falls to 2nd of 313 and the unlit
+  contact to 8th of 232. The Case 2 tanker's margin falls from .396 to .048. But
+  the authored Case 3 vessel stays 1st of 316 (margin .186 to .130): it is
+  berthed at the slick's head, so proximity and "stationary" carry it.
+  PHASE-06's Case 3 ablation line is **not met**, and nothing was tuned.
+- **The live pipeline runs the engine but never ranks.** On a wind-only field
+  (X2) the `attribute` stage still refuses (C3), but it scores the run's own
+  traffic and reports the gate's count, "kept N of M tracks: a filter, not a
+  ranking". It does not rank unmatched CFAR returns as dark vessels: with no
+  length estimate and no infrastructure dataset, a platform would become a
+  false accusation.
+- **Harness:** the venv lacked the `export` extra (`onnx`, `onnxruntime`), and pip
+  added them as new files, which is safe beside a hard-linked venv. The repo's
+  `data/interim/datasets` is now a junction to the old directory's corpus.
+
+## 2.24 Currents, wind timing and the offline demo (2026-09-25, later, 4060 Ti)
+
+- **A browser login is not an API login.** The Copernicus Marine toolbox does a
+  Keycloak password grant (`auth.marine.copernicus.eu`, realm MIS, client
+  `toolbox`). The user's account is signed into through the Marine login's
+  "CDSE" option, so it has no Marine password, and the grant answers 400
+  *Invalid user credentials* for the CDSE pair. The toolbox reports that as
+  `CouldNotConnectToAuthenticationSystem` with an empty message, which reads
+  like a network fault; probe the token endpoint (credentials redacted) before
+  believing it. Without any credentials the toolbox **prompts on stdin**, which
+  in the API's pipeline subprocess is a hang, so `cmems.has_credentials` checks
+  first.
+- **The Data Store's own subset form works with the browser login.** It gave the
+  three scenes' currents (4.4 MB each, 192 hourly steps). In this pane its date
+  fields ignore typed keys; `form_input` sets them, and the form clamps From to
+  To, so set To first. The size estimate is the tell that the form took the
+  values (one hour of this box is 23 kB, eight days 4.4 MB).
+- **The hourly analysis, not the plan's reanalysis.** `GLOBAL_MULTIYEAR_PHY_001_030`
+  is daily means; the analysis/forecast archive now reaches 2022-06-01 and is
+  hourly, on ERA5's clock. Eulerian `uo`/`vo` only: `merged-uv` adds Stokes
+  drift, which OpenOil's 3% windage already stands in for. The daily
+  reanalysis is kept for windows before 2022-06.
+- **CDS returns whole days**, because a request is a cross product of days and
+  hours. So the ERA5 files already cached cover the wider X9 window. The
+  exports now use the pipeline's covering lookup (`cache.resolve`) and fetched
+  nothing; they used to accept an exact key only.
+- **X9: shift the forcing's clock, not the run's.** OpenDrift's generic reader
+  takes an xarray Dataset, so each member's ERA5 time axis is moved in memory
+  (`era5_reader(shift_h=)`). `run_ensemble` takes readers as a function of the
+  member. Requests pad 4 h past each end (`era5.PAD_H`), or a member shifted by
+  3 h has no wind for its last hours, silently. The test turns the wind round
+  mid-run. Hourly wind is interpolated in time, so the turn lands at 3.5 h, not
+  4; the test measures the difference between members (2 × shift × windage).
+- **Currents did not make a real run rankable.** On wind and currents, April and
+  December still never converge (no age). May converges (0.0 / 0.5 / 10.2 h,
+  against 7.3 h wind-only), but its wind is 1.97 m/s, gate 0. The 90% area at
+  −72 h: April 339 km², May 564, December 49; December strands 48% by +72 h
+  (was 59%). All three refuse, and the May view says both reasons.
+- **The offline guard found a real reach at once.** Ultralytics resolves
+  `one.one.one.one` and `dns.google` at import (`ONLINE = is_online()`). Its
+  opt-out is `YOLO_OFFLINE`, set by `infer.py` when `DEMO_OFFLINE` is. After
+  that, the whole live pipeline (detect on CUDA, cached forcing, OpenDrift,
+  AIS, verdict, attribution) made 0 non-loopback connections and 0 lookups.
+  With `DEMO_OFFLINE` the API no longer probes the hosted database either.
+- **F20 moved no ranking and no verdict.** It dropped the 1 / 4 / 1 / 6 / 8 zero
+  stations on the authored slicks, the counts ISSUES had measured. The scoring
+  fixtures regenerate byte-identical, so the scorer never reads width.
+- **Offline land from the drift's own mask.** On a tile failure the map draws the
+  GSHHG raster the frontend already loads, as an image source. Rows are spaced
+  in Web Mercator, because MapLibre stretches an image linearly in projected
+  space.
+- **X1's cause:** the Supabase project is `INACTIVE` (paused), found through the
+  Supabase MCP, not the pooler.
+
+## 2.25 The live site, flow arrows and MapLibre 6 (2026-09-25, evening, 4060 Ti)
+
+- **The Vercel site had never shown a real run.** Vercel builds whatever is in
+  git, and `runs/` (which also matches `frontDemo/public/runs`) and `*.onnx`
+  were ignored. Every Real view answered `drift.json: 404`, and uploads had no
+  model. `.gitignore` now re-includes both (`!frontDemo/public/runs/`,
+  `!frontDemo/public/models/*.onnx`, 34 MB). `git check-ignore` confirmed that
+  the runs and the model are committable, while `.pt`, `runs/final*` and `*.nc`
+  stay ignored. The live pipeline (`POST /runs`) does not exist there (F26).
+- **MapLibre 6 finds its worker beside its own module, at run time**
+  (`new URL("./maplibre-gl-worker.mjs", import.meta.url)`). Vite moves the
+  module (`.vite/deps` in dev, a hashed `assets/` file in a build) and the
+  worker is not moved with it, so every map failed with "Worker failed to
+  load", in dev and in the build alike. `map/maplibre.ts` imports the worker
+  as `?worker&url`, which Vite bundles with its shared chunk, and calls
+  `setWorkerUrl` before any map exists. Import MapLibre from there, never from
+  `maplibre-gl`. Verified on `vite preview` of the production build: the
+  worker loads from `assets/`, with no errors. The other v6 changes are that
+  there is no default export and that `setPaintProperty` takes typed names
+  (`setPaint` in `MapCanvas` casts the run-time ones).
+- **The flow grid is data, not a function.** A real run's wind and current
+  reach the browser as a 10 x 10 grid per hour in `scene.json`
+  (`backend/drift/flow.py`, sampled from the files the drift ran on). An
+  authored run samples its analytic forcing the same way (`sim/flow.ts`), so
+  one renderer serves both. ERA5 latitude descends and CMEMS has a depth axis:
+  sort and `isel(depth=0)` before `interp`.
+- **Arrows are cell means, not point samples.** The first cut drew about 30
+  small point arrows. The user found them cluttered, so now there is one
+  arrow per coarse cell (about 3 across the event), each its cell's mean
+  (`flowCells`, `flowMean`), drawn larger. A point lookup at a seed against the
+  coast lands in CMEMS land cells and reads nothing; the cards and the
+  environment series use the mean around the slick for the same reason.
+- **A real scene's detection is the whole scene.** `run.detection.parts` holds
+  every polygon in 250 km. Anything about "the spill" (arrow cells, the cards)
+  must use `spillParts`, which keeps the seed parts only.
+- **Simulated data is display-only on a real run.** When a place has no AIS,
+  the view draws `buildTraffic` voyages tagged SIM, but the radar matching and
+  the gate read the real tracks alone. Otherwise a simulated ship could make a
+  real radar target look "matched" and change a real verdict. A missing
+  current is simulated for the arrows (`completeFlow`) and stays NaN in the
+  environment charts, which carry no SIM label.
+- **SIM on the map, sources in the panels.** At the user's direction, the flow
+  cards carry only a SIM tag. `Sourced` in the panels prints SIM or "sourced
+  from ERA5 (Copernicus CDS) / CMEMS hourly (Copernicus Marine) /
+  marinecadastre AIS / OpenDrift / Sentinel-1", and pane 04 flags each
+  simulated candidate.
+- **The Marine toolbox logs in through the CDSE pair** once the account has a
+  Marine password equal to the CDSE one (dry run `DRY_RUN`, 2026-09-25).
+
+## 2.26 The last seven plan items (2026-09-25, night, 4060 Ti)
+
+- **§2.6:** `scripts/archive_cleanup.py` checks every archive against its extraction: all entries present at their size, plus a fixed-seed CRC32 sample. It found 9 archives deletable (91 GB) and deleted nothing. Junctions can list one archive twice; dedupe by real path.
+- **§4.2 / §4.3:** A git-only copy of `frontDemo` (182 files, 43 MB) passes `npm ci` and the build, as Vercel would run them. `VITE_API_BASE` (frontend) and `API_CORS_ORIGINS` (API) are the hosted-pipeline switch; both are tested.
+- **Phase 07:**
+  - API reads after the startup warm-up: max 298 ms, median 32 ms. Reads over files regenerated after start are slow once (re-parse): up to 2.7 s.
+  - 52,122 AIS points play at 69.5 fps.
+  - A scan of the UI copy found no guilt language.
+- **Phase 08: the authored cases' drift, measured (`npm run export:evaluation`).** Continuous releases hold their source in the 90% contour late in the window, not at its start (6-15 km off). Case 2's tanker is 0.13 km outside, at the tip. The age interval is degenerate (F5), so the Case 3 age line fails. All of it is reported, not tuned.
+- **Phase 10:**
+  - The registry sits in `frontDemo/src/sim/` because a Vercel build rooted at `frontDemo` cannot import from outside it.
+  - The zone caveats are appended in the Evidence pane, not the scorer, which keeps the Python parity text unchanged.
+  - Ennore and Paradip passed `check:scenarios` on first authoring.
+  - The real-engine Ennore cross-check: direction and beaching agree, the reach is 3.4× too long (X17).
+  - The authored Ennore field was about 2× the observed reach as well.
+
 ## Where the detailed evidence lives
 
 | Artifact | Contents |
 |---|---|
 | `eval/final/operational/*/summary.json` | Per-run metrics at the frozen operating point |
-| `eval/final/scenes/benchmark.json` | Full-scene inference timings and output hashes |
+| `eval/final/scenes-v11/benchmark.json` | Full-scene inference timings and output hashes (v11; v12's are in each geojson's properties) |
+| `eval/part2/REPORT.md`, `box_fill.json` | v12 against v11: look-alike alarms (C8) and box-fill |
+| `eval/attribution/REPORT.md`, `ablation.json` | PHASE-06: S_drift variants, the ablations, timing |
 | `eval/screening/dataset_audit.json` | Per-source tile census, duplicate groups |
 | `eval/final_preflight/label_audit.json` | Per-split label validation — zero format errors |
 | `eval/phase2-closure/annotation-pilot/` | The 24-tile review pack and its inventory |

@@ -154,12 +154,18 @@ export function characterise(
   const lengthKm = pathLengthKm(geom.centreline);
 
   // Width sampled perpendicular to the axis, which is what the profile means.
+  // A station between fragments, or on a tip, is on no slick at all: it is
+  // left out rather than recorded as 0 m, which read the mean width low and
+  // the elongation high (ISSUES F20). The backend's stations sit on the parts
+  // only, for the same reason (`backend/characterize/geometry.py`).
   const widthMProfile: number[] = [];
   for (let i = 0; i < geom.centreline.length; i++) {
-    widthMProfile.push(widthAt(geom, i));
+    const w = widthAt(geom, i);
+    if (w > 0) widthMProfile.push(w);
   }
-  const widthMMean =
-    widthMProfile.reduce((s, w) => s + w, 0) / widthMProfile.length;
+  const widthMMean = widthMProfile.length
+    ? widthMProfile.reduce((s, w) => s + w, 0) / widthMProfile.length
+    : 0;
 
   const orientationDeg = bearingDeg(geom.head, geom.tail);
   const elongation = (lengthKm * 1000) / Math.max(1, widthMMean);

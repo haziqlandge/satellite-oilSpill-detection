@@ -1,0 +1,193 @@
+{
+ "variant": "integral",
+ "note": "authored scenarios (C10); see eval/RESULTS.md",
+ "scenarios": [
+  {
+   "id": "gom-moving",
+   "candidates": 24,
+   "refused": false,
+   "ageHours": [
+    0,
+    0,
+    0
+   ],
+   "ageMethod": "drift_convergence",
+   "truth": "MMSI 477•••••5",
+   "rank": 1,
+   "total": 0.757,
+   "margin": 0.3962,
+   "rankWithoutDrift": 1,
+   "releaseAgeHours": 0,
+   "hoursSourceInside90": [],
+   "sourceInside90DuringRelease": false,
+   "kmOutsideContourAtReleaseStart": 0.13,
+   "releaseInsideAge": true,
+   "releaseWindowHours": [
+    1.28,
+    0
+   ]
+  },
+  {
+   "id": "gom-berthed",
+   "candidates": 11,
+   "refused": false,
+   "ageHours": [
+    0,
+    0,
+    0
+   ],
+   "ageMethod": "drift_convergence",
+   "truth": "MMSI 367•••••9",
+   "rank": 1,
+   "total": 0.744,
+   "margin": 0.1858,
+   "rankWithoutDrift": 1,
+   "releaseAgeHours": 16,
+   "hoursSourceInside90": [
+    -1,
+    0
+   ],
+   "sourceInside90DuringRelease": true,
+   "kmOutsideContourAtReleaseStart": 6.38,
+   "releaseInsideAge": false,
+   "releaseWindowHours": [
+    16,
+    0
+   ]
+  },
+  {
+   "id": "gom-platform",
+   "candidates": 6,
+   "refused": false,
+   "ageHours": [
+    0,
+    0,
+    0
+   ],
+   "ageMethod": "drift_convergence",
+   "truth": "Platform group SP-52",
+   "rank": 1,
+   "total": 0.6787,
+   "margin": 0.2324,
+   "rankWithoutDrift": 1,
+   "releaseAgeHours": 15,
+   "hoursSourceInside90": [
+    0
+   ],
+   "sourceInside90DuringRelease": true,
+   "kmOutsideContourAtReleaseStart": 10.01,
+   "releaseInsideAge": false,
+   "releaseWindowHours": [
+    15,
+    0
+   ]
+  },
+  {
+   "id": "kutch-dark",
+   "candidates": 38,
+   "refused": false,
+   "ageHours": [
+    0,
+    0,
+    13
+   ],
+   "ageMethod": "source_coincidence",
+   "truth": "Unlit contact",
+   "rank": 1,
+   "total": 0.6419,
+   "margin": 0.0579,
+   "rankWithoutDrift": 3,
+   "releaseAgeHours": 18,
+   "hoursSourceInside90": [
+    -14,
+    -13,
+    -12,
+    -11,
+    -2,
+    -1,
+    0
+   ],
+   "sourceInside90DuringRelease": true,
+   "kmOutsideContourAtReleaseStart": 1.48,
+   "releaseInsideAge": false,
+   "releaseWindowHours": [
+    18,
+    0
+   ]
+  },
+  {
+   "id": "mumbai-null",
+   "candidates": 52,
+   "refused": true,
+   "ageHours": [
+    0,
+    0,
+    0
+   ],
+   "ageMethod": "drift_convergence"
+  },
+  {
+   "id": "ennore-anchored",
+   "candidates": 7,
+   "refused": false,
+   "ageHours": [
+    0,
+    0,
+    7
+   ],
+   "ageMethod": "source_coincidence",
+   "truth": "MMSI 367•••••0",
+   "rank": 1,
+   "total": 0.7468,
+   "margin": 0.2054,
+   "rankWithoutDrift": 1,
+   "releaseAgeHours": 16,
+   "hoursSourceInside90": [
+    -6,
+    -5,
+    -4,
+    -3,
+    -2,
+    -1,
+    0
+   ],
+   "sourceInside90DuringRelease": true,
+   "kmOutsideContourAtReleaseStart": 11.7,
+   "releaseInsideAge": false,
+   "releaseWindowHours": [
+    16,
+    0
+   ]
+  },
+  {
+   "id": "paradip-spm",
+   "candidates": 5,
+   "refused": false,
+   "ageHours": [
+    0,
+    0,
+    5
+   ],
+   "ageMethod": "source_coincidence",
+   "truth": "Paradip SPM-1",
+   "rank": 1,
+   "total": 0.6783,
+   "margin": 0.3267,
+   "rankWithoutDrift": 1,
+   "releaseAgeHours": 12,
+   "hoursSourceInside90": [
+    -4,
+    -2,
+    -1,
+    0
+   ],
+   "sourceInside90DuringRelease": true,
+   "kmOutsideContourAtReleaseStart": 7.29,
+   "releaseInsideAge": false,
+   "releaseWindowHours": [
+    12,
+    0
+   ]
+  }
+ ]
+}

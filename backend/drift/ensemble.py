@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import numpy as np
@@ -147,7 +147,7 @@ def run_ensemble(
     particles: int = DEFAULT_PARTICLES_PER_MEMBER,
     radius_m: float = 500.0,
     forcing: Forcing | None = None,
-    readers: list[Any] | None = None,
+    readers: list[Any] | Callable[[Member], list[Any]] | None = None,
     seed: int = 0,
     time_step_s: int | None = None,
     coastline_action: str | None = None,
@@ -166,6 +166,11 @@ def run_ensemble(
 
     `progress(done, total)` is called after each member, failed or not, so a
     caller streaming the run (`backend/pipeline`) reports members as they land.
+
+    `readers` may be a function of the member, which is how the wind phase
+    shift is applied (ISSUES X9): `era5.drift_readers(..., wind_shift_h=
+    member.wind_phase_shift_h)` moves that member's wind in time, never the
+    run's clock. Constant forcing has no time axis to shift.
     """
 
     if not np.isscalar(lon) and np.size(lon) != particles:
@@ -175,7 +180,7 @@ def run_ensemble(
 
     lon_stack: list[np.ndarray] = []
     lat_stack: list[np.ndarray] = []
-    times: tuple[datetime, ...] = ()
+    runs: list[Any] = []
     failures: list[str] = []
 
     for member in sampled:
@@ -196,10 +201,9 @@ def run_ensemble(
         # shifting the clock leaves the trajectory identical and only relabels
         # it -- so the shift contributed no diversity and corrupted the axis.
         #
-        # The shift belongs on the forcing's time reference, not the run's, and
-        # that needs a reader-side offset. `wind_phase_shift_h` is still sampled
-        # and reported in `Member.as_dict()`, but it is NOT applied until real
-        # time-varying readers exist. See FUTURE_WORK.md.
+        # The shift belongs on the forcing's time reference, not the run's: a
+        # caller with a time-varying wind passes `readers` as a function of the
+        # member and shifts that member's wind reader (ISSUES X9, closed).
         try:
             result = run_drift(
                 lon=lon,
@@ -210,7 +214,7 @@ def run_ensemble(
                 number=particles,
                 radius_m=radius_m,
                 forcing=forcing,
-                readers=readers,
+                readers=readers(member) if callable(readers) else readers,
                 horizontal_diffusivity=member.horizontal_diffusivity,
                 wind_drift_factor=member.wind_drift_factor,
                 time_step_s=time_step_s or DEFAULT_TIME_STEP_S,
@@ -222,22 +226,31 @@ def run_ensemble(
                 progress(member.index + 1, len(sampled))
             continue
 
-        if not times:
-            times = result.times
-        # Members can differ by a step if a run ends early; trim to the shortest
-        # so the stack stays rectangular and no member is padded with invented
-        # positions.
-        steps = min(len(times), result.lon_history.shape[0])
-        times = times[:steps]
-        lon_stack = [array[:steps] for array in lon_stack]
-        lat_stack = [array[:steps] for array in lat_stack]
-        lon_stack.append(result.lon_history[:steps])
-        lat_stack.append(result.lat_history[:steps])
+        runs.append(result)
         if progress is not None:
             progress(member.index + 1, len(sampled))
 
-    if not lon_stack:
+    if not runs:
         raise EnsembleError(f"every ensemble member failed: {failures[:3]}")
+
+    # OpenDrift stops a member once none of its parcels is afloat (all stranded),
+    # hours before the horizon. Its missing rows are that fact -- nothing in the
+    # water -- so they are NaN, never positions. Trimming every member to the
+    # shortest instead cut the April forecast at +15.8 h while 37% of the oil was
+    # still adrift (2026-09-25). Any other difference in length (a step either
+    # way) is trimmed as before, so no member is padded with invented rows.
+    step = timedelta(seconds=(time_step_s or DEFAULT_TIME_STEP_S) * (-1 if backward else 1))
+    horizon = round(hours * 3600 / (time_step_s or DEFAULT_TIME_STEP_S)) + 1
+    running = [r for r in runs if r.active_at_end != 0]
+    steps = min([horizon] + [r.lon_history.shape[0] for r in running]) if running else horizon
+    times = max((r.times for r in runs), key=len)[:steps]
+    while len(times) < steps:
+        times = (*times, times[-1] + step)
+    for r in runs:
+        rows = r.lon_history[:steps]
+        pad = np.full((steps - rows.shape[0], rows.shape[1]), np.nan)  # only a finished member is short
+        lon_stack.append(np.vstack([rows, pad]))
+        lat_stack.append(np.vstack([r.lat_history[:steps], pad]))
 
     return EnsembleResult(
         lon_history=np.concatenate(lon_stack, axis=1),

@@ -5,6 +5,7 @@ Returns research GeoJSON, not operational two-class Detection database rows.
 
 import argparse
 import json
+import os
 import time
 from itertools import batched
 from pathlib import Path
@@ -96,6 +97,13 @@ def infer_scene(
     expected = ("slick",) if research else ("oos", "slick_unknown")
     manifest = read_manifest(weights, expected_classes=expected)
     import torch
+
+    from backend.ingest.metocean.cache import is_offline
+
+    if is_offline():
+        # Ultralytics resolves two public DNS names at import to decide whether it
+        # is online; offline that is a reach the demo must not make (PHASE-09).
+        os.environ.setdefault("YOLO_OFFLINE", "1")
     from ultralytics import YOLO
 
     from ml.models.yolo_seg_lsk import register_lsk

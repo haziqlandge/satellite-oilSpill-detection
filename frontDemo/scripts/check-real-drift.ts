@@ -84,7 +84,9 @@ for (const scene of scenes) {
   // And the forecast spreads forward from the same parcels; oil that strands stays stranded.
   const ahead = run.frames.filter(f => f.hour > 0);
   const last = ahead[ahead.length - 1];
-  assert.ok(last.spreadKm > zero.spreadKm, `${scene}: the forecast did not spread (${last.spreadKm} km at +${last.hour} h)`);
+  // Unless all of it went ashore: then nothing is afloat to spread (spreadKm 0, strandedPct 100).
+  assert.ok(last.spreadKm > zero.spreadKm || (last.strandedPct === 100 && last.particles.length === 0),
+    `${scene}: the forecast did not spread (${last.spreadKm} km at +${last.hour} h)`);
   let stranded = 0;
   for (const f of ahead) {
     assert.ok(f.strandedPct !== undefined && f.strandedPct >= 0 && f.strandedPct <= 100, `${scene}: +${f.hour} h has no stranded share`);

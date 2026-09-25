@@ -42,10 +42,6 @@ API_RUNS = REPO_ROOT / "data" / "runs"
 SAR_DIR = REPO_ROOT / "data" / "processed" / "sar"
 AIS_DAYS = REPO_ROOT / "data" / "interim" / "ais"
 
-# The Gulf AOI the AIS cache is cut to (`backend/ingest/ais/clip.py`), for naming a region.
-GULF = (-98.0, 18.0, -80.0, 31.0)
-
-
 def scene_uuid(name: str) -> uuid.UUID:
     return uuid.uuid5(NAMESPACE, f"scene:{name}")
 

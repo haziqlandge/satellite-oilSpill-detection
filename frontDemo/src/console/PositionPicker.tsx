@@ -23,7 +23,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ensureLandmask, isLand } from "../sim/landmask";
-import maplibregl from "maplibre-gl";
+import maplibregl from "../map/maplibre";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { KM_PER_DEG_LAT, kmPerDegLon } from "../sim/geo";
 import type { LngLat } from "../sim/types";

@@ -102,6 +102,10 @@ class DriftResult:
     backward: bool
     seed_lon: float | np.ndarray = field(default=0.0)
     seed_lat: float | np.ndarray = field(default=0.0)
+    #: Parcels still in the water when the run ended. OpenDrift stops a run early
+    #: once this reaches 0 -- every parcel stranded -- so a short history with 0
+    #: here is finished, not truncated.
+    active_at_end: int = -1
 
     @property
     def particle_count(self) -> int:
@@ -216,4 +220,5 @@ def run_drift(
         backward=backward,
         seed_lon=lon,
         seed_lat=lat,
+        active_at_end=int(model.num_elements_active()),
     )

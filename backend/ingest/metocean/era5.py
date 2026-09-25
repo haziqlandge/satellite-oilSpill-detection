@@ -18,9 +18,9 @@ behaviour, not a bug -- but it means the age estimate, which is one of the
 system's three answers, can never be anything but a refusal. A time-varying
 wind field is what gives the hindcast structure to converge on.
 
-WHAT IT DOES NOT DO. Currents. CMEMS has no credentials in this repository
-(ISSUES X2), so a run using this reader is wind-forced only, and any run built
-on it should say so rather than implying a full metocean field.
+WHAT IT DOES NOT DO. Currents: those are `cmems.py`. A run that could not get
+them (no Copernicus Marine credentials, or offline with nothing cached) is
+wind-forced only, and says so rather than implying a full metocean field.
 """
 
 from __future__ import annotations
@@ -35,6 +35,10 @@ from .cache import ForcingRequest
 # The CDS name for what OpenDrift wants as x_wind / y_wind at 10 m.
 ERA5_WIND_VARIABLES = ("10m_u_component_of_wind", "10m_v_component_of_wind")
 ERA5_DATASET = "reanalysis-era5-single-levels"
+
+#: Hours of wind beyond each end of a run: the largest wind phase shift a member
+#: can draw (`ensemble.WIND_PHASE_SHIFT_H`, 3 h), plus the hour a reader needs to bracket it.
+PAD_H = 4
 
 
 class Era5Error(RuntimeError):
@@ -85,37 +89,50 @@ def run_wind_requests(
     One place, because the real-run export, the live pipeline and the wind the
     views show all read the same cached files, and a series fetched separately
     would not be the wind the parcels felt. `bbox` is every detection ring's
-    extent; `acquired` is naive UTC. One hour past each end, so the reader
-    brackets the run rather than ending on it.
+    extent; `acquired` is naive UTC. `PAD_H` past each end: the reader must
+    bracket the run even for a member whose wind is shifted by the full phase
+    range (ISSUES X9), or that member's first or last hours get no wind at all.
     """
     west, south, east, north = bbox
     box = dict(west=west, south=south, east=east, north=north)
-    back = wind_request(**box, start=acquired - timedelta(hours=hours + 1), end=acquired + timedelta(hours=1))
-    ahead = wind_request(**box, start=acquired - timedelta(hours=1), end=acquired + timedelta(hours=forward + 1))
+    back = wind_request(**box, start=acquired - timedelta(hours=hours + PAD_H), end=acquired + timedelta(hours=PAD_H))
+    ahead = wind_request(**box, start=acquired - timedelta(hours=PAD_H),
+                         end=acquired + timedelta(hours=forward + PAD_H))
     return back, ahead
 
 
-def wind_only_readers(wind_path: Path) -> list[Any]:
-    """The readers a wind-forced OpenOil run needs: ERA5 wind, the coast, and zero current.
+def drift_readers(wind_path: Path, current_path: Path | None = None, *, wind_shift_h: float = 0.0) -> list[Any]:
+    """The readers a real OpenOil run needs: ERA5 wind, CMEMS currents if fetched, the coast.
 
     OpenOil needs more than wind. It requires currents and a land mask, and
     refuses to start without a reader for each -- "every ensemble member
     failed" is what a missing one looks like.
 
-    Order is priority: ERA5 answers the wind, OpenDrift's own global landmask
-    answers the coast, and the constant reader answers what is left, which is
-    the currents. Those are ZERO, because CMEMS has no credentials (ISSUES X2)
-    -- so this is a wind-driven reconstruction and every artifact says so rather
-    than implying a full metocean field.
+    Order is priority: ERA5 answers the wind, CMEMS the currents, OpenDrift's
+    own global landmask the coast, and the constant reader whatever is left.
+    With no `current_path` that is the currents, which are then ZERO -- a
+    wind-driven reconstruction, and every artifact says so (`frames.drift_payload`)
+    rather than implying a full metocean field.
 
     The landmask is OpenDrift's own, not the frontend's: hand-rolling coastline
     handling inside the physics is exactly what C6 forbids.
+
+    `wind_shift_h` is one ensemble member's wind timing error (ISSUES X9): its
+    wind arrives that many hours late (early, if negative). Pass it per member
+    through `run_ensemble(readers=lambda m: drift_readers(..., wind_shift_h=
+    m.wind_phase_shift_h))`.
     """
     from opendrift.readers import reader_global_landmask
 
     from backend.drift.opendrift_runner import Forcing
 
-    return [era5_reader(wind_path), reader_global_landmask.Reader(), Forcing().as_reader()]
+    currents = []
+    if current_path is not None:
+        from .cmems import cmems_reader
+
+        currents = [cmems_reader(current_path)]
+    return [era5_reader(wind_path, shift_h=wind_shift_h), *currents, reader_global_landmask.Reader(),
+            Forcing().as_reader()]
 
 
 def _hours_between(start: datetime, end: datetime) -> list[datetime]:
@@ -185,17 +202,31 @@ def fetch_era5_wind(request: ForcingRequest, destination: Path) -> None:
         raise Era5Error("ERA5 returned no data")
 
 
-def era5_reader(path: Path):
-    """An OpenDrift reader over a fetched ERA5 file.
+def era5_reader(path: Path, *, shift_h: float = 0.0) -> Any:
+    """An OpenDrift reader over a fetched ERA5 file, its time axis moved `shift_h` hours later.
 
     ERA5 names its wind `u10`/`v10`; OpenDrift wants `x_wind`/`y_wind`, so the
     mapping is stated here rather than left to the reader's guesswork. Getting
     it wrong is silent -- the run succeeds with no wind at all.
+
+    The shift is applied to the data's time coordinate in memory (OpenDrift's
+    reader takes an xarray Dataset), so the wind blowing at t is felt at
+    t + shift and the run's own clock is untouched.
     """
+    import numpy as np
+    import xarray as xr
     from opendrift.readers import reader_netCDF_CF_generic
 
+    source: Any = str(path)
+    if shift_h:
+        dataset = xr.open_dataset(path)
+        name = "valid_time" if "valid_time" in dataset.coords else "time"
+        moved = dataset[name] + np.timedelta64(round(shift_h * 3600), "s")
+        moved.attrs = dataset[name].attrs
+        source = dataset.assign_coords({name: moved})
     return reader_netCDF_CF_generic.Reader(
-        str(path),
+        source,
+        name=f"{path.name} shifted {shift_h:+.2f} h" if shift_h else None,
         standard_name_mapping={
             "u10": "x_wind",
             "v10": "y_wind",

@@ -1,0 +1,438 @@
+{
+  "operating_confidence": {
+    "release": 0.2,
+    "v12": 0.15
+  },
+  "models": {
+    "release": "d4a74906e3a9b692c14f28305baf3cb20ba63da4c38bc30dbabd14c5c6d1fc6c",
+    "v12": "ccaad1a118ac5b5d324a0d54b5a8ecfdbde0d9aeb9be9f0ce7d4062360833399"
+  },
+  "release": {
+    "val_map": {
+      "mask_map50_95": 0.1544740093156539,
+      "mask_map50": 0.35597323078666493,
+      "box_map50_95": 0.19067197787409593
+    },
+    "val_operating": {
+      "images": 482,
+      "instances": 2375,
+      "tp": 801,
+      "fp": 695,
+      "recall": 0.3372631578947368,
+      "precision": 0.535427807486631,
+      "negative_images": 53,
+      "negative_fp_images": 19,
+      "negative_fp_instances": 53,
+      "lookalike_images": 23,
+      "lookalike_fp_images": 13,
+      "lookalike_fp_instances": 38,
+      "no_oil_images": 15,
+      "no_oil_fp_images": 1,
+      "strata": {
+        "small": {
+          "instances": 1101,
+          "recall": 0.11807447774750227
+        },
+        "medium": {
+          "instances": 518,
+          "recall": 0.3301158301158301
+        },
+        "large": {
+          "instances": 756,
+          "recall": 0.6613756613756614
+        },
+        "elongated": {
+          "instances": 35,
+          "recall": 0.4
+        },
+        "border": {
+          "instances": 0,
+          "recall": 0.0
+        }
+      },
+      "f1": 0.41384655127873937,
+      "dice": 0.7610107386788909,
+      "iou": 0.6558062376260385,
+      "boundary_f1": 0.4644958273422141,
+      "pixel_precision": 0.7838694991494687,
+      "pixel_recall": 0.8066640984633584,
+      "area_bias": 0.029079584469893005
+    },
+    "val_at_operating": {
+      "confidence": 0.2,
+      "recall": 0.3372631578947368,
+      "precision": 0.535427807486631,
+      "lookalike_alarm_tiles": 13,
+      "lookalike_tiles": 23,
+      "lookalike_fp_instances": 38,
+      "no_oil_alarm_tiles": 1,
+      "no_oil_tiles": 15,
+      "negative_alarm_tiles": 19,
+      "negative_tiles": 53
+    },
+    "holdout_at_operating": {
+      "confidence": 0.2,
+      "recall": null,
+      "precision": 0.0,
+      "lookalike_alarm_tiles": 55,
+      "lookalike_tiles": 87,
+      "lookalike_fp_instances": 127,
+      "no_oil_alarm_tiles": 17,
+      "no_oil_tiles": 102,
+      "negative_alarm_tiles": 72,
+      "negative_tiles": 189
+    },
+    "common": {
+      "0.2": {
+        "val": {
+          "confidence": 0.2,
+          "recall": 0.3372631578947368,
+          "precision": 0.535427807486631,
+          "lookalike_alarm_tiles": 13,
+          "lookalike_tiles": 23,
+          "lookalike_fp_instances": 38,
+          "no_oil_alarm_tiles": 1,
+          "no_oil_tiles": 15,
+          "negative_alarm_tiles": 19,
+          "negative_tiles": 53
+        },
+        "holdout": {
+          "confidence": 0.2,
+          "recall": null,
+          "precision": 0.0,
+          "lookalike_alarm_tiles": 55,
+          "lookalike_tiles": 87,
+          "lookalike_fp_instances": 127,
+          "no_oil_alarm_tiles": 17,
+          "no_oil_tiles": 102,
+          "negative_alarm_tiles": 72,
+          "negative_tiles": 189
+        }
+      },
+      "0.25": {
+        "val": {
+          "confidence": 0.25,
+          "recall": 0.3031578947368421,
+          "precision": 0.5985037406483791,
+          "lookalike_alarm_tiles": 11,
+          "lookalike_tiles": 23,
+          "lookalike_fp_instances": 29,
+          "no_oil_alarm_tiles": 1,
+          "no_oil_tiles": 15,
+          "negative_alarm_tiles": 17,
+          "negative_tiles": 53
+        },
+        "holdout": {
+          "confidence": 0.25,
+          "recall": null,
+          "precision": 0.0,
+          "lookalike_alarm_tiles": 50,
+          "lookalike_tiles": 87,
+          "lookalike_fp_instances": 82,
+          "no_oil_alarm_tiles": 11,
+          "no_oil_tiles": 102,
+          "negative_alarm_tiles": 61,
+          "negative_tiles": 189
+        }
+      }
+    },
+    "matched_recall": {
+      "0.3": {
+        "val": {
+          "confidence": 0.2586,
+          "recall": 0.3002105263157895,
+          "precision": 0.6094017094017095,
+          "lookalike_alarm_tiles": 11,
+          "lookalike_tiles": 23,
+          "lookalike_fp_instances": 29,
+          "no_oil_alarm_tiles": 1,
+          "no_oil_tiles": 15,
+          "negative_alarm_tiles": 17,
+          "negative_tiles": 53
+        },
+        "holdout": {
+          "confidence": 0.2586,
+          "recall": null,
+          "precision": 0.0,
+          "lookalike_alarm_tiles": 49,
+          "lookalike_tiles": 87,
+          "lookalike_fp_instances": 78,
+          "no_oil_alarm_tiles": 11,
+          "no_oil_tiles": 102,
+          "negative_alarm_tiles": 60,
+          "negative_tiles": 189
+        }
+      },
+      "0.35": {
+        "val": {
+          "confidence": 0.1805,
+          "recall": 0.3503157894736842,
+          "precision": 0.5015069318866787,
+          "lookalike_alarm_tiles": 13,
+          "lookalike_tiles": 23,
+          "lookalike_fp_instances": 41,
+          "no_oil_alarm_tiles": 1,
+          "no_oil_tiles": 15,
+          "negative_alarm_tiles": 21,
+          "negative_tiles": 53
+        },
+        "holdout": {
+          "confidence": 0.1805,
+          "recall": null,
+          "precision": 0.0,
+          "lookalike_alarm_tiles": 59,
+          "lookalike_tiles": 87,
+          "lookalike_fp_instances": 157,
+          "no_oil_alarm_tiles": 17,
+          "no_oil_tiles": 102,
+          "negative_alarm_tiles": 76,
+          "negative_tiles": 189
+        }
+      },
+      "0.4": {
+        "val": {
+          "confidence": 0.12,
+          "recall": 0.4,
+          "precision": 0.39207593891869585,
+          "lookalike_alarm_tiles": 14,
+          "lookalike_tiles": 23,
+          "lookalike_fp_instances": 62,
+          "no_oil_alarm_tiles": 4,
+          "no_oil_tiles": 15,
+          "negative_alarm_tiles": 26,
+          "negative_tiles": 53
+        },
+        "holdout": {
+          "confidence": 0.12,
+          "recall": null,
+          "precision": 0.0,
+          "lookalike_alarm_tiles": 69,
+          "lookalike_tiles": 87,
+          "lookalike_fp_instances": 300,
+          "no_oil_alarm_tiles": 27,
+          "no_oil_tiles": 102,
+          "negative_alarm_tiles": 96,
+          "negative_tiles": 189
+        }
+      }
+    }
+  },
+  "v12": {
+    "val_map": {
+      "mask_map50_95": 0.14929015463456763,
+      "mask_map50": 0.34473032935741443,
+      "box_map50_95": 0.182709533921835
+    },
+    "val_operating": {
+      "images": 482,
+      "instances": 2375,
+      "tp": 828,
+      "fp": 923,
+      "recall": 0.3486315789473684,
+      "precision": 0.4728726442033124,
+      "negative_images": 53,
+      "negative_fp_images": 7,
+      "negative_fp_instances": 22,
+      "lookalike_images": 23,
+      "lookalike_fp_images": 2,
+      "lookalike_fp_instances": 2,
+      "no_oil_images": 15,
+      "no_oil_fp_images": 1,
+      "strata": {
+        "small": {
+          "instances": 1101,
+          "recall": 0.12443233424159855
+        },
+        "medium": {
+          "instances": 518,
+          "recall": 0.333976833976834
+        },
+        "large": {
+          "instances": 756,
+          "recall": 0.6851851851851852
+        },
+        "elongated": {
+          "instances": 35,
+          "recall": 0.45714285714285713
+        },
+        "border": {
+          "instances": 0,
+          "recall": 0.0
+        }
+      },
+      "f1": 0.4013572467280659,
+      "dice": 0.7550538476427279,
+      "iou": 0.6523430574558927,
+      "boundary_f1": 0.49589126165531433,
+      "pixel_precision": 0.7997731867302933,
+      "pixel_recall": 0.8075230197920275,
+      "area_bias": 0.009690038613844692
+    },
+    "val_at_operating": {
+      "confidence": 0.15,
+      "recall": 0.3486315789473684,
+      "precision": 0.4728726442033124,
+      "lookalike_alarm_tiles": 2,
+      "lookalike_tiles": 23,
+      "lookalike_fp_instances": 2,
+      "no_oil_alarm_tiles": 1,
+      "no_oil_tiles": 15,
+      "negative_alarm_tiles": 7,
+      "negative_tiles": 53
+    },
+    "holdout_at_operating": {
+      "confidence": 0.15,
+      "recall": null,
+      "precision": 0.0,
+      "lookalike_alarm_tiles": 4,
+      "lookalike_tiles": 87,
+      "lookalike_fp_instances": 6,
+      "no_oil_alarm_tiles": 8,
+      "no_oil_tiles": 102,
+      "negative_alarm_tiles": 12,
+      "negative_tiles": 189
+    },
+    "common": {
+      "0.2": {
+        "val": {
+          "confidence": 0.2,
+          "recall": 0.3141052631578947,
+          "precision": 0.5554728220402085,
+          "lookalike_alarm_tiles": 0,
+          "lookalike_tiles": 23,
+          "lookalike_fp_instances": 0,
+          "no_oil_alarm_tiles": 1,
+          "no_oil_tiles": 15,
+          "negative_alarm_tiles": 5,
+          "negative_tiles": 53
+        },
+        "holdout": {
+          "confidence": 0.2,
+          "recall": null,
+          "precision": 0.0,
+          "lookalike_alarm_tiles": 3,
+          "lookalike_tiles": 87,
+          "lookalike_fp_instances": 4,
+          "no_oil_alarm_tiles": 6,
+          "no_oil_tiles": 102,
+          "negative_alarm_tiles": 9,
+          "negative_tiles": 189
+        }
+      },
+      "0.25": {
+        "val": {
+          "confidence": 0.25,
+          "recall": 0.28926315789473683,
+          "precision": 0.626253418413856,
+          "lookalike_alarm_tiles": 0,
+          "lookalike_tiles": 23,
+          "lookalike_fp_instances": 0,
+          "no_oil_alarm_tiles": 1,
+          "no_oil_tiles": 15,
+          "negative_alarm_tiles": 5,
+          "negative_tiles": 53
+        },
+        "holdout": {
+          "confidence": 0.25,
+          "recall": null,
+          "precision": 0.0,
+          "lookalike_alarm_tiles": 2,
+          "lookalike_tiles": 87,
+          "lookalike_fp_instances": 2,
+          "no_oil_alarm_tiles": 5,
+          "no_oil_tiles": 102,
+          "negative_alarm_tiles": 7,
+          "negative_tiles": 189
+        }
+      }
+    },
+    "matched_recall": {
+      "0.3": {
+        "val": {
+          "confidence": 0.2273,
+          "recall": 0.3002105263157895,
+          "precision": 0.6027049873203719,
+          "lookalike_alarm_tiles": 0,
+          "lookalike_tiles": 23,
+          "lookalike_fp_instances": 0,
+          "no_oil_alarm_tiles": 1,
+          "no_oil_tiles": 15,
+          "negative_alarm_tiles": 5,
+          "negative_tiles": 53
+        },
+        "holdout": {
+          "confidence": 0.2273,
+          "recall": null,
+          "precision": 0.0,
+          "lookalike_alarm_tiles": 2,
+          "lookalike_tiles": 87,
+          "lookalike_fp_instances": 2,
+          "no_oil_alarm_tiles": 5,
+          "no_oil_tiles": 102,
+          "negative_alarm_tiles": 7,
+          "negative_tiles": 189
+        }
+      },
+      "0.35": {
+        "val": {
+          "confidence": 0.1482,
+          "recall": 0.3503157894736842,
+          "precision": 0.4687323943661972,
+          "lookalike_alarm_tiles": 2,
+          "lookalike_tiles": 23,
+          "lookalike_fp_instances": 2,
+          "no_oil_alarm_tiles": 1,
+          "no_oil_tiles": 15,
+          "negative_alarm_tiles": 7,
+          "negative_tiles": 53
+        },
+        "holdout": {
+          "confidence": 0.1482,
+          "recall": null,
+          "precision": 0.0,
+          "lookalike_alarm_tiles": 4,
+          "lookalike_tiles": 87,
+          "lookalike_fp_instances": 7,
+          "no_oil_alarm_tiles": 8,
+          "no_oil_tiles": 102,
+          "negative_alarm_tiles": 12,
+          "negative_tiles": 189
+        }
+      },
+      "0.4": {
+        "val": {
+          "confidence": 0.0968,
+          "recall": 0.4,
+          "precision": 0.36384527001148986,
+          "lookalike_alarm_tiles": 3,
+          "lookalike_tiles": 23,
+          "lookalike_fp_instances": 4,
+          "no_oil_alarm_tiles": 4,
+          "no_oil_tiles": 15,
+          "negative_alarm_tiles": 12,
+          "negative_tiles": 53
+        },
+        "holdout": {
+          "confidence": 0.0968,
+          "recall": null,
+          "precision": 0.0,
+          "lookalike_alarm_tiles": 6,
+          "lookalike_tiles": 87,
+          "lookalike_fp_instances": 11,
+          "no_oil_alarm_tiles": 12,
+          "no_oil_tiles": 102,
+          "negative_alarm_tiles": 18,
+          "negative_tiles": 189
+        }
+      }
+    }
+  },
+  "holdout_lookalike_alarm_rate_difference_v12_minus_release": {
+    "point": -0.5862068965517241,
+    "ci95": [
+      -0.6896551724137931,
+      -0.471264367816092
+    ],
+    "note": "each model at its own validation-selected operating point; paired over holdout look-alike tiles"
+  }
+}

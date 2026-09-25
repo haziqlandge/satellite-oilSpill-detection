@@ -1,0 +1,137 @@
+{
+  "rule": "straight grid-aligned run >= 1.2 km",
+  "scenes": {
+    "S1A_IW_GRDH_1SDV_20230409T000206_20230409T000231_048012_05C552_27F2_s0db": {
+      "v11": {
+        "detections": 86,
+        "polygons": 366,
+        "areaKm2": 373.45,
+        "boxCutPolygons": 20,
+        "boxCutAreaKm2": 297.52,
+        "boxCutAreaShare": 0.7967,
+        "seed": {
+          "rule": "the largest detection at sea (GSHHG: centre offshore, at most 10% of it on land) whose outline never runs straight along the pixel grid for 1.2 km or more -- an edge that straight is the model's box, not a slick's edge -- and that covers at least 0.05 km2",
+          "areaKm2": 5.498,
+          "confidence": 0.4737,
+          "straightEdgeKm": 0.578,
+          "landFraction": 0.0,
+          "passedOver": {
+            "frameCut": 9,
+            "ashore": 0,
+            "tooSmall": 250
+          },
+          "of": 366
+        }
+      },
+      "v12": {
+        "detections": 53,
+        "polygons": 86,
+        "areaKm2": 26.63,
+        "boxCutPolygons": 3,
+        "boxCutAreaKm2": 6.33,
+        "boxCutAreaShare": 0.2378,
+        "seed": {
+          "rule": "the largest detection at sea (GSHHG: centre offshore, at most 10% of it on land) whose outline never runs straight along the pixel grid for 1.2 km or more -- an edge that straight is the model's box, not a slick's edge -- and that covers at least 0.05 km2",
+          "areaKm2": 2.408,
+          "confidence": 0.5912,
+          "straightEdgeKm": 0.296,
+          "landFraction": 0.0,
+          "passedOver": {
+            "frameCut": 1,
+            "ashore": 1,
+            "tooSmall": 44
+          },
+          "of": 86
+        }
+      }
+    },
+    "S1A_IW_GRDH_1SDV_20230515T000208_20230515T000233_048537_05D69B_35AF_s0db": {
+      "v11": {
+        "detections": 240,
+        "polygons": 1331,
+        "areaKm2": 2151.78,
+        "boxCutPolygons": 88,
+        "boxCutAreaKm2": 2001.38,
+        "boxCutAreaShare": 0.9301,
+        "seed": {
+          "rule": "the largest detection at sea (GSHHG: centre offshore, at most 10% of it on land) whose outline never runs straight along the pixel grid for 1.2 km or more -- an edge that straight is the model's box, not a slick's edge -- and that covers at least 0.05 km2",
+          "areaKm2": 6.705,
+          "confidence": 0.3132,
+          "straightEdgeKm": 1.083,
+          "landFraction": 0.0,
+          "passedOver": {
+            "frameCut": 55,
+            "ashore": 0,
+            "tooSmall": 1004
+          },
+          "of": 1331
+        }
+      },
+      "v12": {
+        "detections": 119,
+        "polygons": 237,
+        "areaKm2": 94.11,
+        "boxCutPolygons": 9,
+        "boxCutAreaKm2": 48.23,
+        "boxCutAreaShare": 0.5125,
+        "seed": {
+          "rule": "the largest detection at sea (GSHHG: centre offshore, at most 10% of it on land) whose outline never runs straight along the pixel grid for 1.2 km or more -- an edge that straight is the model's box, not a slick's edge -- and that covers at least 0.05 km2",
+          "areaKm2": 3.985,
+          "confidence": 0.3958,
+          "straightEdgeKm": 0.273,
+          "landFraction": 0.0,
+          "passedOver": {
+            "frameCut": 2,
+            "ashore": 0,
+            "tooSmall": 138
+          },
+          "of": 237
+        }
+      }
+    },
+    "S1A_IW_GRDH_1SDV_20231205T000214_20231205T000239_051512_0637C7_66B8_s0db": {
+      "v11": {
+        "detections": 40,
+        "polygons": 89,
+        "areaKm2": 199.48,
+        "boxCutPolygons": 7,
+        "boxCutAreaKm2": 182.12,
+        "boxCutAreaShare": 0.913,
+        "seed": {
+          "rule": "the largest detection at sea (GSHHG: centre offshore, at most 10% of it on land) whose outline never runs straight along the pixel grid for 1.2 km or more -- an edge that straight is the model's box, not a slick's edge -- and that covers at least 0.05 km2",
+          "areaKm2": 3.189,
+          "confidence": 0.8108,
+          "straightEdgeKm": 0.566,
+          "landFraction": 0.0,
+          "passedOver": {
+            "frameCut": 5,
+            "ashore": 0,
+            "tooSmall": 48
+          },
+          "of": 89
+        }
+      },
+      "v12": {
+        "detections": 58,
+        "polygons": 88,
+        "areaKm2": 57.44,
+        "boxCutPolygons": 8,
+        "boxCutAreaKm2": 33.4,
+        "boxCutAreaShare": 0.5815,
+        "seed": {
+          "rule": "the largest detection at sea (GSHHG: centre offshore, at most 10% of it on land) whose outline never runs straight along the pixel grid for 1.2 km or more -- an edge that straight is the model's box, not a slick's edge -- and that covers at least 0.05 km2",
+          "areaKm2": 3.585,
+          "confidence": 0.6316,
+          "straightEdgeKm": 0.209,
+          "landFraction": 0.0,
+          "passedOver": {
+            "frameCut": 2,
+            "ashore": 0,
+            "tooSmall": 36
+          },
+          "of": 88
+        }
+      }
+    }
+  }
+}

@@ -55,6 +55,7 @@
 
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -437,6 +438,26 @@ export function Meter({
  * ------------------------------------------------------------------ */
 
 /** A machine status flag. `SIM`, `HALT`, `LIVE`, `IN OIL`. */
+/**
+ * Where a figure came from, in the panels: a SIM flag when it was simulated,
+ * "sourced from ..." when it was not (ERA5, CMEMS, marinecadastre AIS). The
+ * map's overlay carries only the SIM tag; the sources are said here.
+ */
+export function Sourced({ source }: { source: string | null | undefined }) {
+  if (!source || source.startsWith("SIM")) {
+    return (
+      <Flag tone="warn" title={source ? `Simulated: ${source.replace(/^SIM\s*/, "")}` : "Simulated"}>
+        sim
+      </Flag>
+    );
+  }
+  return (
+    <span className="text-[9.5px] whitespace-nowrap" style={{ color: "var(--ink-faint)" }}>
+      sourced from {source}
+    </span>
+  );
+}
+
 export function Flag({
   tone = "ok",
   children,
@@ -666,13 +687,58 @@ export function Note({
         carrying the hierarchy was letter-spacing. It is a step *below* every
         label now and a step above nothing, with the leading a paragraph needs.
       */}
+      <Clamped lines={2} className="text-[11px] leading-[1.65]" style={{ color: "var(--ink-dim)" }}>
+        {children}
+      </Clamped>
+    </div>
+  );
+}
+
+/**
+ * Panel prose, cut to a few lines until asked for (the user's call,
+ * 2026-09-25): the figures and charts get the room, and the full text --
+ * provenance, refusals, caveats, all of which stay true and required -- is one
+ * click away. The toggle appears only when the text is actually longer.
+ */
+function Clamped({
+  lines,
+  className,
+  style,
+  children,
+}: {
+  lines: number;
+  className: string;
+  style: CSSProperties;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [long, setLong] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (el && !open) setLong(el.scrollHeight > el.clientHeight + 1);
+  }, [children, open]);
+  return (
+    <div>
       <div
+        ref={box}
         data-prose
-        className="text-[11px] leading-[1.65]"
-        style={{ color: "var(--ink-dim)" }}
+        className={className}
+        style={open ? style : { ...style, maxHeight: `${lines * 1.65}em`, overflow: "hidden" }}
       >
         {children}
       </div>
+      {(long || open) && (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="mt-0.5 text-[9px] tracking-[0.18em] uppercase"
+          style={{ color: "var(--ink-faint)" }}
+        >
+          {open ? "less" : "more"}
+        </button>
+      )}
     </div>
   );
 }
@@ -787,11 +853,10 @@ export function Alarm({
           </span>
         </p>
         {children && (
-          <div
-            className="mt-1.5 text-[10.5px] leading-[1.6]"
-            style={{ color: "var(--ink)" }}
-          >
-            {children}
+          <div className="mt-1.5">
+            <Clamped lines={3} className="text-[10.5px] leading-[1.6]" style={{ color: "var(--ink)" }}>
+              {children}
+            </Clamped>
           </div>
         )}
       </div>

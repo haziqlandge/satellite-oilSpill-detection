@@ -31,6 +31,7 @@ logging.disable(logging.WARNING)
 from backend.drift.ensemble import (  # noqa: E402
     MIN_MEMBERS,
     WIND_DRIFT_RANGE,
+    WIND_PHASE_SHIFT_H,
     EnsembleError,
     run_ensemble,
     sample_members,
@@ -183,6 +184,52 @@ def test_the_wind_phase_shift_is_sampled_both_ways() -> None:
     assert min(shifts) < 0 < max(shifts)
 
 
+def _era5_file(path, *, turn_hour: int):
+    """ERA5's layout (`valid_time`, `u10`/`v10`): 10 m/s from the west until `turn_hour` after T0, then from the east."""
+    import xarray as xr
+
+    hours = np.arange(-6, 18)
+    times = np.datetime64(T0.replace(minute=0)) + hours.astype("timedelta64[h]")
+    u = np.where(hours < turn_hour, 10.0, -10.0)[:, None, None] * np.ones((1, 25, 25))
+    lats = np.linspace(LAT - 1, LAT + 1, 25)
+    lons = np.linspace(LON - 1, LON + 1, 25)
+    xr.Dataset(
+        {"u10": (("valid_time", "latitude", "longitude"), u.astype(np.float32), {"units": "m s**-1"}),
+         "v10": (("valid_time", "latitude", "longitude"), np.zeros_like(u, dtype=np.float32), {"units": "m s**-1"})},
+        coords={"valid_time": ("valid_time", times, {"standard_name": "time"}),
+                "latitude": ("latitude", lats, {"standard_name": "latitude", "units": "degrees_north"}),
+                "longitude": ("longitude", lons, {"standard_name": "longitude", "units": "degrees_east"})},
+    ).to_netcdf(path)
+    return path
+
+
+@pytest.mark.slow
+def test_a_members_wind_is_shifted_in_time_not_its_clock(tmp_path) -> None:
+    """ISSUES X9: the phase shift moves the wind's time axis; the run still starts at the observation.
+
+    The wind turns round partway through an 8 h run. A member whose wind
+    arrives 2 h late turns 2 h later: 2 h more east and 2 h less west, so it
+    ends 4 h x 0.3 m/s (3% windage) = ~4.3 km east of the member on time. The
+    difference is the test, because hourly wind is interpolated in time and
+    where that puts the turn (3.5 h here) is the same for both.
+    """
+    from backend.ingest.metocean.era5 import PAD_H, drift_readers
+
+    wind = _era5_file(tmp_path / "era5.nc", turn_hour=4)
+    start = T0.replace(minute=0)
+
+    def east_km(shift_h: float) -> tuple[float, datetime]:
+        result = run_drift(lon=LON, lat=LAT, start=start, hours=8, backward=False, number=5,
+                           readers=drift_readers(wind, wind_shift_h=shift_h), horizontal_diffusivity=0.0)
+        return float(np.mean(result.lon) - LON) * _KM_LON, result.times[0]
+
+    on_time, first = east_km(0.0)
+    late, first_late = east_km(2.0)
+    assert first == first_late == start
+    assert late - on_time == pytest.approx(4 * 3600 * 0.3 / 1000, rel=0.15)
+    assert PAD_H >= WIND_PHASE_SHIFT_H + 1, "a shifted wind must still bracket the run"
+
+
 def test_sampling_is_reproducible() -> None:
     assert sample_members(8, seed=7) == sample_members(8, seed=7)
     assert sample_members(8, seed=7) != sample_members(8, seed=8)
@@ -261,3 +308,34 @@ def test_an_ensemble_reports_each_member_as_it_lands() -> None:
     )
 
     assert seen == [(k, MIN_MEMBERS) for k in range(1, MIN_MEMBERS + 1)]
+
+
+def test_a_member_whose_oil_all_stranded_is_padded_not_the_forecast_cut(monkeypatch) -> None:
+    """OpenDrift stops a member once every parcel is ashore; the ensemble keeps its horizon.
+
+    Trimming every member to the shortest cut the April 2023 forecast at +15.8 h
+    while 37% of the oil was still adrift (2026-09-25). The finished member's
+    later rows are NaN -- nothing afloat -- and the others keep their positions.
+    """
+    import backend.drift.ensemble as ensemble
+    from backend.drift.opendrift_runner import DriftResult
+
+    def fake(*, start, hours, backward, number, time_step_s, **_):
+        index = fake.calls
+        fake.calls += 1
+        rows = 3 if index == 0 else hours * 3600 // time_step_s + 1  # member 0 strands after two steps
+        step = timedelta(seconds=time_step_s)
+        history = np.full((rows, number), float(index))
+        return DriftResult(lon=history[-1], lat=history[-1], times=tuple(start + k * step for k in range(rows)),
+                           lon_history=history, lat_history=history, backward=backward,
+                           active_at_end=0 if index == 0 else number)
+
+    fake.calls = 0
+    monkeypatch.setattr(ensemble, "run_drift", fake)
+    result = run_ensemble(lon=LON, lat=LAT, start=T0, hours=2, backward=False, members=MIN_MEMBERS,
+                          particles=4, forcing=Forcing(), time_step_s=1800)
+
+    assert len(result.times) == 5 and result.times[-1] == T0 + timedelta(hours=2)
+    first = result.lon_history[:, :4]
+    assert np.isfinite(first[:3]).all() and np.isnan(first[3:]).all()
+    assert np.isfinite(result.lon_history[:, 4:]).all()

@@ -1,0 +1,44 @@
+{
+  "name": "L1-ciou-research",
+  "classes": [
+    "slick"
+  ],
+  "status": "research-only",
+  "sha256": "d4a74906e3a9b692c14f28305baf3cb20ba63da4c38bc30dbabd14c5c6d1fc6c",
+  "frozen_sha256": "a14f25187f4ecac389e5d6455115d356f77032e94edf429554ffc2d2803fe979",
+  "data_hashes": {
+    "data_yaml": "a196ff93a72957b1e9b31d740de3860795f885622be26bdbf744e226786a6b7e",
+    "val": "02ebdef59e5ac183b032daf86c3621690d6a81ab997d0cc848a17735d011fe9f",
+    "test": "1c6a266cf5e80c292b60bc7a2ec876a34baa6367d26f59dfecea06639c3d3770"
+  },
+  "inference": {
+    "imgsz": 1024,
+    "batch": 4,
+    "conf": 0.2,
+    "iou": 0.7,
+    "max_det": 1000,
+    "half": false,
+    "rect": true,
+    "retina_masks": true
+  },
+  "raster": {
+    "band": 2,
+    "units": "sigma0_db",
+    "db_window": [
+      -35.0,
+      0.0
+    ],
+    "masked_zero": true
+  },
+  "tiling": {
+    "tile_size": 1024,
+    "overlap": 0.1,
+    "merge_metric": "IOS",
+    "merge_threshold": 0.5
+  },
+  "limitations": [
+    "One slick class; never relabel predictions as oos.",
+    "Tile test does not validate full-scene transfer or attribution.",
+    "Retina masks and seam merging are separate scene acceptance settings."
+  ]
+}

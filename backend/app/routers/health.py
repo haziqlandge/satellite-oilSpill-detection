@@ -57,7 +57,9 @@ def health(request: Request, store: Store,
         "browser_model": browser_model_status(weights.get("sha256")),
         "forcing_cache": {"dir": str(DEFAULT_CACHE_DIR).replace("\\", "/"), "files": len(forcing),
                           "bytes": sum(p.stat().st_size for p in forcing),
-                          "note": "ERA5 10 m wind only; no current field (ISSUES X2)"},
+                          "note": (f"{sum(p.name.startswith('era5-wind_') for p in forcing)} ERA5 wind, "
+                                   f"{sum(p.name.startswith('cmems-currents_') for p in forcing)} CMEMS currents "
+                                   "file(s); a run without currents is wind-only (ISSUES X2)")},
         "artifacts": {"scenes": len(scenes), "with_drift": sum(1 for s in scenes if s.run_dir is not None),
                       "api_runs": sum(1 for s in scenes if s.origin == "api-run")},
         "runs": jobs.describe(),

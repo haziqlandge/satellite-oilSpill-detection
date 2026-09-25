@@ -82,7 +82,11 @@ export const SOURCE = {
   trackingGap: "tracking-gap",
   trackingPredicted: "tracking-predicted",
   trackingMarkers: "tracking-markers",
+  flow: "flow-arrows",
 } as const;
+
+/** The arrow the flow layers draw, registered by `MapCanvas` as an SDF image so `icon-color` tints it. */
+export const FLOW_ARROW = "flow-arrow";
 
 /* ------------------------------------------------------------------ *
  * The world under the data
@@ -425,6 +429,27 @@ export function dataLayers(paint: MapPaint): LayerSpecification[] {
       filter: ["==", ["get", "band"], 50],
       paint: { "line-color": paint.contour50, "line-width": 1.4 * k },
     },
+    // Wind and surface current over the event, one arrow per coarse cell,
+    // each the cell's mean (`sim/flow.ts`), pointing where the air or water
+    // goes. A few large arrows show the general movement; sized by speed
+    // within a narrow range.
+    ...(["wind", "current"] as const).map(
+      (kind): LayerSpecification => ({
+        id: `flow-${kind}`,
+        type: "symbol",
+        source: SOURCE.flow,
+        filter: ["==", ["get", "kind"], kind],
+        layout: {
+          "icon-image": FLOW_ARROW,
+          "icon-rotate": ["get", "towardDeg"],
+          "icon-rotation-alignment": "map",
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
+          "icon-size": ["interpolate", ["linear"], ["get", "speed"], 0, 0.8, kind === "wind" ? 12 : 0.8, 1.3],
+        },
+        paint: { "icon-color": kind === "wind" ? paint.target : paint.contour50, "icon-opacity": 0.8 },
+      }),
+    ),
     {
       id: "traffic",
       type: "line",
@@ -598,6 +623,10 @@ export interface LayerToggles {
   /** The release itself, played forward from the first hour of the discharge. */
   release: boolean;
   darkVessel: boolean;
+  /** Small wind arrows on and around the event (`sim/flow.ts`). */
+  windArrows: boolean;
+  /** Small surface-current arrows, half a step off the wind arrows. */
+  currentArrows: boolean;
 }
 
 export const DEFAULT_TOGGLES: LayerToggles = {
@@ -623,4 +652,6 @@ export const DEFAULT_TOGGLES: LayerToggles = {
   */
   release: false,
   darkVessel: true,
+  windArrows: true,
+  currentArrows: true,
 };

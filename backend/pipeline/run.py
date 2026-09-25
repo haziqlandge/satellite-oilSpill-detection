@@ -16,9 +16,11 @@ view it already has for the three real runs.
 WHAT IT REFUSES, as results rather than errors (C3):
 
   * no detection meets the seed rule -> nothing to drift, and it says why;
-  * attribution -> nobody is ranked. The backend's attribution engine is
-    PHASE-06, not built; and the field is wind-only (no currents, ISSUES X2),
-    which could not carry a ranking anyway.
+  * attribution -> nobody is ranked: without currents the field is wind-only
+    (ISSUES X2) and could not carry a ranking; with them, ranking a real field
+    waits on smoothing it (ISSUES X16). The engine (`backend/attribute`,
+    PHASE-06) still runs on the run's own field and AIS, and its gate count is
+    reported -- how many tracks the field kept -- never its ranking.
 
 Run it directly, as the API does:
 
@@ -52,7 +54,7 @@ STAGES: tuple[tuple[str, str], ...] = (
     ("screen", "Overview screen (pass 1)"),
     ("detect", "Segment the candidate tiles (pass 2)"),
     ("seed", "Choose the seed detection"),
-    ("wind", "ERA5 wind before and after the pass"),
+    ("wind", "ERA5 wind and CMEMS currents, before and after the pass"),
     ("characterise", "Characterise the seed"),
     ("cfar", "Bright targets near the seed (CFAR)"),
     ("drift_backward", "Backward ensemble (OpenDrift)"),
@@ -63,6 +65,11 @@ STAGES: tuple[tuple[str, str], ...] = (
     ("attribute", "Rank candidates"),
     ("write", "Write the run"),
 )
+
+
+#: Why a current-forced run is still not ranked: the scorer would read an unsmoothed field.
+UNSCORED_REASON = ("the field is current-forced (CMEMS), but ranking a real field is not built yet: the live "
+                   "origin field is an unsmoothed particle histogram (ISSUES X16)")
 
 
 class StageRefusedError(RuntimeError):
@@ -315,9 +322,19 @@ def run_pipeline(
 
         # ---- wind ------------------------------------------------------------
         with stage(events, "wind") as box:
+            from backend.ingest.metocean.cmems import currents_for
+
             back_nc, ahead_nc, wind_from = forcing_files(bbox, acquired, hours=BACKWARD_HOURS, forward=FORWARD_HOURS)
-            box.data = {"backward": back_nc.name, "forward": ahead_nc.name, "from": wind_from}
-            box.detail = f"ERA5 10 m wind, {wind_from}; no current field (ISSUES X2)"
+            back_cur, ahead_cur, currents_from = currents_for(bbox, acquired, hours=BACKWARD_HOURS,
+                                                              forward=FORWARD_HOURS)
+            forcing_mode = "era5" if back_cur is None else "era5+cmems"
+            box.data = {"backward": back_nc.name, "forward": ahead_nc.name, "from": wind_from,
+                        "currents": None if back_cur is None or ahead_cur is None
+                        else {"backward": back_cur.name, "forward": ahead_cur.name},
+                        "currentsFrom": currents_from}
+            box.detail = f"ERA5 10 m wind, {wind_from}; " + (
+                f"CMEMS surface currents, {currents_from}" if back_cur is not None
+                else f"no current field ({currents_from})")
 
         # ---- characterise ----------------------------------------------------
         with stage(events, "characterise") as box:
@@ -345,7 +362,7 @@ def run_pipeline(
         from backend.drift.ensemble import run_ensemble
         from backend.drift.origin_field import build_origin_field
         from backend.drift.seeding import points_in_polygon
-        from backend.ingest.metocean.era5 import wind_only_readers
+        from backend.ingest.metocean.era5 import drift_readers
 
         seed_lons, seed_lats = points_in_polygon(seed_outline, PARTICLES_PER_MEMBER, seed=0)
 
@@ -362,7 +379,7 @@ def run_pipeline(
             result = run_ensemble(
                 lon=seed_lons, lat=seed_lats, start=acquired, hours=BACKWARD_HOURS, backward=True,
                 members=MEMBERS, particles=PARTICLES_PER_MEMBER, radius_m=0.0,
-                readers=wind_only_readers(back_nc), seed=0, progress=members("drift_backward"),
+                readers=lambda m: drift_readers(back_nc, back_cur, wind_shift_h=m.wind_phase_shift_h), seed=0, progress=members("drift_backward"),
             )
             elapsed = time.time() - t0
             box.data = {"shape": list(result.lon_history.shape), "failures": len(result.failures)}
@@ -373,19 +390,20 @@ def run_pipeline(
             ahead = run_ensemble(
                 lon=seed_lons, lat=seed_lats, start=acquired, hours=FORWARD_HOURS, backward=False,
                 members=MEMBERS, particles=PARTICLES_PER_MEMBER, radius_m=0.0,
-                readers=wind_only_readers(ahead_nc), seed=0, progress=members("drift_forward"),
+                readers=lambda m: drift_readers(ahead_nc, ahead_cur, wind_shift_h=m.wind_phase_shift_h), seed=0, progress=members("drift_forward"),
             )
             ahead_elapsed = time.time() - t0
             box.data = {"shape": list(ahead.lon_history.shape), "failures": len(ahead.failures)}
             box.detail = f"the same parcels {FORWARD_HOURS} h forward, {len(ahead.failures)} member failure(s)"
 
         with stage(events, "origin_field") as box:
+            origin = build_origin_field(result.lon_history, result.lat_history, result.times)
             payload = drift_payload(
                 stem=run_dir.name, acquired=acquired, seed=seed, polygons=polygon_count,
                 result=result, ahead=ahead,
-                field=build_origin_field(result.lon_history, result.lat_history, result.times),
+                field=origin,
                 ahead_field=build_origin_field(ahead.lon_history, ahead.lat_history, ahead.times),
-                forcing_mode="era5", hours=BACKWARD_HOURS, forward_hours=FORWARD_HOURS,
+                forcing_mode=forcing_mode, hours=BACKWARD_HOURS, forward_hours=FORWARD_HOURS,
                 elapsed=elapsed, ahead_elapsed=ahead_elapsed,
             )
             (run_dir / "drift.json").write_text(
@@ -430,25 +448,49 @@ def run_pipeline(
         # ---- attribute -------------------------------------------------------
         with stage(events, "attribute") as box:
             box.state = "refused"
-            reasons = [
-                "the backend attribution engine (PHASE-06) is not built",
-                "the field is wind-only -- no current field (ISSUES X2) -- and could not carry a ranking",
-            ]
+            reasons = ["the field is wind-only -- no current field (ISSUES X2) -- and could not carry a ranking"
+                       if forcing_mode == "era5" else UNSCORED_REASON]
             if age.get("status") != "converged":
                 reasons.append("the backward field never converges, so there is no age to gate candidates on (C1)")
-            box.detail = "Nobody is ranked (C3): " + "; ".join(reasons) + "."
-            summary["attribution"] = {"ranked": 0, "insufficientEvidence": True, "reasons": reasons}
+            gate = None
+            if traffic is None:
+                reasons.append("no AIS for these waters on this machine (ISSUES F14)")
+            else:
+                from backend.attribute.candidates import attribution_input
+                from backend.attribute.scoring import score
+
+                # The engine runs on this run's own field and AIS; the count its
+                # gate kept is reported, its ranking never is (C3).
+                started = time.perf_counter()
+                scored = score(attribution_input(field=origin, acquired=acquired, character=character,
+                                                 payload=payload, traffic=traffic, backward_hours=BACKWARD_HOURS))
+                gate = {"considered": scored["gate"]["considered"], "admitted": scored["gate"]["admitted"],
+                        "seconds": round(time.perf_counter() - started, 2)}
+            box.detail = "Nobody is ranked (C3): " + "; ".join(reasons) + "." + (
+                f" On this field the AIS gate kept {gate['admitted']} of {gate['considered']} tracks "
+                "-- a filter, not a ranking." if gate else "")
+            summary["attribution"] = {"ranked": 0, "insufficientEvidence": True, "reasons": reasons, "gate": gate}
             box.data = summary["attribution"]
 
         # ---- write -----------------------------------------------------------
         with stage(events, "write") as box:
+            from datetime import timedelta
+
+            from backend.drift.flow import flow_grid
+            from backend.ingest.metocean.cmems import source_label
+
             scene_payload = {
                 "scene": run_dir.name,
                 "detections": detection_rings(document, seed),
                 "cfar": radar,
                 "characterisation": character,
                 "detectionSource": detection_source,
-                "wind": wind_series_for(back_nc, ahead_nc, seed.centre, acquired, BACKWARD_HOURS, FORWARD_HOURS),
+                "wind": wind_series_for(back_nc, ahead_nc, seed.centre, acquired, BACKWARD_HOURS, FORWARD_HOURS,
+                                        payload["forcingNote"]),
+                # The console's arrows and flow cards (`backend/drift/flow.py`).
+                "flow": flow_grid(payload, back_wind=back_nc, ahead_wind=ahead_nc, back_current=back_cur,
+                                  ahead_current=ahead_cur,
+                                  current_source=source_label(acquired - timedelta(hours=BACKWARD_HOURS))),
                 "verdict": verdict,
                 "input": summary["input"],
             }
@@ -470,39 +512,22 @@ def run_pipeline(
 def forcing_files(
     bbox: tuple[float, float, float, float], acquired: datetime, *, hours: int, forward: int
 ) -> tuple[Path, Path, str]:
-    """The ERA5 files a run is forced by: an exact cache hit, a covering cached file, or a CDS fetch.
-
-    A window cut from a processed scene asks for a smaller box than the scene's
-    own runs did, so its exact key is new; the scene's cached file covers it
-    (`cache.covering_path`), which keeps such a run offline-capable. Only a
-    true miss goes to CDS, and `DEMO_OFFLINE=1` forbids even that.
-    """
-    from backend.ingest.metocean.cache import cached_path, covering_path, fetch_with_cache
+    """The ERA5 files a run is forced by: an exact cache hit, a covering cached file, or a CDS fetch (`cache.resolve`)."""
+    from backend.ingest.metocean.cache import resolve
     from backend.ingest.metocean.era5 import fetch_era5_wind, run_wind_requests
 
-    paths: list[Path] = []
-    how: list[str] = []
-    for request in run_wind_requests(bbox, acquired, hours=hours, forward=forward):
-        exact = cached_path(request)
-        if exact is not None:
-            paths.append(exact)
-            how.append("cached")
-            continue
-        covering = covering_path(request)
-        if covering is not None:
-            paths.append(covering)
-            how.append(f"cached in a covering request ({covering.name})")
-            continue
-        paths.append(fetch_with_cache(request, fetch_era5_wind))
-        how.append("fetched from the Copernicus CDS")
-    return paths[0], paths[1], "; ".join(dict.fromkeys(how))
+    (back, how_back), (ahead, how_ahead) = (
+        resolve(request, fetch_era5_wind, fetched_from="the Copernicus CDS")
+        for request in run_wind_requests(bbox, acquired, hours=hours, forward=forward)
+    )
+    return back, ahead, "; ".join(dict.fromkeys((how_back, how_ahead)))
 
 
 def wind_series_for(back: Path, ahead: Path, seed: tuple[float, float], acquired: datetime,
-                    hours: int, forward: int) -> dict[str, object]:
+                    hours: int, forward: int, current_note: str) -> dict[str, object]:
     from backend.characterize.onraster import wind_series
 
-    return wind_series(back, ahead, seed, acquired, hours=hours, forward=forward)
+    return wind_series(back, ahead, seed, acquired, hours=hours, forward=forward, current_note=current_note)
 
 
 def real_traffic(payload: dict[str, Any], acquired: datetime, name: str) -> dict[str, Any] | None:
@@ -541,8 +566,7 @@ def real_traffic(payload: dict[str, Any], acquired: datetime, name: str) -> dict
         half_height_deg=round(max(cy - min(ys), max(ys) - cy) + REAL_RUN_MARGIN_KM / KM_PER_DEG_LAT, 3),
         backward_h=min(REAL_RUN_BACKWARD_MAX_H, available_h),
         published_mmsi=None,
-        note=("Live API run: the traffic around the seed. Context only; nobody is ranked, "
-              "because the backend attribution engine is not built and the field is wind-only."),
+        note="Live API run: the traffic around the seed. Context only; nobody is ranked (see the attribute stage).",
         before_h=0,
         after_h=2,
     )

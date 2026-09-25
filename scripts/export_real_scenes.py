@@ -21,8 +21,8 @@ through, so both are written beside it as `frontDemo/public/runs/<scene>/scene.j
   72 h before the pass for the hindcast, the 72 h after it for the forecast
   (`wind_requests`) -- at the seed, hour by hour. `DEMO_OFFLINE=1` is set so this can only read the cache:
   a wind series that was fetched separately would not be the wind the particles
-  felt. There is no current field (ISSUES X2), and the file says so rather than
-  writing zeros that look like a measurement.
+  felt. What moved the water is the drift's own `forcingNote` (CMEMS currents,
+  or none, ISSUES X2), never zeros that look like a measurement.
 * **Characterisation** of the seed detection is the backend's PHASE-03 record
   (`backend/characterize`): geometry measured from the unsimplified polygon in
   an equal-area projection, the damping ratio against clean sea on the same
@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from backend.characterize.onraster import (
@@ -66,7 +67,7 @@ SAR = Path(__file__).resolve().parents[1] / "data" / "processed" / "sar"
 def characterise_seed(path: Path, *, raster: Path | None = None) -> dict[str, object]:
     """The backend characterisation (PHASE-03) of the detection the drift was seeded from."""
 
-    from backend.ingest.metocean.cache import fetch_with_cache
+    from backend.ingest.metocean.cache import resolve
     from backend.ingest.metocean.era5 import fetch_era5_wind
 
     seed = choose_seed(path)
@@ -77,7 +78,7 @@ def characterise_seed(path: Path, *, raster: Path | None = None) -> dict[str, ob
     os.environ["DEMO_OFFLINE"] = "1"
     return characterise_seed_on(
         json.loads(path.read_text()), seed, raster=raster,
-        wind_nc=fetch_with_cache(back, fetch_era5_wind), acquired=acquired, detection_id=f"{path.stem}-seed",
+        wind_nc=resolve(back, fetch_era5_wind, fetched_from="CDS")[0], acquired=acquired, detection_id=f"{path.stem}-seed",
     )
 
 
@@ -85,8 +86,8 @@ def detections(path: Path) -> list[dict[str, object]]:
     return detection_rings(json.loads(path.read_text()), choose_seed(path), simplify_deg=SIMPLIFY_DEG)
 
 
-def wind(path: Path) -> dict[str, object]:
-    from backend.ingest.metocean.cache import fetch_with_cache
+def wind(path: Path, current_note: str) -> dict[str, object]:
+    from backend.ingest.metocean.cache import resolve
     from backend.ingest.metocean.era5 import fetch_era5_wind
 
     acquired = scene_acquired_at(path.stem)
@@ -95,8 +96,34 @@ def wind(path: Path) -> dict[str, object]:
     back, ahead = wind_requests(path)
     os.environ["DEMO_OFFLINE"] = "1"
     return wind_series(
-        fetch_with_cache(back, fetch_era5_wind), fetch_with_cache(ahead, fetch_era5_wind),
-        choose_seed(path).centre, acquired, hours=BACKWARD_HOURS, forward=FORWARD_HOURS,
+        resolve(back, fetch_era5_wind, fetched_from="CDS")[0], resolve(ahead, fetch_era5_wind, fetched_from="CDS")[0],
+        choose_seed(path).centre, acquired, hours=BACKWARD_HOURS, forward=FORWARD_HOURS, current_note=current_note,
+    )
+
+
+def flow(path: Path, drift: dict[str, object]) -> dict[str, object]:
+    """Wind and current around the run for the console's arrows, from the files the drift ran on (`backend/drift/flow.py`)."""
+    from backend.drift.flow import flow_grid
+    from backend.ingest.metocean.cache import resolve
+    from backend.ingest.metocean.cmems import currents_for, source_label
+    from backend.ingest.metocean.era5 import fetch_era5_wind
+
+    acquired = scene_acquired_at(path.stem)
+    assert acquired is not None
+    back, ahead = wind_requests(path)
+    os.environ["DEMO_OFFLINE"] = "1"
+    back_current = ahead_current = None
+    if drift.get("forcing") == "era5+cmems":
+        from scripts.export_drift_runs import scene_bbox
+
+        bbox, _ = scene_bbox(path)
+        back_current, ahead_current, _ = currents_for(bbox, acquired, hours=BACKWARD_HOURS, forward=FORWARD_HOURS)
+    return flow_grid(
+        drift,
+        back_wind=resolve(back, fetch_era5_wind, fetched_from="CDS")[0],
+        ahead_wind=resolve(ahead, fetch_era5_wind, fetched_from="CDS")[0],
+        back_current=back_current, ahead_current=ahead_current,
+        current_source=source_label(acquired - timedelta(hours=BACKWARD_HOURS)),
     )
 
 
@@ -107,7 +134,8 @@ def main() -> int:
             print(f"{path.stem[:32]}: no drift.json; run export_drift_runs first")
             continue
         found = detections(path)
-        series = wind(path)
+        drift = json.loads((target / "drift.json").read_text())
+        series = wind(path, drift["forcingNote"])
         radar = cfar_near_seed(SAR / f"{path.stem}.tif", choose_seed(path).centre)
         character = characterise_seed(path)
         payload = {
@@ -118,6 +146,7 @@ def main() -> int:
             "detectionSource": "release model (L1-ciou research) on the full scene, eval/final/scenes; "
                                f"rings simplified to {SIMPLIFY_DEG} deg",
             "wind": series,
+            "flow": flow(path, drift),
         }
         out = target / "scene.json"
         out.write_text(json.dumps(payload, separators=(",", ":"), allow_nan=False), encoding="utf-8")

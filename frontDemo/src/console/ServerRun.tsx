@@ -105,7 +105,7 @@ export function ServerRunTimings({ runId }: { runId: string }) {
     <p className="mt-2 px-2 text-[9.5px] leading-[1.5]" style={{ color: "var(--ink-faint)" }}>
       Each stage's state and time come from the pipeline process on this machine, streamed as it
       writes them; only the running stage's clock ticks here. The drift is OpenDrift on ERA5 wind,
-      with no current field (ISSUES X2).</p>
+      and on CMEMS currents when Copernicus Marine credentials are set (the wind stage says which).</p>
   </div>;
 }
 

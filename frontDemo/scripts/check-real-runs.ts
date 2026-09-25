@@ -26,6 +26,7 @@ import { ensureRealRun, REAL_RUN_LISTINGS, setRealRunLoader, type RealSceneFile 
 import type { RealDriftRun } from '../src/sim/realDrift';
 import { buildRun } from '../src/sim/scenarios';
 import { windGate } from '../src/sim/slick';
+import { flowCells, flowMean, isSimulated, spillParts } from '../src/sim/flow';
 import type { LngLat } from '../src/sim/types';
 import { useDiskLandmask } from './landmaskDisk';
 import { detectionFeatures } from '../src/map/detectionView';
@@ -56,6 +57,9 @@ function sameCells(id: string, hour: number, boxes: LngLat[][], rings: LngLat[][
   }
   return polygonsOf(rings).length;
 }
+
+/** Parcels afloat below which a frame's outline shares are not tested (2.5% of 2,000). */
+const MIN_OUTLINE_PARCELS = 50;
 
 const pub = (path: string) => fileURLToPath(new URL(`../public/${path}`, import.meta.url));
 const missing = REAL_RUN_LISTINGS.filter(({ id, scene }) =>
@@ -114,7 +118,7 @@ for (const { id, scene } of REAL_RUN_LISTINGS) {
   // own blur and contour, so they have to hold the ensemble: about half and
   // nine tenths of the parcels. A 90% outline drawn at the 50% level, or from
   // the wrong frame, fails this.
-  let maxLobes = 0, rings90 = 0, in90Min = 1, in90Max = 0, in50Min = 1, in50Max = 0;
+  let maxLobes = 0, rings90 = 0, in90Min = 1, in90Max = 0, in50Min = 1, in50Max = 0, sparse = 0;
   assert.equal(run.drift.frames.length, drift.frames.length, `${id}: drift frames lost`);
   assert.deepEqual(run.drift.frames.map((f) => f.hour), drift.frames.map((f) => f.hour), `${id}: hours reordered`);
   assert.match(run.meta.provenance, /smoothed from OpenDrift's/, `${id}: the provenance does not say the outlines are smoothed`);
@@ -127,17 +131,26 @@ for (const { id, scene } of REAL_RUN_LISTINGS) {
       for (let k = 0; k < parcels; k++) if (inside([x.particles[2 * k], x.particles[2 * k + 1]], rings)) n++;
       return n / parcels;
     };
-    const in90 = share(f.contour90), in50 = share(f.contour50);
-    // No ceiling on the 90% share: at the pass the parcels are uniform over the
-    // slick, the density has no interior peak, and the 90% region covers
-    // nearly all of it (99.5% measured). The 50% band is what pins the levels.
-    assert.ok(in90 >= 0.8, `${id} ${x.hour} h: the 90% outline holds ${(in90 * 100).toFixed(1)}% of the parcels`);
-    // Measured over all 435 frames: 90% outlines hold 91-100% of the parcels,
-    // 50% outlines 52-77% (highest at the pass, for the same reason), and the
-    // two levels are never closer than 20.8 points.
-    assert.ok(in50 >= 0.35 && in50 <= 0.85, `${id} ${x.hour} h: the 50% outline holds ${(in50 * 100).toFixed(1)}% of the parcels`);
-    assert.ok(in90 - in50 >= 0.1, `${id} ${x.hour} h: the 50% and 90% outlines hold nearly the same parcels`);
-    [in90Min, in90Max, in50Min, in50Max] = [Math.min(in90Min, in90), Math.max(in90Max, in90), Math.min(in50Min, in50), Math.max(in50Max, in50)];
+    // A forecast whose oil has nearly all stranded leaves a few dozen parcels
+    // afloat, and a density outline over those is one blob: on the v12 April
+    // run the 50% outline held 57-69% of 45-384 parcels, then all of 36 (+27 h,
+    // 98% ashore), and from +42 h nothing is afloat. Below this the shares are
+    // not a statistic, so those frames are counted, not tested.
+    if (parcels < MIN_OUTLINE_PARCELS) {
+      sparse++;
+    } else {
+      const in90 = share(f.contour90), in50 = share(f.contour50);
+      // No ceiling on the 90% share: at the pass the parcels are uniform over the
+      // slick, the density has no interior peak, and the 90% region covers
+      // nearly all of it (99.5% measured). The 50% band is what pins the levels.
+      assert.ok(in90 >= 0.8, `${id} ${x.hour} h: the 90% outline holds ${(in90 * 100).toFixed(1)}% of the parcels`);
+      // Measured over all 435 frames: 90% outlines hold 91-100% of the parcels,
+      // 50% outlines 52-77% (highest at the pass, for the same reason), and the
+      // two levels are never closer than 20.8 points.
+      assert.ok(in50 >= 0.35 && in50 <= 0.85, `${id} ${x.hour} h: the 50% outline holds ${(in50 * 100).toFixed(1)}% of the parcels`);
+      assert.ok(in90 - in50 >= 0.1, `${id} ${x.hour} h: the 50% and 90% outlines hold nearly the same parcels`);
+      [in90Min, in90Max, in50Min, in50Max] = [Math.min(in90Min, in90), Math.max(in90Max, in90), Math.min(in50Min, in50), Math.max(in50Max, in50)];
+    }
     // The number printed is the outline drawn.
     const drawn = f.contour90.reduce((sum, r) => sum + ringAreaKm2(r), 0);
     assert.ok(Math.abs(drawn - f.area90Km2) < 1e-6, `${id} ${x.hour} h: area90 ${f.area90Km2} is not the drawn outline's ${drawn}`);
@@ -180,14 +193,25 @@ for (const { id, scene } of REAL_RUN_LISTINGS) {
   assert.ok(run.forwardImpact.length > 0, `${id}: no forecast envelope`);
   assert.match(run.meta.provenance, /Forecast: the same parcels run forward/, `${id}: the provenance does not describe the forecast`);
 
+  // Wind and current around the run (`scene.json` flow, `sim/flow.ts`): measured,
+  // never tagged SIM on a real run that has them, and only a few averaged arrows.
+  assert.ok(run.flow, `${id}: no flow grid`);
+  assert.ok(!isSimulated(run.flow.windSource) && !isSimulated(run.flow.currentSource),
+    `${id}: a real run's wind or current reads as simulated (${run.flow.windSource} / ${run.flow.currentSource})`);
+  assert.equal(run.trafficSource, 'marinecadastre AIS', `${id}: the Gulf runs' ships are real AIS`);
+  const cells = flowCells([...spillParts(run.detection), ...run.drift.frames.flatMap((f) => f.contour90)]);
+  assert.ok(cells.length >= 1 && cells.length <= 9, `${id}: ${cells.length} arrow cells; a few averaged arrows, not a scatter`);
+  assert.ok(cells.some((c) => flowMean(run.flow!, 'current', c.bbox, 0) !== null), `${id}: no cell has a current at the pass`);
+
   // The refusal: no age (C1 keeps the triple), nobody ranked, and it says why.
   // With an age when the export converged (its own triple, C1), without one when it did not.
   const halt = run.drift.insufficientEvidence;
   const t = drift.age.age_hours;
   const aged = drift.age.status === 'converged' && !!t && t.low !== null && t.best !== null && t.high !== null;
-  assert.ok(halt && halt.kind === (aged ? 'wind_only' : 'no_age'), `${id}: the refusal kind does not match the export's age`);
+  const currents = drift.forcing === 'era5+cmems';
+  assert.ok(halt && halt.kind === (!aged ? 'no_age' : currents ? 'unscored' : 'wind_only'), `${id}: the refusal kind does not match the export's age and forcing`);
   assert.match(halt.reason, aged ? /tightest/ : /never converges/, `${id}: the refusal misstates convergence`);
-  assert.match(halt.reason, /no current\s+field/, `${id}: the refusal does not name the missing currents`);
+  assert.match(halt.reason, currents ? /current-forced/ : /no current\s+field/, `${id}: the refusal does not name the forcing`);
   assert.equal(run.drift.ageMethod, aged ? 'drift_convergence' : 'no_convergence', `${id}: the age method is not the export's`);
   assert.equal(run.drift.ageHours.length, 3, `${id}: C1 -- the age is a triple`);
   if (aged) assert.deepEqual(run.drift.ageHours, [t!.low, t!.best, t!.high], `${id}: the age is not the export's triple`);
@@ -201,10 +225,14 @@ for (const { id, scene } of REAL_RUN_LISTINGS) {
   assert.match(run.meta.provenance, /^REAL · /, `${id}: provenance does not open with REAL`);
   assert.doesNotMatch(run.meta.provenance, /\bSIM\b/, `${id}: provenance claims simulation`);
 
-  // Wind is the ERA5 series; currents are absent, not zero.
+  // Wind is the ERA5 series. Currents are CMEMS where the run was forced by them
+  // (some hours may be NaN: the seed's surroundings on land), and absent, never
+  // zero or simulated, on a wind-only run: these charts carry no SIM label.
   assert.equal(run.environment.windMs.length, drift.backwardHours + drift.forwardHours + 1, `${id}: wind series length`);
   assert.ok(run.environment.windMs.every(Number.isFinite), `${id}: wind has gaps`);
-  assert.ok(run.environment.currentMs.every(Number.isNaN), `${id}: a current was invented`);
+  if (drift.forcing === 'era5+cmems')
+    assert.ok(run.environment.currentMs.some(Number.isFinite), `${id}: forced by CMEMS, yet no current at the seed`);
+  else assert.ok(run.environment.currentMs.every(Number.isNaN), `${id}: a current was invented`);
 
   // The characterisation measured something, and a damping ratio only where one was measured.
   const c = run.characterisation;
@@ -258,6 +286,7 @@ for (const { id, scene } of REAL_RUN_LISTINGS) {
     'T0 spans slick': `${(covered * 100).toFixed(0)}%`,
     'parcels in 90%': `${(in90Min * 100).toFixed(0)}-${(in90Max * 100).toFixed(0)}%`,
     'parcels in 50%': `${(in50Min * 100).toFixed(0)}-${(in50Max * 100).toFixed(0)}%`,
+    'frames < 50 afloat': sparse,
     'export max lobes': maxLobes,
     'area90 horizon': +run.drift.frames[0].area90Km2.toFixed(0),
   });

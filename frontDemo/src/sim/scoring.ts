@@ -243,7 +243,11 @@ export function sTemporality(
  * Gate, score, collate
  * ------------------------------------------------------------------ */
 
+/** The last input `score` saw; `scripts/export-scoring-fixtures.ts` reads it. */
+export const scoringTap: { last: ScoringInput | null } = { last: null };
+
 export function score(input: ScoringInput): ScoringResult {
+  scoringTap.last = input;
   const {
     drift,
     grids,

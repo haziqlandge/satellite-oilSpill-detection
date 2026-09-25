@@ -215,10 +215,13 @@ def resolve_daily_files(directory: Path, window: TimeWindow) -> list[Path]:
 # The Gulf of Mexico AOI, taken from the **measured** footprint of the
 # terrain-corrected Case 1 product (2026-08-30): lon -91.1022..-88.1751,
 # lat 27.9531..29.8763, then buffered for drift. All three P004 fixture scenes
-# are the same Port of South Louisiana frame.
-GULF_OF_MEXICO = BoundingBox(
-    min_lon=-91.1022,
-    min_lat=27.9531,
-    max_lon=-88.1751,
-    max_lat=29.8763,
-).buffered_km(DEFAULT_BUFFER_KM)
+# are the same Port of South Louisiana frame. The footprint is the region
+# registry's (`aisFootprint`, `backend/regions.py`).
+def _footprint(region_id: str) -> BoundingBox:
+    from backend.regions import box, region
+
+    west, south, east, north = box(region(region_id), "aisFootprint")
+    return BoundingBox(min_lon=west, min_lat=south, max_lon=east, max_lat=north)
+
+
+GULF_OF_MEXICO = _footprint("gulf-of-mexico").buffered_km(DEFAULT_BUFFER_KM)

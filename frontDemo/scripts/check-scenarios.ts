@@ -25,9 +25,10 @@ const check = (ok: boolean, msg: string) => { if (!ok) failures.push(msg); };
   insufficient evidence although the scenario has a ground truth; after the
   land mask and the displacement it ranks the truth third. Both are wrong and
   the second is not caused by the first -- disabling the displacement alone
-  brings back the refusal. `max` is the experimental S_drift variant that
-  FUTURE_WORK section 5 says is still undecided against `integral`, which is
-  what the console uses and which passes. Listed rather than silenced.
+  brings back the refusal. `max` was the S_drift variant PHASE-06 left open
+  against `integral`; this failure is what decided it for `integral` on
+  2026-09-25 (eval/attribution/REPORT.md). `max` is kept as the comparison and
+  listed rather than silenced.
 */
 const KNOWN_OPEN = new Set(['kutch-dark/max']);
 

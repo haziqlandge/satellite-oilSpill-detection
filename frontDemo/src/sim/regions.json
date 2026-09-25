@@ -1,0 +1,113 @@
+{
+  "_about": "The region registry (PLAN/phases/PHASE-10.md): every AOI-dependent behaviour reads its extent from here. The console (sim/regions.ts) and the backend (backend/regions.py) share this file. It sits inside frontDemo/ because a Vercel build rooted there cannot import from outside it. Boxes are [west, south, east, north], degrees. `aoi` decides which zone a scene or run belongs to; `landmask` is the coast bundled into the page for scenarios built before anything loads (scripts/build_landmask.py); `aisFootprint` is the measured scene footprint AIS is clipped to (buffered in backend/ingest/ais/clip.py). `infrastructure` and `windGate` are surfaced as caveats on every evidence card in the zone.",
+  "regions": [
+    {
+      "id": "gulf-of-mexico",
+      "label": "Gulf of Mexico",
+      "kind": "validation",
+      "aoi": [-98.0, 18.0, -80.0, 31.0],
+      "landmask": [-92.0, 24.5, -87.5, 30.5],
+      "aisFootprint": [-91.1022, 27.9531, -88.1751, 29.8763],
+      "ais": "marinecadastre AIS (real, US waters)",
+      "forcing": "ERA5 wind and CMEMS global currents",
+      "infrastructure": {
+        "coverage": "partial",
+        "note": "No verified installation dataset is loaded for the Gulf of Mexico. The platform groups in the authored scenes are placed by hand, so a real installation missing from them would push its share of a score onto vessels."
+      },
+      "windGate": {
+        "validated": false,
+        "note": "The 3 and 10-12 m/s wind-gate bounds come from studies in other basins (Espedal 1999); they are used here, not re-derived for the Gulf."
+      }
+    },
+    {
+      "id": "gulf-of-kutch",
+      "label": "Gulf of Kutch",
+      "kind": "demonstration",
+      "aoi": [66.5, 20.5, 71.0, 24.0],
+      "landmask": [66.5, 20.5, 71.0, 24.0],
+      "ais": "simulated (no free AIS outside US waters)",
+      "forcing": "analytic (authored scenario)",
+      "infrastructure": {
+        "coverage": "partial",
+        "note": "The Vadinar and Sikka moorings are placed from public descriptions; the SAR Fixed Infrastructure Dataset has not been verified for Indian waters, so a missing installation here would read as a vessel."
+      },
+      "windGate": {
+        "validated": false,
+        "note": "Monsoon wind climatology differs materially from the basins the 3 and 10-12 m/s bounds were derived in; they are unvalidated for the Gulf of Kutch."
+      }
+    },
+    {
+      "id": "mumbai-high",
+      "label": "Mumbai High",
+      "kind": "demonstration",
+      "aoi": [70.5, 18.0, 73.5, 21.0],
+      "landmask": [70.5, 18.0, 73.5, 21.0],
+      "ais": "simulated (no free AIS outside US waters)",
+      "forcing": "analytic (authored scenario)",
+      "infrastructure": {
+        "coverage": "partial",
+        "note": "The Mumbai High platform complexes are placed from public descriptions; the dense offshore field is not in any verified dataset here, so a missing platform would read as a vessel."
+      },
+      "windGate": {
+        "validated": false,
+        "note": "Monsoon wind climatology differs materially from the basins the 3 and 10-12 m/s bounds were derived in; they are unvalidated for Mumbai High."
+      }
+    },
+    {
+      "id": "chennai-ennore",
+      "label": "Chennai / Ennore",
+      "kind": "demonstration",
+      "aoi": [79.9, 12.4, 81.2, 14.0],
+      "landmask": [79.9, 12.4, 81.2, 14.0],
+      "ais": "simulated (no free AIS outside US waters)",
+      "forcing": "analytic (authored scenario)",
+      "infrastructure": {
+        "coverage": "partial",
+        "note": "No installation dataset is loaded for the Chennai coast; the Kamarajar and Chennai port approaches are drawn from public charts, not a verified layer."
+      },
+      "windGate": {
+        "validated": false,
+        "note": "North-east monsoon winds over the Bay of Bengal are outside the conditions the 3 and 10-12 m/s bounds were derived in; they are unvalidated here."
+      }
+    },
+    {
+      "id": "paradip",
+      "label": "Paradip",
+      "kind": "demonstration",
+      "aoi": [86.3, 19.5, 87.6, 20.9],
+      "landmask": [86.3, 19.5, 87.6, 20.9],
+      "ais": "simulated (no free AIS outside US waters)",
+      "forcing": "analytic (authored scenario)",
+      "infrastructure": {
+        "coverage": "partial",
+        "note": "The Paradip single point moorings are placed from public descriptions of the crude terminal; the SAR Fixed Infrastructure Dataset has not been verified for Indian waters."
+      },
+      "windGate": {
+        "validated": false,
+        "note": "The Bay of Bengal cyclone and monsoon regime is outside the conditions the 3 and 10-12 m/s bounds were derived in; they are unvalidated here."
+      }
+    },
+    {
+      "id": "arabian-sea-sample",
+      "label": "Arabian Sea (sample theatre)",
+      "kind": "sample",
+      "aoi": [66.5, 16.5, 69.0, 19.0],
+      "landmask": [66.5, 16.5, 69.0, 19.0],
+      "ais": "simulated",
+      "forcing": "analytic (sample theatre)",
+      "infrastructure": { "coverage": "partial", "note": "A sample theatre: no installation dataset." },
+      "windGate": { "validated": false, "note": "A sample theatre: the wind-gate bounds are not validated here." }
+    },
+    {
+      "id": "south-china-sea-sample",
+      "label": "South China Sea (sample theatre)",
+      "kind": "sample",
+      "aoi": [113.5, 11.5, 116.0, 14.0],
+      "landmask": [113.5, 11.5, 116.0, 14.0],
+      "ais": "simulated",
+      "forcing": "analytic (sample theatre)",
+      "infrastructure": { "coverage": "partial", "note": "A sample theatre: no installation dataset." },
+      "windGate": { "validated": false, "note": "A sample theatre: the wind-gate bounds are not validated here." }
+    }
+  ]
+}

@@ -24,6 +24,8 @@ import { CONTACT_RADIUS_KM, PHASE_LABEL, type Moment } from "../lib/playback";
 import type { DriftVariant } from "../sim/scoring";
 import type { Run } from "../sim/types";
 import { verdictFor } from "../sim/verdict";
+import { zoneOf } from "../sim/regions";
+
 import {
   Alarm,
   Block,
@@ -35,6 +37,7 @@ import {
   Pane,
   Row,
   SCROLL,
+  Sourced,
   Split,
   Table,
 } from "./components";
@@ -46,6 +49,13 @@ import {
   WidthProfile,
   WindGatePlot,
 } from "./instruments";
+
+/** Where the scene came from: a real Sentinel-1 pass, an upload, or an authored (simulated) scene. */
+function sceneSource(run: Run): string | null {
+  if (isRealRun(run.meta.id)) return "Sentinel-1 (Copernicus)";
+  if (run.meta.id === "upload") return "the uploaded image";
+  return null;
+}
 
 /** The scrolling body every pane shares. */
 /**
@@ -118,11 +128,11 @@ export function Detect({ run }: { run: Run }) {
       <PaneBody>
         {isSample(run.meta.id) && <Block label="Uploaded SAR evidence"><SampleEvidenceImages sample={run.meta.id} /></Block>}
         {run.meta.id === "upload" && <Block label="Uploaded SAR evidence"><UploadEvidenceImages /></Block>}
-        <Block label="Scene">
+        <Block label="Scene" right={<Sourced source={sceneSource(run)} />}>
           <Row label="scene" value={d.sceneId} />
           <Row label="acq" value={stamp(d.acquiredAt)} />
           <Row label="sensor" value="sentinel-1 iw · vv · 10 m" />
-          <Row label="region" value={REGION[run.meta.region] ?? run.meta.region} />
+          <Row label="region" value={zoneOf(run.meta.centre)?.label ?? REGION[run.meta.region] ?? run.meta.region} />
           <Row
             label="centre"
             value={`${run.meta.centre[1].toFixed(3)} ${run.meta.centre[0].toFixed(3)}`}
@@ -222,7 +232,10 @@ export function Detect({ run }: { run: Run }) {
           </Note>
         </Block>
 
-        <Block label="Wind gate" right={`x${c.windGateMultiplier.toFixed(2)}`}>
+        <Block
+          label="Wind gate"
+          right={<span className="flex items-center gap-2"><Sourced source={run.flow?.windSource} />{`x${c.windGateMultiplier.toFixed(2)}`}</span>}
+        >
           <Split
             figure={<WindGatePlot ms={c.windSpeedMs} value={c.windGateMultiplier} />}
           >
@@ -387,7 +400,10 @@ export function Drift({
         )}
 
         <Block label="Ensemble">
-          <div data-fields className="grid grid-cols-2 gap-1.5">
+          <Row label="engine" value={<Sourced source={isRealRun(run.meta.id) ? "OpenDrift (OpenOil)" : null} />} />
+          <Row label="wind" value={<Sourced source={run.flow?.windSource} />} />
+          <Row label="current" value={<Sourced source={run.flow?.currentSource} />} />
+          <div data-fields className="mt-1.5 grid grid-cols-2 gap-1.5">
             <Field label="members" value={d.ensembleSize} />
             <Field label="particles" value={d.particleCount.toLocaleString()} />
             <Field label="forecast" value={`${d.forwardHours} h`} />
@@ -660,6 +676,7 @@ export function Traffic({
     >
       <PaneBody>
         <Block label="AIS" right={`${CONTACT_RADIUS_KM} km radius`}>
+          <Row label="ships" value={<Sourced source={run.trafficSource} />} />
           <div data-fields className="grid grid-cols-3 gap-1.5">
             <Field label="reports" value={run.aisPointCount.toLocaleString()} />
             <Field label="tracks" value={run.vessels.length} />

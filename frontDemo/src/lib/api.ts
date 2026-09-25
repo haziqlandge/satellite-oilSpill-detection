@@ -15,7 +15,13 @@
 
 import { useSyncExternalStore } from "react";
 
-export const API_BASE = "api/v1";
+/**
+ * Where the live pipeline answers. Relative by default: the dev server and
+ * `vite preview` proxy `/api` to a local uvicorn. A build can point at a hosted
+ * pipeline instead (FUTURE_WORK §4.3) with `VITE_API_BASE=https://host/api/v1`
+ * at build time; that host must list the site in `API_CORS_ORIGINS`.
+ */
+export const API_BASE = (import.meta.env.VITE_API_BASE ?? "api/v1").replace(/\/+$/, "");
 
 export type ApiStageState = "pending" | "running" | "done" | "failed" | "skipped" | "refused";
 

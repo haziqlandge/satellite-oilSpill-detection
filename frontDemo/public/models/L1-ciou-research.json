@@ -5,8 +5,8 @@
   ],
   "status": "research-only",
   "file": "L1-ciou-research.onnx",
-  "sha256": "7c67c62d906443a4a144018de8ce14ad7e8adc7e2c3327e7c09de208ac46f905",
-  "source_weights_sha256": "d4a74906e3a9b692c14f28305baf3cb20ba63da4c38bc30dbabd14c5c6d1fc6c",
+  "sha256": "696c5c67f891150df5acd907db391b07d273035ab72f1d2aa608f9f798d795bf",
+  "source_weights_sha256": "ccaad1a118ac5b5d324a0d54b5a8ecfdbde0d9aeb9be9f0ce7d4062360833399",
   "precision": "fp32",
   "input": {
     "size": 1024,
@@ -15,7 +15,7 @@
     "pad_value": 114
   },
   "inference": {
-    "conf": 0.2,
+    "conf": 0.15,
     "iou": 0.7,
     "max_det": 1000
   },
@@ -35,16 +35,17 @@
     "merge_threshold": 0.5
   },
   "parity": {
-    "box_pixels_max_abs": 0.001556396484375,
-    "scores_coeffs_max_abs": 5.841255187988281e-06,
-    "protos_max_abs": 1.0251998901367188e-05,
+    "box_pixels_max_abs": 0.001251220703125,
+    "scores_coeffs_max_abs": 3.933906555175781e-06,
+    "protos_max_abs": 7.510185241699219e-06,
     "candidates_over_conf": 12,
     "candidates_over_conf_torch": 12
   },
   "limitations": [
     "One slick class; never relabel predictions as oos.",
     "Tile test does not validate full-scene transfer or attribution.",
-    "Retina masks and seam merging are separate scene acceptance settings."
+    "Retina masks and seam merging are separate scene acceptance settings.",
+    "Trained with Zenodo Part II look-alike and No_oil tiles; look-alike alarms are reported separately from mAP in eval/part2/REPORT.md (C8)."
   ],
   "outputs": {
     "output0": [

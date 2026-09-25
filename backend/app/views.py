@@ -13,7 +13,8 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from backend.app.store import GULF, ArtifactStore, SceneEntry, detection_uuid
+from backend.app.store import ArtifactStore, SceneEntry, detection_uuid
+from backend.regions import zone_of
 
 API = "/api/v1"
 SIMPLIFY_DEG = 0.0002
@@ -81,8 +82,8 @@ def scene_summary(store: ArtifactStore, scene: SceneEntry) -> dict[str, Any]:
         "run_id": scene.run_id,
         "acquired_at": iso(scene.acquired_at),
         "bbox": bbox,
-        "region": "gulf-of-mexico" if bbox and GULF[0] <= bbox[0] and bbox[2] <= GULF[2]
-        and GULF[1] <= bbox[1] and bbox[3] <= GULF[3] else None,
+        # The zone whose AOI holds the scene (the region registry, PHASE-10).
+        "region": zone_of((bbox[0], bbox[1], bbox[2], bbox[3])) if bbox else None,
         "detection_count": len(rows),
         "seed_detection_id": None if seed is None else str(detection_uuid(scene.id, seed)),
         "has_drift": scene.run_dir is not None,
@@ -227,9 +228,13 @@ def attribution_refusal(drift: dict[str, Any]) -> list[str]:
     reasons = []
     if age["status"] != "converged":
         reasons.append("the backward field never converges, so there is no age to gate candidates on (C1)")
-    reasons.append(f"the field is wind-only ({drift.get('forcingNote', 'no current field')}), and a wind-only "
-                   "field cannot carry an attribution")
-    reasons.append("the backend attribution engine (PHASE-06) is not built")
+    if drift.get("forcing") == "era5+cmems":
+        from backend.pipeline.run import UNSCORED_REASON
+
+        reasons.append(UNSCORED_REASON)
+    else:
+        reasons.append(f"the field is wind-only ({drift.get('forcingNote', 'no current field')}), and a wind-only "
+                       "field cannot carry an attribution")
     return reasons
 
 

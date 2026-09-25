@@ -1,4 +1,10 @@
-"""Export the frozen single-class research release without changing tensor precision."""
+"""Promote the single-class research release without changing tensor precision.
+
+The release is the final-v12 checkpoint (Zenodo Part II negatives), promoted by
+the user on 2026-09-25 from the comparison in `eval/part2/REPORT.md`. The
+previous release (final-v11, `d4a749...`) is kept beside it as
+`weights/L1-ciou-research-v11.{pt,json}`; its manifest records how it was made.
+"""
 
 import hashlib
 import json
@@ -6,6 +12,10 @@ import shutil
 from pathlib import Path
 
 WEIGHTS = Path("weights/L1-ciou-research.pt")
+PREVIOUS = Path("weights/L1-ciou-research-v11.pt")
+SOURCE = Path("runs/final_v12_l1/L1-ciou/weights/best-fp32.pt")
+RECORD = Path("eval/part2/comparison.json")
+DATASET = Path("data/processed/dataset/final-v12")
 
 
 def sha256(path):
@@ -24,27 +34,30 @@ def read_manifest(weights, *, expected_classes=("oos", "slick_unknown")):
 
 
 def main():
-    root = Path("eval/final/operational")
-    frozen_path = root / "frozen.json"
-    frozen = json.loads(frozen_path.read_text())
-    protocol_path = root / "protocol.json"
-    protocol = json.loads(protocol_path.read_text())
-    if sha256(protocol_path) != frozen["protocol_sha256"]:
-        raise ValueError("Frozen protocol hash mismatch")
-    source = Path("runs/final_l1_fp32_release/L1-ciou/weights/best-fp32.pt")
-    if sha256(source) != frozen["checkpoint_sha256"]:
+    record = json.loads(RECORD.read_text())
+    if sha256(SOURCE) != record["models"]["v12"]:
         raise ValueError("Selected checkpoint hash mismatch")
+    # Archive the previous release once; its bytes must be the ones compared.
+    if WEIGHTS.exists() and sha256(WEIGHTS) == record["models"]["release"]:
+        if PREVIOUS.exists():
+            raise ValueError(f"{PREVIOUS} already exists; refusing to overwrite it")
+        shutil.move(WEIGHTS, PREVIOUS)
+        shutil.move(WEIGHTS.with_suffix(".json"), PREVIOUS.with_suffix(".json"))
+    read_manifest(PREVIOUS, expected_classes=("slick",))
     manifest = dict(
         name="L1-ciou-research",
+        version="final-v12",
         classes=["slick"],
         status="research-only",
-        sha256=frozen["checkpoint_sha256"],
-        frozen_sha256=sha256(frozen_path),
-        data_hashes={k: protocol["inputs"][k] for k in ("data_yaml", "val", "test")},
+        sha256=record["models"]["v12"],
+        record_sha256=sha256(RECORD),
+        data_hashes={k: sha256(DATASET / v) for k, v in
+                     (("data_yaml", "data.yaml"), ("val", "val.txt"), ("test", "test.txt"))},
+        supersedes=dict(path=PREVIOUS.as_posix(), sha256=record["models"]["release"]),
         inference=dict(
             imgsz=1024,
             batch=4,
-            conf=frozen["confidence"],
+            conf=record["operating_confidence"]["v12"],
             iou=0.7,
             max_det=1000,
             half=False,
@@ -57,9 +70,10 @@ def main():
             "One slick class; never relabel predictions as oos.",
             "Tile test does not validate full-scene transfer or attribution.",
             "Retina masks and seam merging are separate scene acceptance settings.",
+            "Trained with Zenodo Part II look-alike and No_oil tiles; look-alike alarms are "
+            "reported separately from mAP in eval/part2/REPORT.md (C8).",
         ],
     )
-    WEIGHTS.parent.mkdir(exist_ok=True)
     if WEIGHTS.exists() and sha256(WEIGHTS) != manifest["sha256"]:
         raise ValueError("Refusing to replace different exported weights")
     if (
@@ -68,7 +82,7 @@ def main():
     ):
         raise ValueError("Refusing to replace a different manifest")
     if not WEIGHTS.exists():
-        shutil.copyfile(source, WEIGHTS)
+        shutil.copyfile(SOURCE, WEIGHTS)
     WEIGHTS.with_suffix(".json").write_text(json.dumps(manifest, indent=2))
     read_manifest(WEIGHTS, expected_classes=("slick",))
     print(f"Verified research release: {WEIGHTS}")

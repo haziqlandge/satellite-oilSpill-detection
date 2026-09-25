@@ -1,0 +1,169 @@
+{
+  "weights": {
+    "drift": 0.3,
+    "proximity": 0.2,
+    "parity": 0.15,
+    "temporality": 0.15,
+    "behaviour": 0.12,
+    "prior": 0.08
+  },
+  "scenarios": {
+    "gom-moving": {
+      "vessels": 232,
+      "integral": {
+        "rank": 1,
+        "of": 24,
+        "total": 0.757,
+        "margin": 0.3962,
+        "refused": null,
+        "admitted": 22,
+        "seconds": 0.1
+      },
+      "max": {
+        "rank": 1,
+        "of": 24,
+        "total": 0.757,
+        "margin": 0.3878,
+        "refused": null,
+        "admitted": 22,
+        "seconds": 0.101
+      },
+      "termAblation": {
+        "rank": 1,
+        "of": 24,
+        "total": 0.6893,
+        "margin": 0.2661
+      },
+      "fieldAblation": {
+        "rank": 1,
+        "of": 232,
+        "total": 0.6893,
+        "margin": 0.0481
+      }
+    },
+    "gom-berthed": {
+      "vessels": 315,
+      "integral": {
+        "rank": 1,
+        "of": 11,
+        "total": 0.744,
+        "margin": 0.1858,
+        "refused": null,
+        "admitted": 10,
+        "seconds": 0.129
+      },
+      "max": {
+        "rank": 1,
+        "of": 11,
+        "total": 0.744,
+        "margin": 0.1858,
+        "refused": null,
+        "admitted": 10,
+        "seconds": 0.101
+      },
+      "termAblation": {
+        "rank": 1,
+        "of": 11,
+        "total": 0.6985,
+        "margin": 0.2086
+      },
+      "fieldAblation": {
+        "rank": 1,
+        "of": 316,
+        "total": 0.6985,
+        "margin": 0.13
+      }
+    },
+    "gom-platform": {
+      "vessels": 316,
+      "integral": {
+        "rank": 1,
+        "of": 6,
+        "total": 0.6787,
+        "margin": 0.2324,
+        "refused": null,
+        "admitted": 4,
+        "seconds": 0.052
+      },
+      "max": {
+        "rank": 1,
+        "of": 6,
+        "total": 0.6787,
+        "margin": 0.2324,
+        "refused": null,
+        "admitted": 4,
+        "seconds": 0.05
+      },
+      "termAblation": {
+        "rank": 1,
+        "of": 6,
+        "total": 0.5983,
+        "margin": 0.2573
+      },
+      "fieldAblation": {
+        "rank": 2,
+        "of": 313,
+        "total": 0.5983,
+        "margin": -0.0245
+      }
+    },
+    "kutch-dark": {
+      "vessels": 230,
+      "integral": {
+        "rank": 1,
+        "of": 38,
+        "total": 0.6419,
+        "margin": 0.0579,
+        "refused": null,
+        "admitted": 36,
+        "seconds": 0.127
+      },
+      "max": {
+        "rank": 4,
+        "of": 38,
+        "total": 0.6419,
+        "margin": -0.0436,
+        "refused": "Top two candidates separated by 0.011. That is inside the noise of the weighting, so neither is distinguished from the other.",
+        "admitted": 36,
+        "seconds": 0.127
+      },
+      "termAblation": {
+        "rank": 3,
+        "of": 38,
+        "total": 0.6192,
+        "margin": -0.0341
+      },
+      "fieldAblation": {
+        "rank": 8,
+        "of": 232,
+        "total": 0.6192,
+        "margin": -0.1316
+      }
+    },
+    "mumbai-null": {
+      "vessels": 239,
+      "integral": {
+        "rank": null,
+        "of": 52,
+        "refused": "Wind 1.9 m/s at the detection centroid puts the gate multiplier at 0.00. At this wind the sea is dark whether or not there is oil on it, so no ranking here would mean anything.",
+        "admitted": 50,
+        "seconds": 0.215
+      },
+      "max": {
+        "rank": null,
+        "of": 52,
+        "refused": "Wind 1.9 m/s at the detection centroid puts the gate multiplier at 0.00. At this wind the sea is dark whether or not there is oil on it, so no ranking here would mean anything.",
+        "admitted": 50,
+        "seconds": 0.247
+      },
+      "termAblation": {
+        "rank": null,
+        "of": 52
+      },
+      "fieldAblation": {
+        "rank": null,
+        "of": 241
+      }
+    }
+  }
+}

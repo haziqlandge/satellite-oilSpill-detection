@@ -90,13 +90,14 @@ class Region:
 # Every authored scene and sample theatre, padded to cover its drift envelope
 # and shipping lanes. The runs for these are built synchronously as the page
 # loads, before anything could be fetched, so their tiles ship in the bundle.
-BUNDLED = (
-    Region("gulf-of-mexico", -92.0, 24.5, -87.5, 30.5),
-    Region("kutch", 66.5, 20.5, 71.0, 24.0),
-    Region("mumbai", 70.5, 18.0, 73.5, 21.0),
-    Region("arabian-sea-sample", 66.5, 16.5, 69.0, 19.0),
-    Region("south-china-sea-sample", 113.5, 11.5, 116.0, 14.0),
-)
+# The boxes are the region registry's `landmask` extents (`backend/regions.py`).
+def _bundled() -> tuple[Region, ...]:
+    from backend.regions import box, regions
+
+    return tuple(Region(entry["id"], *box(entry, "landmask")) for entry in regions() if "landmask" in entry)
+
+
+BUNDLED = _bundled()
 
 
 def tile_index(row: int, col: int) -> int:

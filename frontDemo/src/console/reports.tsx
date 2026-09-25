@@ -55,10 +55,12 @@ import {
   Note,
   Pane,
   Row,
+  Sourced,
   Table,
   Toggle,
 } from "./components";
 import { AnomalySeries, TermBar, TrackScope } from "./instruments";
+import { zoneCaveats, zoneOf } from "../sim/regions";
 import { PaneBody } from "./panes";
 
 const KIND_TONE: Record<string, "ok" | "warn" | "alarm" | "dim"> = {
@@ -228,6 +230,11 @@ function sharedNote(tag: CandidateTag | undefined): string {
  * ================================================================== */
 
 export function Attribute({ run, state }: { run: Run; state: SpillState }) {
+  // Candidates whose track is recorded AIS; every other candidate is simulated and flagged SIM.
+  const recorded = useMemo(
+    () => new Set(run.vessels.filter((v) => v.source === "real").map((v) => v.mmsi)),
+    [run.vessels],
+  );
   const { ablated, setAblated, selectedId, setSelectedId } = state;
   const rows = useMemo(() => orderedSuspects(run, ablated), [run, ablated]);
   const halt = run.drift.insufficientEvidence;
@@ -332,6 +339,7 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
           label={halt ? "Hypotheses considered" : "Candidates"}
           right={ablated ? "s_drift removed" : `x${run.characterisation.windGateMultiplier.toFixed(2)} gate`}
         >
+          <Row label="ships" value={<Sourced source={run.trafficSource} />} />
           <Table
             head={["#", "candidate", "kind", "score", "", "no drift"]}
             align={["right", "left", "left", "right", "left", "right"]}
@@ -353,7 +361,10 @@ export function Attribute({ run, state }: { run: Run; state: SpillState }) {
                 >
                   <Tagged tag={tag} fallback={s.label} />
                 </span>,
-                <Flag tone={KIND_TONE[s.kind] ?? "dim"}>{KIND_SHORT[s.kind]}</Flag>,
+                <span className="inline-flex items-center gap-1">
+                  <Flag tone={KIND_TONE[s.kind] ?? "dim"}>{KIND_SHORT[s.kind]}</Flag>
+                  {!(s.kind === "ais_vessel" && recorded.has(s.id)) && <Flag tone="warn" title="simulated candidate">sim</Flag>}
+                </span>,
                 <span style={{ color: "var(--ink)" }}>{total.toFixed(3)}</span>,
                 <AsciiBar value={total} width={10} tone={halt ? "faint" : "ok"} />,
                 <span style={{ color: "var(--ink-faint)" }}>
@@ -475,6 +486,8 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
   }
 
   const card = selected.evidence;
+  // The scorer's caveats, then the zone's (PHASE-10): coverage gaps and unvalidated wind-gate bounds.
+  const caveats = [...card.caveats, ...zoneCaveats(zoneOf(run.meta.centre))];
   const terms = TERM_ORDER.map((k) => card.terms.find((t) => t.key === k)).filter(
     (t): t is NonNullable<typeof t> => !!t,
   );
@@ -798,8 +811,8 @@ export function Evidence({ run, state }: { run: Run; state: SpillState }) {
           </Note>
         </Block>
 
-        <Block label="Caveats" right={`${card.caveats.length}`}>
-          {card.caveats.map((c, i) => (
+        <Block label="Caveats" right={`${caveats.length}`}>
+          {caveats.map((c, i) => (
             <p
               key={i}
               className="mt-1.5 flex gap-2 text-[10px] leading-[1.55] first:mt-0"

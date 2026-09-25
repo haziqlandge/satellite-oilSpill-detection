@@ -50,7 +50,19 @@ over patching per machine.
 | `8346860` | Part I | **53 GB** | 1,200 oil-positive scenes + masks. The SCENES are **2-band float32 sigma-0 dB, 2048², and georeferenced EPSG:4326**; the MASKS are the 1-band `{0,1}` uint8 rasters with no transform. See §2.1 — this row described the masks and was applied to both. |
 | `13761290` | Part III | **16 GB** | 150 each of `Oil`, `Lookalike`, `No oil`, plus `Mask/` |
 | `15298010` | Refined Deep-SAR SOS | **1.4 GB** | 6,455 train + 1,615 val pairs, 3-band RGB 256², values `{0,255}` |
-| `8253899` | Part II | **not extracted** | Only two mask archives (426 KB + 417 KB). The two ~21 GB image archives were never downloaded. See `ISSUES.md` B3 |
+| `8253899` | Part II | **56 GB extracted, verified 2026-09-24** | 685 `Lookalike` + 685 `No_oil` scenes, 2-band float32 dB, 2048², georeferenced EPSG:4326 (~0.18° tiles, worldwide); masks all empty. On the 4060 Ti machine it lives OUTSIDE the repo, in `E:\temp downloads` (four folders + archives; C: cannot hold it). All four archives match Zenodo's MD5 and all 2,740 extracted files match their archive CRC32 (`eval/part2/verification.json`, `scripts/part_two.py verify`) |
+
+**On the 4060 Ti machine, Parts I and III live on E:** (moved 2026-09-25 to free
+C:): `E:\oilSpil2l-data\data\{raw,interim}\datasets\zenodo\{8346860,13761290}`.
+They were verified after the copy (archives against Zenodo's MD5, all 3,300
+extracted files against their archive CRC32) before the C: originals were
+removed. The old paths under `C:\Users\adi\Downloads\oilSpil2l16\oilSpil2l\data\`
+are directory junctions to them, so every path in this file still resolves. E:
+is a 5400 rpm HDD, so it is fine for reading once and slow for random access.
+Training reads none of it (only `data/processed/dataset`). Since 2026-09-25 the
+repo's own `data/interim/datasets` is a directory junction to the old
+directory's, so repo-relative corpus paths (the ONNX parity scene, precomputed
+upload sources, `ZENODO_DIR`-free checks) resolve here too.
 
 ### 2.1 The source scenes ARE georeferenced — corrected 2026-09-22
 
@@ -120,7 +132,22 @@ all are handled in `ml/datasets/oos_dataset.py` and guarded by tests.
 |---|---|
 | `oos/` | Raw pre-dedup build. 4,606 train / 585 val / 627 test PNGs, 2048² 8-bit greyscale, ~2.4 MB each |
 | `final-v1` … `final-v10` | Superseded dedup/quarantine generations. Keep for provenance; do not train on |
-| **`final-v11/`** | **Authoritative.** The frozen split the release was trained on |
+| **`final-v11/`** | **Authoritative for the release.** The frozen split the release was trained on |
+| `part2/` | Zenodo Part II as 8-bit PNG (band 2, fixed dB window), `images/{train,holdout}` + empty labels; presized `.npy` cache for the kept train tiles. 3.2 GB. `scripts/part_two.py build` |
+| **`final-v12/`** | final-v11 **unchanged** (val and test lists byte-identical) plus 872 Part II tiles in train only: **4,227 train / 482 val / 627 test**, 28.4% of train empty. 309 Part II train candidates quarantined (305 within 0.1° of a v11 val/test footprint; the 5 SIFT overlaps with test and 1 exact duplicate were all inside that set). `holdout.txt` / `holdout.yaml`: the frozen Part II holdout (below). Never trained on |
+
+**The Part II holdout** (`eval/part2/holdout.json`, frozen 2026-09-24 before any
+training on Part II): tiles grouped by single linkage where footprints come within
+0.1°; a family is eligible only if no member is within 0.1° of any final-v11 train
+footprint; half the eligible families held out by CRC32. **189 tiles in 105
+families: 87 Lookalike, 102 No_oil.** None SIFT-matches a training tile. It is
+geographically disjoint from training, not an independently labelled scene set.
+
+On the 4060 Ti machine `oos/` and the repo's `.venv` are **hard links** into the
+older training directory `C:\Users\adi\Downloads\oilSpil2l16\oilSpil2l` (zero
+disk; C: had ~18 GB free). Replace a file there, never edit one in place.
+`final-v11` was copied and repathed, and every image and label hash-checks
+against its manifest (`scripts.train_final.verify_data`).
 
 `final-v11`: **3,355 train / 482 val / 627 test** = 4,464 tiles, 20,261 polygon
 instances. Of these, 4,021 tiles are positive and 443 are empty negatives.
@@ -150,25 +177,43 @@ Note the third does **not** match the published Case 3 acquisition time
 A processed scene is not web-servable. There is no COG pyramid and no tile
 pipeline.
 
+`data/processed/sar/windows/` holds the two upload windows
+(`scripts/cut_geotiff_window.py`, gitignored), re-cut 2026-09-25:
+`..._20230409..._win1536.tif` at the v11 largest detection (-89.65388, 29.59906),
+byte-identical to the one the precomputed entry is keyed on (`3371b1dd…`), and
+`..._20231205..._win2048.tif` at the December seed (-89.0082, 29.2661), the upload
+that yields a full live run. The cutter's default centre reads
+`eval/final/scenes`, which is v12's now: pass `--lon/--lat` to reproduce these.
+
 ## 5. Models — `weights/` and `runs/`
 
 | Artifact | Note |
 |---|---|
-| `weights/L1-ciou-research.pt` | The release checkpoint, exported. 13 MB. SHA-256 `d4a749…fc6c`. **Gitignored** |
-| `weights/L1-ciou-research.json` | Its manifest — class scheme, frozen inference config, raster convention. **Tracked**, and the loader enforces it |
+| `weights/L1-ciou-research.pt` | **The release: final-v12, promoted 2026-09-25** (`ml/export/export.py`) from `runs/final_v12_l1/L1-ciou/weights/best-fp32.pt`. 13 MB. SHA-256 `ccaad1…3399`. **Gitignored** |
+| `weights/L1-ciou-research.json` | Its manifest — class scheme, frozen inference config (conf .15, v12's own validation point), raster convention, `version`, `supersedes`, and the hash of the record it was promoted from (`eval/part2/comparison.json`). **Tracked**, and the loader enforces it |
+| `weights/L1-ciou-research-v11.{pt,json}` | The previous release (final-v11, `d4a749…fc6c`, conf .20) and its original manifest, kept beside it. `scripts/evaluate_v12.py` and `scripts/train_v12.py` compare against it |
 | `weights/yolo26n.pt`, `yolo11n-seg.pt` | Pretrained bases. Tracked via a `!weights/` negation |
-| `frontDemo/public/models/L1-ciou-research.onnx` | The release exported for the browser, fp32, 12.9 MB. **Gitignored** (`*.onnx`); regenerate with `.venv/Scripts/python.exe -m ml.export.onnx_export`, which checks it against PyTorch first |
+| `frontDemo/public/models/L1-ciou-research.onnx` | The release exported for the browser, fp32, 12.9 MB, SHA-256 `696c5c…95bf` (v12, 2026-09-25; box coordinates within 0.0013 px of PyTorch). **Gitignored** (`*.onnx`); regenerate with `.venv/Scripts/python.exe -m ml.export.onnx_export`, which checks it against PyTorch first and needs the `export` extra (`onnx`, `onnxruntime`) |
 | `frontDemo/public/models/L1-ciou-research.json` | Its web manifest: the frozen inference config, the ONNX hash, and the PyTorch parity figures. **Tracked**; `tests/test_onnx_export.py` checks a present `.onnx` against it |
 | `runs/final_l1_fp32_release/` | 274 MB. The 100/100-epoch FP32 reproduction |
 | `runs/final/` | 604 MB. `none-ciou`, `L1-ciou` (best + epoch snapshots), `L4-ciou` (no weights — NaN failure) |
 | `runs/ablation/` | 233 MB. The 12 screening cells. `none-ciou` has no checkpoint |
 
-Frozen inference config, from the manifest: `imgsz 1024, batch 4, conf 0.20,
+Frozen inference config, from the manifest: `imgsz 1024, batch 4, conf 0.15,
 iou 0.70, max_det 1000, half false, rect true, retina_masks true`; raster
 `band 2, sigma0_db, db_window [-35, 0]`; tiling `1024 / 0.1 overlap`.
 
 **`runs/` is the one directory worth copying by hand** when moving machines.
 Re-deriving it costs roughly 4.5 hours of GPU time.
+
+**It did not survive** (2026-09-24: absent from every directory on the 4060 Ti
+machine). What remains is `weights/L1-ciou-research.pt`, which carries the
+release's own `train_args` and per-epoch `train_results`. `runs/final/initial_head.pt`
+was regenerated by `train_final.prepare`'s deterministic recipe and proved
+identical: a fresh epoch 1 on final-v11 reproduced the release's epoch-1 row to 5
+decimals on all 12 losses and metrics (`runs/smoke_v11_l1/smoke.json`,
+`scripts/train_v12.py --smoke`). The final-v12 retrain wrote `runs/final_v12_l1/`
+(epoch snapshots every 10, `best-fp32.pt` the promoted release).
 
 ## 5a. Land mask — `frontDemo/public/landmask/`
 
@@ -195,10 +240,11 @@ underneath is Esri's picture and can differ from both. GSHHG is LGPL
 | `data/interim/ais/AIS_*_gulf.npz` | 178 MB, 8 files (15-27 MB each) | Each day a scene window needs, cut to the Gulf AOI and cached by `scripts/export_ais_traffic.py`. Regenerable, ~90 s a day |
 | `frontDemo/public/ais/{gom-platform,gom-moving,gom-berthed}.json` | 1.2 MB | Per-scene tracks, simplified to 100 m (TD-TR), reception gaps as `breaks`, identities withheld (MID only), the published vessel flagged. **Tracked**; the app fetches them |
 | `frontDemo/public/ais/real-{20230409,20230515,20231205}.json` | 3.2 MB | Traffic around each real OpenDrift run's seed, for the console's real-run views. Box = the run's 90% contour extent + 15 km; window = the AIS days on disk (48 h Apr/May, 72 h Dec). `python -m scripts.export_ais_traffic --real-runs`. Needs Dec 2-3 parsed into `data/interim/ais/` (done 2026-09-23) |
-| `frontDemo/public/runs/<scene>/drift.json` | 7-10 MB | The real OpenDrift run: 10 members x 200 parcels, seeded uniformly over the seed detection's polygon (the same positions for every member), 72 h backward on the ERA5 wind before the pass and 72 h forward on the wind after it, one frame per hour from -72 to +72 (all 2,000 parcels, the 0.01° 50/90% cells, spread; forward frames add `strandedPct`), plus OpenDrift's own on-land share, the convergence series (backward only) and the age (`estimate_age`: a triple, or a refusal). `python -m scripts.export_drift_runs --all`, ~3 min a scene here. **Gitignored** |
+| `frontDemo/public/runs/<scene>/drift.json` | 7-10 MB | The real OpenDrift run: 10 members x 200 parcels, seeded uniformly over the seed detection's polygon (the same positions for every member), 72 h backward and 72 h forward on ERA5 wind and CMEMS currents (since 2026-09-25; each member's wind shifted in time by up to 3 h either way, the ensemble's timing uncertainty), one frame per hour from -72 to +72 (all 2,000 parcels, the 0.01° 50/90% cells, spread; forward frames add `strandedPct`, and a forward hour with nothing afloat is still a frame: no parcels, areas and spread 0, `strandedPct` 100 -- April's v12 seed is all ashore by +42 h), plus OpenDrift's own on-land share, the convergence series (backward only) and the age (`estimate_age`: a triple, or a refusal). `python -m scripts.export_drift_runs --all`, ~3 min a scene here. **Gitignored** |
 | `frontDemo/public/runs/<scene>/scene.json` | 70-650 KB | Beside each `drift.json`: the model's full-scene detections, one ring per polygon part (simplified to 0.0002°), each with its `feature` index, its own confidence, `seed` and `boxCut` (a straight axis-aligned edge of 1.2 km or more, `ISSUES.md` Q5/F18), and the ERA5 wind at the seed from the drift's own two cached requests, -72 to +72 h. Also `cfar`: CA-CFAR targets (lon/lat, peak dB, area px) within 15 km of the seed on the processed scene (`cfar_near_seed`; `not_run` when the 3.6 GB scene is absent). Also, since the night of 2026-09-23, `characterisation`: the backend's PHASE-03 record of the seed detection (`characterise_seed`, `backend/characterize`) -- geometry from the unsimplified polygon in an equal-area projection, the damping ratio on the processed scene's band 2 against clean sea (GSHHG land, other detections and SNAP's zero fill kept out; `null` when the scene is absent), the ERA5 wind and wind gate at the pass, and the Fay morphology age prior (a ceiling, never an age). `python -m scripts.export_real_scenes` (offline; reads the ERA5 cache). The flagged seed is the detection `choose_seed` picked (largest at sea without a box-cut edge). **Gitignored** with the rest of `public/runs/`, like `drift.json`: regenerate on any other machine, after `export_drift_runs` |
-| `data/cache/metocean/era5-wind_<hash>.nc` | 80-210 KB each | The ERA5 10 m wind the real runs are forced by, one file per request, keyed by the request's hash (`backend/ingest/metocean/cache.py`). Per scene: the 74 h before the pass (the original three) and the 74 h after it (fetched 2026-09-23 for the forecast); `wind_requests` in `export_drift_runs.py` defines both. **Gitignored**; re-fetched from CDS with `CDSAPI_KEY` if missing |
-| `frontDemo/public/precomputed/` | 4-31 KB each | "Use precomputed result" for uploads (`FUTURE_WORK.md` §1.5): the segmentation of a known file, keyed by the file's SHA-256 (`index.json`), stamped with the model's SHA-256, mask as run lengths. Made by `npm run precompute:uploads -- <repo-relative files>` (default: `data/processed/sar/windows/*.tif`); `check:precomputed` recomputes every entry whose source is on disk. Current entries: the Gulf window, `8346860__Oil__00001.png`, Part I `Oil/00586.tif`. **Tracked**. Stale the moment the model changes: re-run after retraining |
+| `data/cache/metocean/era5-wind_<hash>.nc` | 80-210 KB each | The ERA5 10 m wind the real runs are forced by, one file per request, keyed by the request's hash (`backend/ingest/metocean/cache.py`). Per scene: the 74 h before the pass and the 74 h after it; `wind_requests` in `export_drift_runs.py` defines both, over the extent of every detection in the scene. So a new model means new files: six were fetched 2026-09-25 (user-approved) for v12's detections, which reach the scene's west edge (-91.02); the v11 files stay for `scenes-v11`. **Gitignored**; re-fetched from CDS with `CDSAPI_KEY` if missing |
+| `data/cache/metocean/cmems-currents_*.nc` | 4.4 MB each | CMEMS hourly mean surface currents (`uo`/`vo`, `cmems_mod_glo_phy_anfc_0.083deg_PT1H-m`, 1/12°) the three real runs are forced by since 2026-09-25. The `browser-<from>-<to>` files were downloaded through the Data Store in the logged-in browser (the toolbox cannot log in yet, ISSUES X2): box 26.9-30.9 N, 92.1-87.1 W, 00:00 on the first day to 23:00 on the last, Apr 5-12, May 11-18 and Dec 1-8 2023. `cache.covering_path` finds them for any request inside. A toolbox fetch (`cmems.fetch_cmems_currents`) names its file by the request's key instead. **Gitignored** |
+| `frontDemo/public/precomputed/` | 4-31 KB each | "Use precomputed result" for uploads (`FUTURE_WORK.md` §1.5): the segmentation of a known file, keyed by the file's SHA-256 (`index.json`), stamped with the model's SHA-256, mask as run lengths. Made by `npm run precompute:uploads -- <repo-relative files>` (default: `data/processed/sar/windows/*.tif`); `check:precomputed` recomputes every entry whose source is on disk. Current entries: the Gulf window, `8346860__Oil__00001.png`, Part I `Oil/00586.tif`, all made by v12 (2026-09-25). v12 finds **nothing** in the April window (v11 filled 26.6% of it with one box, ISSUES Q5), 7 detections in the PNG and 18 in `00586`. **Tracked**. Stale the moment the model changes: re-run after retraining |
 
 No real MMSI or vessel name is in the tracked files; `tests/test_export_ais_traffic.py`
 asserts it.
@@ -214,6 +260,38 @@ both `check:verdict` and `tests/test_verdict.py`), `wind_gate.json` (the
 console's gate over 0-16 m/s, for `tests/test_windgate.py`). Regenerate after
 changing `sim/slick.ts`, `sim/verdict.ts` or a scenario on purpose.
 
+### Scoring fixtures — `tests/fixtures/scoring/`
+
+`cd frontDemo && npm run export:scoring-fixtures`; **tracked**, 2.1 MB, gzipped
+JSON, never edited by hand. Per authored scenario, the exact input the console's
+`score()` gets and its output under both S_drift variants, for
+`tests/test_attribution.py` to hold `backend/attribute` to. Trimmed to what the
+scorer reads: the console's mass table per hour and only the grid cells it
+samples, and only vessels within reach of the gate (the rest are counted, and
+the export asserts dropping them changes nothing). `frame.json.gz` is one whole
+frame for the grid ports. `-- --all-vessels <dir>` writes the untrimmed input
+(~9 MB, not for the repository) for `scripts/attribution_ablation.py`.
+
+## 5c. The demo snapshot — `demo/`
+
+`python -m scripts.export_snapshot` writes `demo/data/snapshot.zip` (gitignored): every
+file the offline demo reads that git does not carry. That is the weights, the ONNX model,
+the real-run views, cached ERA5 and CMEMS forcing, the upload windows, the parsed AIS days
+and the API's runs. It also writes `demo/snapshot.json` (tracked), which lists every file
+the demo needs, git-carried or not, with its size and SHA-256. `--check` compares a
+machine against it. Re-export last, after any pipeline re-run.
+
+## 5d. Added 2026-09-25 (night)
+
+| Artifact | What |
+|---|---|
+| `frontDemo/src/sim/regions.json` | The region registry (PHASE-10), read by the console and `backend/regions.py`. **Tracked** |
+| `frontDemo/public/runs/<scene>/scene.json` `flow` | Wind (ERA5) and current (CMEMS) on a 10 × 10 grid per hour, for the map's arrows. **Now tracked** (Vercel) |
+| `eval/cleanup/delete_list.json` | §2.6's verified delete list, paths of the machine it ran on |
+| `eval/evaluation/authored.json` | PHASE-08's drift/attribution measurements on the authored scenarios |
+| `eval/ennore/crosscheck.json` | The engine against the INCOIS Ennore 2017 assessment (X17) |
+| `data/cache/metocean/cmems-currents_*.nc`, `era5-wind_*.nc` | Now also the Ennore 2017 window (fetched by the toolbox via the `CDSE_*` login) |
+
 ## 6. Evaluation artifacts — `eval/`
 
 240 MB on disk. Tracked selectively:
@@ -228,7 +306,12 @@ changing `sim/slick.ts`, `sim/verdict.ts` or a scenario on purpose.
 `eval/phase2-closure/annotation-pilot-cfar/` (5.2 MB, 2026-09-23) is the CFAR-backed review pack built from the 24-tile pilot by `scripts/cfar_review_pack.py`: `reviews/*.json` (proposals + measured evidence, all unconfirmed), `tiles/` previews, `summary.json`, and a self-contained `index.html` (serve it with the `review-pack` launch config). Decisions come back through `scripts/apply_review_decisions.py`. The original `annotation-pilot/` is untouched.
 
 `eval/final/scenes/*.geojson` holds **three real full-scene detection outputs**
-— 86, 240 and 40 merged polygons, EPSG:4326, map-ready as-is.
+from the release, **v12 since 2026-09-25** — 53, 119 and 58 detections (86, 237, 88
+polygons), EPSG:4326, map-ready as-is, each stamped with the weights' hash. The
+v11 outputs (86, 240 and 40 detections) and their `benchmark.json` moved to
+`eval/final/scenes-v11/`. `eval/part2/box_fill.json` compares the two
+(`scripts/measure_box_fill.py`, ISSUES Q5). `eval/attribution/` is PHASE-06's
+record: `REPORT.md`, and `ablation.json` from `scripts/attribution_ablation.py`.
 
 ## 7. What is irreplaceable versus regenerable
 
@@ -248,6 +331,6 @@ changing `sim/slick.ts`, `sim/verdict.ts` or a scenario on purpose.
 | Key | State |
 |---|---|
 | `CDSAPI_KEY` (ERA5 wind) | **set** |
-| `COPERNICUSMARINE_SERVICE_USERNAME` / `_PASSWORD` | **absent** — blocks real current forcing |
+| `COPERNICUSMARINE_SERVICE_USERNAME` / `_PASSWORD` | **absent.** The Marine account is signed into through CDSE and has no Marine password yet, so the toolbox cannot log in (ISSUES X2). `cmems.py` falls back to the `CDSE_*` pair, which will work once the account's Marine password is set to match |
 | CDSE client id/secret | for the `.SAFE` download path |
 | Supabase | hosted Postgres + PostGIS. Use the **session pooler on 5432**; the direct host is IPv6-only and the transaction pooler on 6543 lacks prepared statements |
