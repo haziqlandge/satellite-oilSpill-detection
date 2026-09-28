@@ -1,0 +1,76 @@
+/* The tech stack (X, after the journey). Tokens come from .pt-root. */
+
+.pt-stack {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.pt-stack-links .pt-connector {
+  left: 0;
+  top: 0;
+}
+.pt-layer-pill {
+  position: absolute;
+  padding: 8px 20px;
+  border-radius: 8px;
+  background: var(--pt-card);
+  border: 1.5px solid var(--pt-red);
+  font-size: 20px;
+  letter-spacing: 0.06em;
+  box-shadow: 0 8px 26px rgba(216, 52, 74, 0.18);
+  opacity: 0;
+}
+.pt-tool {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 18px;
+  box-sizing: border-box;
+}
+.pt-tool-mark {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+}
+.pt-tool-logo {
+  width: 36px;
+  height: 36px;
+  fill: #fff;
+}
+.pt-tool-img {
+  max-width: 44px;
+  max-height: 40px;
+  object-fit: contain;
+}
+.pt-tool-mono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  border: 1.5px solid #4a505a;
+  font-size: 15px;
+  color: #cfd5de;
+}
+.pt-tool-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pt-tool-name {
+  font-family: "Archivo Variable", "Archivo", sans-serif;
+  font-weight: 700;
+  font-size: 19px;
+  color: #fff;
+  white-space: nowrap;
+}
+.pt-tool-note {
+  font-size: 13px;
+  color: var(--pt-body);
+  white-space: nowrap;
+}

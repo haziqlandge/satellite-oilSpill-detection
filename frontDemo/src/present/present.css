@@ -1,0 +1,540 @@
+/* The presentation overlay. Loaded with the lazy chunk, so the console pays
+   nothing for it until T or X is pressed. Style A tokens mirror theme.ts. */
+@import "@fontsource-variable/archivo/wdth.css";
+
+.pt-root {
+  --pt-ground: #121418;
+  --pt-vignette: #1d2025;
+  --pt-card: #25272c;
+  --pt-hairline: #33363d;
+  --pt-red: #d8344a;
+  --pt-red-glow: #e0364c;
+  --pt-blue: #2f7cf6;
+  --pt-body: #9ea3ad;
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  overflow: hidden;
+  clip-path: circle(0 at 50% 50%);
+  color: #fff;
+  background: radial-gradient(ellipse at center, var(--pt-vignette) 0%, var(--pt-ground) 72%);
+  font-family: "Manrope Variable", "Manrope", sans-serif;
+  user-select: none;
+}
+
+.pt-stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+.pt-scene {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+}
+
+.pt-head {
+  font-family: "Archivo Variable", "Archivo", sans-serif;
+  font-stretch: 112%;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+/* --- title pill ---------------------------------------------------- */
+.pt-pill {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 14px 30px;
+  opacity: 0;
+  white-space: nowrap;
+  font-family: "Archivo Variable", "Archivo", sans-serif;
+  font-stretch: 112%;
+  font-weight: 800;
+  font-size: 40px;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+}
+.pt-pill-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: var(--pt-red);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 40px rgba(216, 52, 74, 0.28);
+  transform-origin: 50% 50%;
+}
+.pt-pill-text {
+  position: relative;
+  display: inline-flex;
+  gap: 0.32em;
+  align-items: baseline;
+}
+
+/* --- rolling word -------------------------------------------------- */
+.pt-roll {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  height: 1.15em;
+  filter: url(#present-vblur);
+}
+.pt-roll-a,
+.pt-roll-b {
+  display: block;
+  white-space: nowrap;
+}
+.pt-roll-b {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translateY(115%);
+}
+
+/* --- cards --------------------------------------------------------- */
+.pt-card {
+  position: absolute;
+  opacity: 0;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #2a2c32 0%, var(--pt-card) 100%);
+  border: 1px solid var(--pt-hairline);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* --- icon badge (flips to a tick) ---------------------------------- */
+.pt-badge {
+  position: relative;
+  perspective: 600px;
+}
+.pt-badge-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.pt-badge-ring circle {
+  opacity: 0;
+  fill: none;
+  stroke: var(--pt-blue);
+  stroke-width: 3;
+}
+.pt-badge-glow {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  opacity: 0;
+  box-shadow: 0 0 0 6px rgba(47, 124, 246, 0.25), 0 0 28px rgba(47, 124, 246, 0.55);
+}
+.pt-badge-coin {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+.pt-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  backface-visibility: hidden;
+}
+.pt-front {
+  color: var(--pt-red);
+}
+.pt-front-fill {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--pt-blue);
+  opacity: 0;
+}
+.pt-front svg {
+  position: relative;
+}
+.pt-back {
+  background: var(--pt-blue);
+  transform: rotateY(180deg);
+  box-shadow: 0 0 22px rgba(47, 124, 246, 0.5);
+}
+
+/* --- dashed connector ---------------------------------------------- */
+.pt-connector {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+  opacity: 0;
+}
+.pt-connector-line {
+  fill: none;
+  stroke: #6b6f78;
+  stroke-width: 2;
+  stroke-dasharray: 5 7;
+}
+.pt-connector-reveal {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 10;
+}
+
+/* --- statement sequence -------------------------------------------- */
+.pt-statement {
+  position: absolute;
+  inset: 0;
+}
+.pt-st-body {
+  position: absolute;
+  left: 160px;
+  right: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 44px;
+  text-align: center;
+}
+.pt-st-title {
+  margin: 0;
+  max-width: 1480px;
+  font-family: "Archivo Variable", "Archivo", sans-serif;
+  font-weight: 700;
+  font-size: 60px;
+  line-height: 1.22;
+  letter-spacing: -0.005em;
+}
+.pt-word {
+  display: inline-block;
+  opacity: 0;
+}
+.pt-red {
+  color: var(--pt-red-glow);
+}
+.pt-st-desc {
+  margin: 0;
+  max-width: 1180px;
+  font-size: 28px;
+  line-height: 1.5;
+  color: var(--pt-body);
+  opacity: 0;
+}
+.pt-st-chips {
+  display: flex;
+  gap: 22px;
+}
+.pt-chip {
+  display: inline-block;
+  padding: 14px 26px;
+  border-radius: 10px;
+  background: var(--pt-card);
+  border: 1px solid var(--pt-hairline);
+  font-family: "Archivo Variable", "Archivo", sans-serif;
+  font-stretch: 112%;
+  font-weight: 700;
+  font-size: 24px;
+  letter-spacing: 0.04em;
+  opacity: 0;
+}
+
+.pt-obj {
+  overflow: hidden;
+}
+.pt-obj-icon {
+  position: absolute;
+  opacity: 0;
+  transform-origin: 0 0;
+}
+.pt-obj-stack {
+  position: absolute;
+  left: 40px;
+  right: 40px;
+  top: 178px;
+  text-align: center;
+}
+.pt-obj-side {
+  position: absolute;
+  left: 128px;
+  right: 40px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  opacity: 0;
+}
+.pt-obj-heading {
+  font-size: 26px;
+  color: #fff;
+}
+.pt-obj-stack .pt-obj-heading {
+  margin-bottom: 10px;
+}
+.pt-obj-stack > * {
+  opacity: 0;
+}
+.pt-obj-body {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--pt-body);
+}
+.pt-obj-side .pt-obj-heading {
+  font-size: 23px;
+}
+.pt-obj-side .pt-obj-body {
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+/* --- solutions ------------------------------------------------------ */
+.pt-sol {
+  overflow: hidden;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.pt-sol-title {
+  color: #fff;
+  opacity: 0;
+}
+.pt-sol-caption {
+  color: var(--pt-body);
+  opacity: 0;
+}
+.pt-sol-picture {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  width: 512px;
+  height: 200px;
+  border-radius: 9px;
+  overflow: hidden;
+  background: #0d0f12;
+}
+.pt-sol--image .pt-sol-title {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  top: 230px;
+  font-size: 21px;
+}
+.pt-sol--image .pt-sol-caption {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  top: 262px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.pt-sol-iconrow {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  top: 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  opacity: 0;
+}
+.pt-sol-iconrow .pt-sol-title {
+  flex: 1;
+  min-width: 0;
+  opacity: 1;
+  font-size: 18px;
+  line-height: 1.15;
+}
+.pt-sol-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--pt-blue);
+  color: #fff;
+  box-shadow: 0 0 18px rgba(47, 124, 246, 0.45);
+}
+.pt-sol--icon .pt-sol-caption {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  top: 72px;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.pt-vis {
+  position: absolute;
+  inset: 0;
+}
+.pt-tag {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: rgba(13, 15, 18, 0.82);
+  border: 1px solid var(--pt-hairline);
+  font-family: "Archivo Variable", "Archivo", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #fff;
+  opacity: 0;
+}
+.pt-tag-br {
+  left: auto;
+  top: auto;
+  right: 8px;
+  bottom: 8px;
+}
+.pt-tag-tr {
+  left: auto;
+  right: 8px;
+}
+.pt-tag-bl {
+  top: auto;
+  bottom: 8px;
+}
+.pt-tag-red {
+  border-color: var(--pt-red);
+  color: #ffd9de;
+}
+.pt-tag-blue {
+  border-color: var(--pt-blue);
+  color: #d6e5ff;
+}
+
+/* the training mosaic */
+.pt-mosaic {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 4px;
+  padding: 3px;
+}
+.pt-mosaic-tile {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: cover;
+  border-radius: 3px;
+  opacity: 0;
+}
+.pt-mosaic-count {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(13, 15, 18, 0.88);
+  border: 1px solid var(--pt-hairline);
+  text-align: right;
+  opacity: 0;
+}
+.pt-mosaic-count span {
+  display: block;
+  font-size: 34px;
+  line-height: 1;
+  color: #fff;
+}
+.pt-mosaic-count small {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pt-body);
+}
+
+/* sliced, then segmented */
+.pt-slice-pane {
+  position: absolute;
+  top: 0;
+  width: 200px;
+  height: 200px;
+  opacity: 0;
+}
+.pt-slice-pane[data-pt="sar"] {
+  left: 40px;
+}
+.pt-slice-pane[data-pt="mask"] {
+  left: 272px;
+}
+.pt-slice-pane img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.pt-slice-pane .pt-tag {
+  opacity: 1;
+}
+.pt-slice-pane .pt-tag[data-pt="tilecount"] {
+  opacity: 0;
+}
+.pt-slice-grid {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.pt-slice-grid rect {
+  fill: var(--pt-blue);
+  fill-opacity: 0;
+  stroke: #8fb8ff;
+  stroke-width: 1.2;
+  opacity: 0;
+}
+.pt-slice-arrow {
+  position: absolute;
+  left: 240px;
+  top: 0;
+  width: 32px;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: var(--pt-body);
+  opacity: 0;
+}
+
+/* the weather terminal */
+.pt-term {
+  background: #0b0d10;
+}
+.pt-term-bar {
+  display: flex;
+  gap: 6px;
+  padding: 9px 12px;
+  border-bottom: 1px solid #1c2026;
+}
+.pt-term-bar i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #2c3139;
+}
+.pt-term-body {
+  margin: 0;
+  padding: 10px 16px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+  white-space: pre;
+}
+.pt-term-cmd {
+  color: #fff;
+}
+.pt-term-out {
+  color: #8fb8ff;
+}
+
+/* the drift map capture */
+.pt-capture img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform-origin: 45% 50%;
+}

@@ -1,0 +1,143 @@
+{
+ "scene": {
+  "id": "S1A_IW_GRDH_1SDV_20230515T000208_20230515T000233_048537_05D69B_35AF_s0db",
+  "bounds": [
+   -91.10223587962486,
+   27.95362904314638,
+   -88.17534502090663,
+   29.87674240338945
+  ],
+  "widthPx": 32582,
+  "heightPx": 21408,
+  "image": "may/scene.webp"
+ },
+ "clean": {
+  "bounds": [
+   -89.27645700000001,
+   28.438513,
+   -89.156457,
+   28.558512999999998
+  ],
+  "raw": "may/raw-crop.webp",
+  "filtered": "may/clean-crop.webp"
+ },
+ "tiles": [
+  "tiles/zenodo-00.webp",
+  "tiles/zenodo-01.webp",
+  "tiles/zenodo-02.webp",
+  "tiles/zenodo-03.webp",
+  "tiles/zenodo-04.webp",
+  "tiles/zenodo-05.webp",
+  "tiles/zenodo-06.webp",
+  "tiles/zenodo-07.webp",
+  "tiles/zenodo-08.webp",
+  "tiles/zenodo-09.webp",
+  "tiles/zenodo-10.webp",
+  "tiles/zenodo-11.webp"
+ ],
+ "gate": {
+  "considered": 615,
+  "admitted": 15,
+  "admittedIds": [
+   "538000002",
+   "577000001",
+   "338000008",
+   "338000013",
+   "367000120",
+   "303000010",
+   "338000027",
+   "368000048",
+   "367000195",
+   "636000009",
+   "367000267",
+   "369000020",
+   "210000001",
+   "368000070",
+   "369000021"
+  ],
+  "threshold": 0.06
+ },
+ "score": {
+  "label": "MMSI 477\u2022\u2022\u2022\u2022\u20225",
+  "isTruth": true,
+  "rank": 1,
+  "of": 24,
+  "detail": "Tanker, 180 m \u00b7 recorded AIS track",
+  "total": 0.7570280415438344,
+  "terms": [
+   {
+    "key": "drift",
+    "label": "Drift",
+    "value": 0.9151764942538482,
+    "weight": 0.3
+   },
+   {
+    "key": "parity",
+    "label": "Parity",
+    "value": 0.08827604462281001,
+    "weight": 0.15
+   },
+   {
+    "key": "proximity",
+    "label": "Proximity",
+    "value": 0.9965073460707317,
+    "weight": 0.2
+   },
+   {
+    "key": "temporality",
+    "label": "Timing",
+    "value": 1,
+    "weight": 0.15
+   },
+   {
+    "key": "behaviour",
+    "label": "Behaviour",
+    "value": 0.42989668312913976,
+    "weight": 0.12
+   },
+   {
+    "key": "prior",
+    "label": "Vessel prior",
+    "value": 0.8543076923076924,
+    "weight": 0.08
+   }
+  ]
+ },
+ "ranking": [
+  {
+   "rank": 1,
+   "label": "MMSI 477\u2022\u2022\u2022\u2022\u20225",
+   "kind": "Tanker, 180 m",
+   "total": 0.7570280415438344,
+   "isTruth": true
+  },
+  {
+   "rank": 2,
+   "label": "MMSI 367\u2022\u2022\u2022\u2022\u20223",
+   "kind": "Passenger, 47 m",
+   "total": 0.3607940408065104,
+   "isTruth": false
+  },
+  {
+   "rank": 3,
+   "label": "MMSI 367\u2022\u2022\u2022\u2022\u20224",
+   "kind": "Other, 86 m",
+   "total": 0.3389486013635984,
+   "isTruth": false
+  },
+  {
+   "rank": 4,
+   "label": "MMSI 210\u2022\u2022\u2022\u2022\u20221",
+   "kind": "Cargo, 100 m",
+   "total": 0.32137458484303166,
+   "isTruth": false
+  },
+  {
+   "rank": 5,
+   "label": "MMSI 538\u2022\u2022\u2022\u2022\u20222",
+   "kind": "Cargo, 180 m",
+   "total": 0.31788534512691885,
+   "isTruth": false
+  }
+ ]
+}

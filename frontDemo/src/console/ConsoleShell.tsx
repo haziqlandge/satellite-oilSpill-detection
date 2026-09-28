@@ -39,6 +39,7 @@ import {
   nextFrame, SampleImagePanel, stageEnd, stageStart, UploadTimings, useSampleSession,
 } from "./SampleImagePanel";
 import { PanelsMenu } from "./PanelsMenu";
+import { PresentMount } from "../present/PresentMount";
 import { DockRail } from "./dock/DockRail";
 import { FloatWindow } from "./dock/FloatWindow";
 import { PANELS, useDock, useDockDrag, type PanelId } from "./dock/useDock";
@@ -67,7 +68,6 @@ const LAYERS: { key: keyof LayerToggles; label: string; hint: string }[] = [
   { key: "hindcast", label: "hindcast", hint: "show or hide the persistent hindcast areas before T0" },
   { key: "windArrows", label: "wind arrows", hint: "10 m wind around the event, where the air goes" },
   { key: "currentArrows", label: "current arrows", hint: "surface current around the event, where the water goes" },
-  { key: "shipIcons", label: "ship icons", hint: "ships drawn as ships turned to their course; off, as dots" },
   { key: "labels", label: "place labels", hint: "coastline names from the basemap" },
 ];
 
@@ -673,6 +673,9 @@ export default function ConsoleShell() {
           {renderPanel(id)}
         </FloatWindow>
       ))}
+
+      {/* T, X, Q, Z: the narrated demo sequences (src/present/). */}
+      <PresentMount />
     </div>
   );
 }

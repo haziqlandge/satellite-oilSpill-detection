@@ -25,7 +25,6 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 
 import {
   EMPTY,
-  SHIP_ICON,
   frameScene,
   SOURCE,
   WORLD_LAYER_IDS,
@@ -42,7 +41,7 @@ import { ParticleOverlay } from "./ParticleOverlay";
 import { FlowStreaks } from "./FlowStreaks";
 import { subscribePlayhead, syncPlayhead } from "../lib/playhead";
 import type { MapPaint } from "../theme";
-import type { LngLat, Run, Suspect, Vessel } from "../sim/types";
+import type { LngLat, Run, Suspect } from "../sim/types";
 import { positionAt } from "../sim/ais";
 import { trackSegments } from "../sim/realAis";
 import { pointInPolygon, distanceToPathKm, polygonsOf } from "../sim/geo";
@@ -133,36 +132,6 @@ function line(coords: LngLat[], props: Record<string, unknown> = {}): GeoJSON.Fe
     properties: props,
     geometry: { type: "LineString", coordinates: coords },
   };
-}
-
-/** A ship from above, bow up, white on clear: tinted by `icon-color` and turned to its course by `icon-rotate`. */
-function shipImage(): ImageData {
-  const size = 32;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "#fff";
-  // Hull: a pointed bow, parallel sides, a square stern.
-  ctx.beginPath();
-  ctx.moveTo(16, 2);
-  ctx.quadraticCurveTo(22, 8, 22, 14);
-  ctx.lineTo(22, 28);
-  ctx.lineTo(10, 28);
-  ctx.lineTo(10, 14);
-  ctx.quadraticCurveTo(10, 8, 16, 2);
-  ctx.fill();
-  // The house aft, cut out of the deck so it reads as a ship and not a pill.
-  ctx.clearRect(12.5, 20, 7, 4);
-  ctx.fillRect(13.5, 21, 5, 2);
-  return ctx.getImageData(0, 0, size, size);
-}
-
-/** The course a vessel is on at `at`: its reported COG nearest in time. */
-function courseAt(v: Vessel, at: number): number {
-  let best = v.points[0];
-  for (const p of v.points) if (Math.abs(p.t - at) < Math.abs(best.t - at)) best = p;
-  return Number.isFinite(best.cog) ? best.cog : 0;
 }
 
 /**
@@ -350,11 +319,9 @@ export function MapCanvas({
           SOURCE.trackingGap,
           SOURCE.trackingPredicted,
           SOURCE.trackingMarkers,
-          SOURCE.vessels,
         ]) {
           map.addSource(id, { type: "geojson", data: EMPTY });
         }
-        if (!map.hasImage(SHIP_ICON)) map.addImage(SHIP_ICON, shipImage(), { sdf: true });
         for (const layer of dataLayers(paint)) map.addLayer(layer);
         // Above the data, which is why it is not in `buildStyle`.
         for (const layer of worldSpec(paint).over) map.addLayer(layer);
@@ -497,8 +464,6 @@ export function MapCanvas({
         ],
       ],
       ["markers", "circle-stroke-color", paint.water],
-      ["vessel-icons", "icon-color", ["case", ["get", "candidate"], paint.suspect, paint.target]],
-      ["vessel-icons", "icon-halo-color", paint.water],
     ];
 
     /*
@@ -859,7 +824,6 @@ export function MapCanvas({
     const traffic: GeoJSON.Feature[] = [];
     const candidates: GeoJSON.Feature[] = [];
     const vessels: GeoJSON.Feature[] = [];
-    const ships: GeoJSON.Feature[] = [];
     const trackingGap: GeoJSON.Feature[] = [];
     const trackingPredicted: GeoJSON.Feature[] = [];
     const trackingMarkers: GeoJSON.Feature[] = [];
@@ -895,9 +859,7 @@ export function MapCanvas({
         trackingMarkers.push(point(pa,{kind:"tracking-off",mmsi:v.mmsi}));
         if (b.t <= at) trackingMarkers.push(point(pb,{kind:"tracking-on",mmsi:v.mmsi}));
       }
-      if (now && reporting && toggles.shipIcons && (isCandidate ? toggles.candidates : toggles.traffic))
-        ships.push(point(now, { cog: courseAt(v, at), candidate: isCandidate }));
-      else if (now && reporting && isCandidate && !toggles.shipIcons) vessels.push(point(now, { kind: "vessel" }));
+      if (now && reporting && isCandidate) vessels.push(point(now, { kind: "vessel" }));
     }
 
     src(SOURCE.traffic).setData(collection(traffic));
@@ -905,7 +867,6 @@ export function MapCanvas({
     src(SOURCE.trackingGap).setData(collection(trackingGap));
     src(SOURCE.trackingPredicted).setData(collection(trackingPredicted));
     src(SOURCE.trackingMarkers).setData(collection(trackingMarkers));
-    src(SOURCE.vessels).setData(collection(ships));
 
     src(SOURCE.markers).setData(
       collection([
@@ -914,7 +875,7 @@ export function MapCanvas({
         ...vessels,
       ]),
     );
-  }, [hour, run, ready, candidateIds, paint, toggles.shipIcons, toggles.candidates, toggles.traffic]);
+  }, [hour, run, ready, candidateIds, paint]);
 
   /* --- camera ------------------------------------------------------ */
 

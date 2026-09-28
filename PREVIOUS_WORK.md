@@ -1154,10 +1154,10 @@ All at the user's request.
     wind or current crosses a fifth of the event in 3 s.
   - **Wind and current each have an ink:** `MapPaint.wind` (yellow) and
     `.current` (cyan). The flow cards use the same inks.
-  - **Ships are hulls turned to their reported COG** (`vessel-icons`): the
-    candidates in the suspect ink, passing traffic faint. The "ship icons"
-    layer switch puts back the dots.
-  - **The Ships card draws a side-view ship.**
+  - ~~Ships are hulls turned to their reported COG~~ (`vessel-icons`).
+    **Reverted the same day at the user's request:** candidates are circles
+    again (the `markers` layer) and the "ship icons" switch is gone.
+  - **The Ships card draws a side-view ship** (kept; the user wants it).
   - **The hindcast/forecast legend** is a stacked pair of colour boxes.
   - **`flowCells` is gone.** `check:realruns` now asserts a current around
     the spill at the pass instead.
@@ -1196,6 +1196,114 @@ All at the user's request.
 - **AIS.** Apr 6 and May 12 2023 were downloaded from marinecadastre (329 +
   352 MB, zip integrity checked). The real runs' AIS now covers the full
   72 h hindcast: 282 / 617 / 342 vessels.
+
+## 2.29 The console presentation overlay (2026-09-27, session machine)
+
+At the user's request: two keyboard-narrated sequences for the SIH demo that
+play over `#/console`. Spec and plan:
+`docs/superpowers/specs/2026-09-27-console-presentation-design.md` and
+`docs/superpowers/plans/2026-09-27-console-presentation.md`.
+
+**Keys.** They work anywhere on the console except inside a form field.
+
+| Key | What it does |
+|---|---|
+| T | The statement sequence |
+| X | The technical sequence |
+| Q | The next beat. If a beat is still running, Q snaps it to its end instead |
+| Z | Leave |
+| K | Show or hide the team names on the closing screen, from anywhere, remembered per browser |
+
+**How it is built.**
+
+- `src/present/`, a lazy chunk. The console pays nothing until the first T or X.
+- `PresentMount` listens in the window capture phase and swallows every other
+  key while the overlay is open, so Space, 1 to 6 and Home cannot act on the
+  console behind it.
+- A 1920 × 1080 stage, letterboxed.
+- Style A: the Bravos Research explainer's motion at 1:08 to 1:15.
+
+**T, the statement sequence** (24 presses of Q):
+
+1. The problem statement, centred on the screen with its pill just above.
+2. The heading rolls from "Statement" to "Objectives".
+3. Five objective cards build a centred row, then reflow into a left column.
+   The split screen has 70 px margins either side, one top and one bottom
+   edge for both sides, and each red heading spans its own side.
+4. Seven solutions, two presses each: one lands the card large on the right
+   and holds it, the next shrinks it into its slot. As it settles, the
+   objective icons it answers flip like a coin into blue ticks. Attribute
+   ticks only with the Six Factor Score.
+5. A circle opens onto the console.
+
+**X, the technical sequence** (19 presses of Q):
+
+- **One real pass carries it:** the 15 May 2023 Sentinel-1A pass through
+  Acquire, Clean, Slice, Segment, Measure, Weather Data, Hindcast, Forecast,
+  Gate and Score, then Timing.
+- **The camera** zooms between four per-scale views: the Gulf, the scene,
+  the seed crop and the drift area.
+- **Measure** names each quantity: head, tail, area, length, width, damping
+  and the age window. There is no depth (SAR sees the surface only).
+- **The drift area keeps the left 1300 px.** Its cards stand in a column on
+  the right, clear of the particles and tracks:
+  - Weather Data pops the ERA5 and CMEMS card (a line cloud with blowing
+    streaks for wind, three flowing swell lines for currents, both animated);
+  - Hindcast pushes it down, and the hours card opens in its place with the
+    hindcast and forecast keys;
+  - Gate swaps both for the AIS traffic card (615 in the window, 15 in the
+    field, 9 radar contacts, the most suspected vessel).
+- **Timing** is the console's Model Timing for Zenodo 00016.tif as the SIH
+  deck records it (slide 4): nine stages, 22.7 s end to end, 9.1 s inference
+  on WebGPU. Beside it: 91% model confidence on that slick, and 95% of
+  look-alikes rejected (83 of 87 unseen tiles, `eval/RESULTS.md`).
+- **Then** the tech stack as a layered tree.
+- **It ends on a thank-you screen** that stays up until Z: the team, its
+  IDs, six names and a repo QR code.
+
+**What is real and what is authored.** The screen does not say (user
+decision). The record is here and in each module's `PROVENANCE`.
+
+- **Real:**
+  - the Zenodo tiles and the May scene imagery;
+  - the model's detections;
+  - the ERA5/CMEMS forcing and the OpenDrift frames;
+  - the AIS;
+  - the gate, 15 of 615 tracks. This is the backend's own loop, extracted
+    from `score()` as `gate_admitted` with no change in output and run on the
+    shipped files.
+  - Case 2's published ship's recorded track, taken from `gom-moving.json`.
+    On screen it is MMSI 477•••••5, the fixture's own label (the user asked
+    for an MMSI, not the ship's name).
+- **Authored:**
+  - The suspect attribution and its six-term score (0.76, rank 1 of 24) are
+    Case 2's authored run.
+  - The "Ranked candidates" card beside it is Case 2's own top five, every
+    one by its masked MMSI.
+  - The user asked for both to be simulated, and for the Score beat to always
+    name a suspect: the calm-sea "Insufficient evidence" card it first carried
+    was removed (2026-09-27). The SIH brief allows simulation. The console
+    itself still refuses a field too wide to discriminate (C3); only the
+    overlay stopped showing that case.
+
+**Assets.**
+
+- `scripts/export_present_assets.py` writes `public/present/journey.json`,
+  the Zenodo tiles and the May quicklook and crops.
+- `npm run export:present-coast` writes the two GSHHG dot coasts.
+- Two console captures, recoloured through the colour panel.
+- White logos: Simple Icons (CC0) plus the deck's ESA and OpenDrift marks.
+- A QR code made with segno and decoded back to the repo URL with OpenCV.
+
+**Checks.** `npm run check:present` holds 38 checks: keys, runner, stage,
+copy guard, beat order, layouts and margins, tick plan, tiling parity,
+projector, streamlines, gate IDs, suspect track and label, measure rows, drift
+cards, timing figures, team and every asset.
+
+**A finding that must not be re-derived.** On this GT 710, a full-screen
+layer at partial opacity over the WebGL map stalls about 2 s per frame, while
+a `clip-path` costs 8 to 17 ms. The overlay is never partly transparent: it
+arrives, leaves and reveals through clip-path circles.
 
 ## Where the detailed evidence lives
 

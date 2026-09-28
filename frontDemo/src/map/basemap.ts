@@ -82,7 +82,6 @@ export const SOURCE = {
   trackingGap: "tracking-gap",
   trackingPredicted: "tracking-predicted",
   trackingMarkers: "tracking-markers",
-  vessels: "vessels",
 } as const;
 
 /**
@@ -102,9 +101,6 @@ export function frameScene(
   map.jumpTo({ center: [(v.west + v.east) / 2, v.south], zoom: v.zoom });
   map.panBy([0, -map.getContainer().clientHeight / 2], { animate: false });
 }
-
-/** The ship the `vessel-icons` layer draws: registered by `MapCanvas` as an SDF image so `icon-color` tints it. */
-export const SHIP_ICON = "ship-icon";
 
 /* ------------------------------------------------------------------ *
  * The world under the data
@@ -520,28 +516,6 @@ export function dataLayers(paint: MapPaint): LayerSpecification[] {
         "line-opacity": 0.55,
       },
     },
-    // Every ship reporting near the playhead, drawn as a ship turned to its
-    // course (the user, 2026-09-26): candidates in the suspect ink, passing
-    // traffic smaller and faint. `LayerToggles.shipIcons` off puts back the dots.
-    {
-      id: "vessel-icons",
-      type: "symbol",
-      source: SOURCE.vessels,
-      layout: {
-        "icon-image": SHIP_ICON,
-        "icon-rotate": ["get", "cog"],
-        "icon-rotation-alignment": "map",
-        "icon-allow-overlap": true,
-        "icon-ignore-placement": true,
-        "icon-size": ["case", ["get", "candidate"], 0.62, 0.46],
-      },
-      paint: {
-        "icon-color": ["case", ["get", "candidate"], paint.suspect, paint.target],
-        "icon-opacity": ["case", ["get", "candidate"], 1, 0.5],
-        "icon-halo-color": paint.water,
-        "icon-halo-width": 1,
-      },
-    },
     {
       id: "targets",
       type: "circle",
@@ -647,8 +621,6 @@ export interface LayerToggles {
   windArrows: boolean;
   /** Moving surface-current streaks, the same way. */
   currentArrows: boolean;
-  /** Ships drawn as ships turned to their course; off, the earlier dots. */
-  shipIcons: boolean;
 }
 
 export const DEFAULT_TOGGLES: LayerToggles = {
@@ -657,7 +629,8 @@ export const DEFAULT_TOGGLES: LayerToggles = {
   particles: true,
   traffic: true,
   candidates: true,
-  targets: true,
+  // Off by default (the user, 2026-09-26); one click in the layer list.
+  targets: false,
   forecast: true,
   hindcast: true,
   labels: true,
@@ -676,5 +649,4 @@ export const DEFAULT_TOGGLES: LayerToggles = {
   darkVessel: true,
   windArrows: true,
   currentArrows: true,
-  shipIcons: true,
 };

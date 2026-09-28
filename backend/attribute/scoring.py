@@ -288,10 +288,13 @@ def _rank(rows: list[dict[str, Any]], by: str, into: str) -> None:
     rows.sort(key=lambda r: r["rank"])
 
 
-def score(inp: ScoringInput) -> dict[str, Any]:
-    """Suspects ranked on one collation scale, the gate's count, separability, or a refusal."""
-    # Stage 1: the spatiotemporal gate -- a track survives only if it was inside
-    # the origin field at the matching backward hour.
+def gate_admitted(inp: ScoringInput) -> list[Vessel]:
+    """Stage 1, the spatiotemporal gate: the tracks that were inside the origin
+    field at the matching backward hour.
+
+    Its own function so a caller that needs *which* tracks survived (the console
+    presentation's gate beat) runs this exact loop instead of a copy of it.
+    """
     admitted = []
     for vessel in inp.vessels:
         peak = 0.0
@@ -302,6 +305,12 @@ def score(inp: ScoringInput) -> dict[str, Any]:
             peak = max(peak, field_agreement(inp.frames, hour, lon, lat)["value"])
         if peak >= GATE_THRESHOLD:
             admitted.append(vessel)
+    return admitted
+
+
+def score(inp: ScoringInput) -> dict[str, Any]:
+    """Suspects ranked on one collation scale, the gate's count, separability, or a refusal."""
+    admitted = gate_admitted(inp)
     gate = {
         "considered": len(inp.vessels), "admitted": len(admitted),
         "reason": f"Tracks retained where P(lat, lon, t) exceeded {fixed(GATE_THRESHOLD, 2)} of the field peak at "

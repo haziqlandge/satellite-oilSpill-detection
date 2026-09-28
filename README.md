@@ -72,6 +72,19 @@ npm run dev --prefix frontDemo
 
 Opens on port 5180. `http://127.0.0.1:5180/#/console` is the operations console.
 
+**Presenting.** On the console, these keys play narrated sequences for a live
+demo (`src/present/`, `PREVIOUS_WORK.md` §2.29):
+
+- **T** plays the problem statement, objectives and proposed solution, and
+  ends on the console.
+- **X** plays the technical approach on the real 15 May 2023 pass, then the
+  tech stack, and ends on a thank-you screen.
+- **Q** moves one beat on.
+- **Z** leaves.
+- **K** shows or hides the team names.
+
+Keys are ignored while typing in a field.
+
 **An upload runs in the browser.**
 
 - **Its mask** comes from the trained segmenter,

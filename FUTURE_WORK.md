@@ -76,6 +76,34 @@ attribution**; commit only when the user asks.
   picked. Reload on plain `#/console` to see the default, and do so before
   showing the user anything.
 
+#### 2026-09-26, session machine (GT 710), after pulling `ed2cfec`
+
+- The local checkout was fast-forwarded to `ed2cfec`. The 4060 Ti's untracked
+  artifacts were copied in: the v12 weights (v11 kept as `-v11.pt`), `final-v12`,
+  the new ERA5/CMEMS cache, two AIS days, its `data/runs` and `runs/final_v12_l1`.
+  `npm install` put MapLibre 6.11.2 in `node_modules` (`npm audit`: 0).
+- Map ships are circles again, and the Ships card keeps its ship illustration
+  (the user's call; `PREVIOUS_WORK.md` §2.28). **Radar targets are off by default**
+  (`DEFAULT_TOGGLES.targets`). The landing page's Cause map shares that default.
+- The `/ani`, `/ani2` and `/animpage` films were moved out of the repository
+  to `C:\Users\admin\Desktop\tempPage` (restore notes there). They were never
+  committed.
+- Here: pytest **676 passed, 9 skipped** (the geocoding test runs, and the
+  CUDA test skips); ruff and mypy clean (147); `tsc -b` clean; all 15 checks
+  pass, with `check:geotiff` and `check:segmenter` running on the local Zenodo
+  corpus.
+
+#### 2026-09-27, session machine (GT 710)
+
+- **The console presentation overlay** (T, X, Q, Z, K on `#/console`;
+  `PREVIOUS_WORK.md` §2.29) is built and verified in the browser.
+  **Uncommitted**, including `frontDemo/public/present/**`, which Vercel
+  needs.
+- **A trap:** the browser pane throttles `requestAnimationFrame` to about
+  1 fps while it is not being painted, so anime.js beats never finish and a
+  scripted Q snaps instead of advancing. Screenshot between presses, or trust
+  a run only while the pane is on screen.
+
 ### Verification state
 
 - pytest **677 passed, 8 skipped**.
@@ -101,7 +129,15 @@ Re-run everything after any further edit.
 4. **X14:** move the AIS export into `backend/ingest/ais/` (backend).
 5. **AIS for uploads on days not on disk.** For US waters, the pipeline could
    download the marinecadastre day zip (~300 MB a day). Downloads need the
-   user's yes. Outside US waters there is no free source (F14).
+   user's yes. Outside US waters there is no free *historical* source (F14).
+   **Live, not historical (checked 2026-09-26):** aisstream.io is a free
+   WebSocket stream (a GitHub-login API key, bounding-box filter, terrestrial
+   receivers). Its key is for server-side use only, and it has no replay. So it
+   helps only as a recorder run by the local API from now on, not for 2023 or
+   any day before the recorder starts. Global Fishing Watch's API is free for
+   non-commercial use with about 3 days' delay, but it serves gridded presence
+   and events, not every ship's track. Past days elsewhere mean a paid archive:
+   VesselFinder credits (from €330), Datalastic, Spire or MarineTraffic.
 6. **Waiting on a person:**
    - B1 labels;
    - the Q6 QGIS measurement;
