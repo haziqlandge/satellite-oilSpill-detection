@@ -320,7 +320,7 @@ beaching agree; the along-shore reach is about 3.4 times too long.
 This system names specific vessels as suspected polluters. Every ranking is accompanied by
 its full score decomposition and caveats, alternative hypotheses stay visible, dark vessels
 are ranked but never named, and a drift field too diffuse to discriminate returns
-**insufficient evidence** rather than a suspect. Those are hard requirements — see
+**insufficient evidence** rather than a suspect. Those are hard requirements - see
 `PLAN/CONSTRAINTS.md`.
 
 Anything simulated says so. Current detections are research output and must never be
